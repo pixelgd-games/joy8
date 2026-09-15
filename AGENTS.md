@@ -27,7 +27,7 @@ Read the smallest complete set for the task:
 | Current repository structure, setup, build, or deployment | `README.md` |
 | Product boundaries, priorities, or roadmap | `docs/product/PRODUCT_SCOPE.md` |
 | Looty game launch, iframe, Gateway, wallet, or game integration | `docs/platform/GAME_PLATFORM_INTEGRATION.md` |
-| Member authentication, persistent guest identity, or direct Mahjong entry | `docs/platform/MEMBER_AUTH_PLAN.md` |
+| Member authentication, persistent guest identity, game-wallet relationship, or branded game entry | `docs/platform/MEMBER_AUTH_PLAN.md` |
 | CrazyGames builds, SDK, ads, saves, or store submission | `docs/platform/CRAZYGAMES_INTEGRATION.md` |
 | Cross-module Flash context | `docs/platform/FLASH.md` |
 | Confirmed limitations, risks, or launch blockers | `docs/operations/KNOWN_ISSUES.md` |
@@ -67,6 +67,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - Do not restore the front-end member login UI until the member entry point is redesigned.
 - Do not move sibling Flash module responsibilities into Looty.
 - Games must not log players in or modify player balances directly.
+- Looty `game_rounds` stores only platform wallet and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Looty Supabase project physically, but games must not access Looty-owned tables, another game's schema, or a project-wide service-role key.
 - Do not modify a game repository during a Looty repository task. Switch to the named game repository for game-side work.
 - The Looty launch code and Gateway token stay in memory only. Never write them to browser storage, logs, or Analytics.
 - Looty owns the Loader iframe shell, permissions, load timeout, and platform error screens.
@@ -115,6 +116,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
 - Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
+- The current wallet has no explicit product scope. The approved future model uses game-scoped wallets for independently operated games and one shared platform wallet for Looty-native games; wallet scope must be resolved by trusted Looty configuration, never by a game request.
 - Demo wallets use only `POINT`. The database-level currency constraint is deliberately on hold; do not recreate or apply it without a new user decision.
 - Until that decision changes, new Demo `POINT` wallets keep the 10,000-point test credit.
 

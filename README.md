@@ -171,6 +171,10 @@ The platform skeleton tables and `gateway_rate_limits` have row-level security e
 
 Demo wallets currently support only `POINT`. A new Demo `POINT` wallet receives a 10,000-point test credit recorded as a deposit transaction. The additional database-level Demo currency constraint is intentionally on hold; the Gateway still rejects non-`POINT` Demo sessions.
 
+The current active wallet key is player plus currency, with no explicit platform-versus-game scope. Games using `POINT` therefore reuse the same active wallet today. The approved product-aware wallet-scope direction is documented in `docs/product/PRODUCT_SCOPE.md`, but it is not implemented and there is no currency-conversion endpoint.
+
+The `game_rounds` table stores only the platform session relationship and aggregate bet, payout, refund, status, and settlement data needed by the wallet flow. It is not a full gameplay or match-history store. Each game owns its authoritative player mapping, rooms, matches, actions, results, progression, and history in its game-owned schema and backend boundary and correlates them with Looty references through the integration contract. The approved initial cost model may host those permission-separated schemas in the same managed Supabase project; no game schema has been added by this repository yet.
+
 The repository has no baseline migration. The active `supabase/migrations/` directory is an incremental history and is currently the database change source. Do not attempt to rebuild the entire schema in one migration.
 
 ## Local Development
@@ -262,7 +266,7 @@ The Supabase Edge Function is deployed separately from Cloudflare Pages.
 | `README.md` | Current repository implementation and operation |
 | `docs/product/PRODUCT_SCOPE.md` | Product boundaries, approved direction, and priorities |
 | `docs/platform/GAME_PLATFORM_INTEGRATION.md` | Looty-to-game runtime contract |
-| `docs/platform/MEMBER_AUTH_PLAN.md` | Member, guest, and direct Mahjong entry plan |
+| `docs/platform/MEMBER_AUTH_PLAN.md` | Platform-wide member, persistent guest, game-wallet relationship, and branded-entry plan |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |
 | `docs/operations/KNOWN_ISSUES.md` | Active limitations, risks, and launch blockers |

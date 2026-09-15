@@ -1,190 +1,307 @@
 # Looty Member and Authentication Plan
 
-這份文件記錄 Looty 的會員、登入、Guest 與帳號生命週期規劃。
+This document owns the planned platform-wide Looty member entry, persistent guest continuity, account linking, account lifecycle, wallet-scope relationship, and Looty-controlled branded game entry.
 
-遊戲啟動、Gateway、game session 與錢包呼叫契約仍以
-`GAME_PLATFORM_INTEGRATION.md` 為準；目前 repo 的實作狀態以
-`../../README.md` 為準。
+Approved product direction and priorities remain in `../product/PRODUCT_SCOPE.md`. The current repository implementation is described in `../../README.md`. Game launch, launch-code exchange, Gateway authorization, and wallet calls remain governed by `GAME_PLATFORM_INTEGRATION.md`.
 
-最後更新：2026-09-15。
+Last reviewed against the repository: 2026-09-15.
 
-## 目標
+## Approved Outcome
 
-- Mahjong Clash 可以在完整 Looty Lobby 公開以前先獨立營運。
-- 玩家在麻將品牌的 H5、Android 或 iOS 大廳完成登入。
-- 底層統一使用 Looty 的會員身份、`player_accounts`、平台錢包與 session。
-- 未來玩家改從 Looty Lobby 進入時，仍是同一個玩家、同一個錢包，並保留麻將資料。
-- 登入能力可以重用到其他 Looty 遊戲，不做成麻將專屬會員系統。
+Looty needs one reusable identity layer so a player can enter through the public Lobby or any Looty-controlled branded game surface and still resolve to the same Looty player. A branded game may launch before the public Looty Lobby, but it still uses Looty Auth and the stable Looty player ID rather than creating a separate member system.
 
-## 目前狀態
+Membership is always platform-wide. Wallet scope depends on the product model:
 
-- Looty 已有 Supabase Auth 與平台資料表骨架。
-- Admin 的 Google OAuth 已可使用，但它是管理員登入，不等於玩家登入。
-- Gateway 沒有收到有效會員 token 時可以建立 Guest，但目前每次啟動可能建立新的 Guest、玩家與錢包。
-- 公開 Looty Lobby 的玩家登入入口目前維持停用。
-- 持久 Guest、玩家登入 UI、Guest 升級、Provider linking、App deep link 與帳號刪除尚未實作。
+- A full independently operated game resolves a game-scoped wallet. Its balance does not change another independent game's balance.
+- A Looty-native game that depends on the shared platform, such as a title in a shared slot or compact table-game service, uses the common Looty platform wallet. Spending in one of these games intentionally changes the balance available to the others.
 
-## 第一階段範圍
+`Mahjong Clash` is an initial adoption case, not the owner or architectural center of this plan. The same member and branded-entry capability must remain reusable by every Looty game that needs it.
 
-第一階段只做足以讓直接遊戲入口安全營運的最小會員核心：
+A branded standalone entry does not have to redirect customers through the public Looty Lobby when the Lobby launches. Because the branded entry already uses the shared Looty member identity, the same player can later enter through either surface without an account migration. Wallet and game-progress behavior still follows the product's approved scope rather than the entry surface.
 
-- 快速登入，也就是可持續使用的 Guest。
-- 首發核准的正式登入方式。
-- Guest 升級正式帳號。
-- 同一玩家身份與錢包的保存。
-- 登入狀態、登出、必要的帳號復原與帳號刪除入口。
-- H5、Android、iOS 的登入返回與 session 保存。
-- 登入成功後建立 Looty game session 與一次性 launch code。
+This identity agreement applies to Looty-operated surfaces. A CrazyGames build or another external platform channel follows its own platform identity contract and must not initialize Looty Auth, sessions, or wallets.
 
-第一階段不做：
+This approval does not select the first sign-in providers, guest mechanism, native callback design, retention policy, or account-deletion policy. Those decisions remain open below.
 
-- 完整 Looty 會員中心。
-- 社群、好友、邀請或好友房帳號功能。
-- 讓遊戲保存密碼、Provider token 或 Supabase service role key。
-- 讓前端直接修改玩家或錢包資料表。
-- 跨兩個既有正式帳號的完整自動資料合併。
+## Responsibility Boundary
 
-## 可行登入方式
+| Concern | Looty | Branded or native entry surface | Game runtime |
+| --- | --- | --- | --- |
+| Member and guest authentication | Owns the identity service and backend flow | Presents or opens the approved Looty-controlled flow | Does not own |
+| Provider callbacks and session restoration | Defines the trusted flow | Implements platform-specific return wiring after its location is approved | Must not receive credentials |
+| Player and wallet resolution | Owns the platform player and the correct game-scoped or platform wallet | Must not write platform tables | Receives only the resulting game session contract |
+| Account upgrade, conflict handling, and deletion | Owns the backend workflow | Presents approved states and actions | Does not own |
+| Game-specific player mapping and game data | Supplies the stable Looty player reference | Does not redefine Looty identity | Owns its mapping and data in the game system |
+| Game launch and wallet authorization | Owns the Loader and Gateway | Hands off to the approved Looty launch path | Consumes `GAME_PLATFORM_INTEGRATION.md` |
 
-下列方式技術上都可以整合，但不代表第一版全部啟用：
+This document may define the cross-surface contract, but implementation in a native wrapper or game repository must be performed later in the repository that owns that surface. Looty repository work must not modify a game repository.
 
-| 方式 | 用途 | 第一版注意事項 |
+## Current Implementation Baseline
+
+The repository currently provides:
+
+- Supabase Auth through one shared browser client.
+- Google OAuth only through the administrator entry at `/admin/login/`, followed by a separate `is_looty_admin()` authorization check.
+- No public player login, account page, persistent guest flow, account upgrade, provider-linking flow, native callback, or account-deletion flow.
+- A Loader that invokes `looty-gateway/create-session` with the active Supabase browser session when one exists.
+- A Gateway that accepts any valid Supabase Auth user ID as a registered player identity. It does not yet distinguish an approved player member from an administrator-only Auth user.
+- Registered-player reuse through the unique `player_accounts.auth_user_id` relationship and active wallet reuse by player and currency.
+- A new guest player, wallet, and session for every successful unauthenticated `create-session` call. There is no persistent guest key or restore path.
+
+The checked-in Supabase configuration currently disables anonymous sign-in and manual identity linking. Hosted provider settings are external configuration and are not established by this repository file alone.
+
+The current data model has one optional, unique Auth user ID on each `player_accounts` row. It does not contain a persistent guest identifier or a separate player-to-identity mapping table. It can support a registered player and wallet, but it does not implement safe guest promotion or multi-provider conflict handling by itself.
+
+The current wallet key is player plus currency, so all games using `POINT` currently reuse the same active wallet. This resembles the approved shared wallet for Looty-native games, but the current schema cannot distinguish a platform wallet from an independent game's game-scoped wallet. Product-aware wallet resolution has not been implemented.
+
+All player, wallet, session, and transaction tables are protected from browser and game writes. Creation and resolution must continue through reviewed backend or database RPC flows.
+
+## Planned Wallet Scope Model
+
+- Looty player identity is shared across the platform.
+- A full independently operated game has a separate game-scoped wallet and balance for that Looty player.
+- Looty-native games that depend on the shared platform use one common Looty platform wallet.
+- Opening one independent game does not spend, refill, or otherwise change another independent game's wallet or the Looty platform wallet.
+- Spending in one Looty-native game intentionally changes the platform-wallet balance available to every other Looty-native game.
+- Game currencies use a common nominal unit with a `1:1` reference ratio to a possible future Looty platform currency.
+- The `1:1` ratio is an accounting convention only. It does not create a current right to exchange, redeem, transfer, or withdraw value.
+- Sharing the same platform wallet does not require a conversion: Looty-native games consume the same balance directly.
+- No conversion between an independent game wallet and the Looty platform wallet, or between independent game wallets, is currently approved or implemented.
+- Conversion may be considered later only as a separate reviewed product, accounting, security, and operational decision after the business requires it.
+- A platform-wallet welcome or test credit is granted once per player, not once per Looty-native game. Initial-credit rules for independent game wallets remain product-specific.
+- Every wallet transaction must retain its originating `game_id`, including transactions against the shared platform wallet.
+
+The product decision belongs in `../product/PRODUCT_SCOPE.md`. The implemented wallet behavior remains documented in `GAME_PLATFORM_INTEGRATION.md` until the schema, Gateway, and contract are deliberately changed together.
+
+## Game Data and Database Boundary
+
+The initial cost-conscious architecture uses one managed Supabase project for Looty Auth, platform data, and game data. This is shared infrastructure, not shared ownership of every table.
+
+Looty owns and stores:
+
+- Looty authentication and the stable platform player reference.
+- Platform-wallet and game-scoped wallet accounts and transactions for Looty-launched sessions.
+- Game-session authorization and launch credentials.
+- The minimum round-level financial summary required to validate bets, payouts, refunds, and settlement.
+
+Each game or intentionally shared game family owns and stores in its dedicated schema and backend boundary:
+
+- Its game-side player profile and mapping to the Looty player reference.
+- Persistent rooms, tables, matches, hands, turns, actions, authoritative state snapshots, and reconnect data.
+- Game results, history, statistics, rankings, progression, settings, and other game-specific records.
+- Its game-specific retention, recovery, and integrity rules within the shared infrastructure policy.
+
+Looty platform tables and each game-owned schema must use explicit grants and backend access boundaries. A game must not receive a project-wide Supabase service-role key or unrestricted access to another game or Looty platform data. Closely bound Looty-native games may share one family schema and backend when that is an intentional product design, but records and wallet transactions must still identify the originating game.
+
+Schema separation is not the same as physical database isolation: compute, outage scope, backups, and some project-level controls remain shared. The design must therefore keep migrations and dependencies separable so a successful or high-risk game can later move to its own Supabase project or another approved managed database without changing Looty identity or wallet contracts.
+
+This plan does not approve GCP or assign game-server responsibilities to a hosting vendor. Authoritative rules, real-time synchronization, gambling adjudication, and full economic settlement remain with the applicable Flash modules described in `FLASH.md`; their eventual hosting is a separate infrastructure decision.
+
+The existing Looty `game_rounds` table is a wallet and settlement record. It stores the session, game, game-generated round ID, status, and aggregate bet, payout, and refund amounts. It is not an authoritative Mahjong hand record or a substitute for any game's match database.
+
+The platform and game-owned schemas correlate records through the stable Looty player reference, Looty game-session ID, game ID, and game-generated round ID as appropriate. These references are correlation data, not permission for game code to write Looty tables. Wallet mutations remain behind Looty's authorized backend flow even when both data sets are hosted in the same Supabase project.
+
+No additional generic gameplay-record table should be added to Looty merely to avoid creating a game-owned database. If the platform later needs a new cross-game result summary for analytics or operations, define the smallest common record in a separate reviewed contract without copying full gameplay data into Looty.
+
+## Phase-One Scope
+
+Phase one should contain only the minimum reusable member core needed for a safe direct game entry:
+
+- A persistent guest experience for the same valid browser profile or app installation.
+- The approved first registered sign-in method or methods.
+- Guest promotion without changing the Looty player or any existing platform or game-scoped wallet.
+- Deterministic reuse of the same player and the correct wallet scope for the selected game after sign-in.
+- Sign-in status, sign-out, required recovery paths, and a user-accessible account-deletion request.
+- Approved H5, Android, and iOS return flows and session restoration.
+- A handoff from resolved platform identity to the existing Looty game-session contract.
+
+Phase one does not include:
+
+- A complete Looty member center.
+- Social, friend, invitation, or private-room account features.
+- Game-side password, provider-token, member-session, or wallet handling.
+- Browser or game writes to player and wallet tables.
+- Automatic merging of two existing registered player accounts.
+- A game-owned replacement for Looty identity.
+- Full gameplay, match, hand, action, progression, or ranking storage in Looty-owned platform tables.
+
+## Candidate Sign-In Methods
+
+The following candidates are not approved merely because they appear in this table:
+
+| Method | Intended use | Decision or implementation concern |
 | --- | --- | --- |
-| 快速登入 | 不註冊先玩 | 必須是持久 Guest，不能每次啟動都換玩家與錢包。 |
-| Google | 常用正式登入 | H5 與 App 要分別設定核准的返回網址。 |
-| LINE | 台灣玩家常用登入 | 透過 LINE OAuth / OIDC 串入 Looty 身份層。 |
-| Apple | iOS 正式登入 | iOS 若提供其他第三方登入，需一併納入 App Store 規則評估。 |
-| Email + 密碼 | 一般帳號 | 需要信箱驗證、忘記密碼與密碼安全流程。 |
-| Email OTP | 免密碼信箱登入 | 可作為 Email + 密碼的替代方案，首發是否使用尚未決定。 |
+| Persistent guest | Play before registration | Must restore the same player and its existing platform- and game-wallet relationships on the same retained installation or browser profile. |
+| Google | Common registered sign-in | Existing admin OAuth proves only the admin flow; player entry, redirect URLs, and session isolation still require design. |
+| LINE | Common sign-in for Taiwan users | No integration is configured in this repository; the identity bridge and callback model must be validated. |
+| Apple | Registered sign-in on Apple surfaces | Configuration and current store requirements must be reviewed when implementation begins. |
+| Email and password | General registered account | Requires verification, recovery, abuse controls, and an approved password policy. |
+| Email OTP | Passwordless email sign-in | Delivery, expiry, retry, recovery, and whether it replaces or complements passwords remain undecided. |
 
-## 身份資料原則
+## Identity Invariants
 
-- Supabase Auth 管理登入憑證與 Provider identity。
-- `player_accounts` 是 Looty 的正式玩家主鍵來源。
-- Guest 與正式帳號都必須對應 `player_accounts`。
-- `wallet_accounts` 必須綁定 Looty 玩家，不綁定遊戲內暱稱或裝置名稱。
-- 麻將戰績與遊戲資料使用同一個 Looty player id 建立對應，不另建會員主檔。
-- 顯示名稱、Email 或相似暱稱都不能當成自動合併帳號的依據。
+- `player_accounts.id` is the stable Looty player reference.
+- Supabase Auth manages credentials and provider identities; it is not a replacement for the Looty player record.
+- A guest and a registered player must each resolve to exactly one Looty player.
+- Provider identities must resolve to one player through an approved linking model.
+- Each future game-scoped wallet remains attached to both the Looty player and its game, not to a nickname, device name, or provider display name.
+- The Looty platform wallet remains attached to the Looty player and is shared only by products explicitly classified as Looty-native.
+- A game must not select or change its own wallet scope. Looty resolves the approved scope from trusted catalog or backend configuration.
+- A game may map its own records to the stable Looty player reference, but Looty does not own the game's record schema or gameplay data.
+- Email address, display name, or a similar nickname must never trigger an automatic account merge.
+- Repeated callbacks, retries, or concurrent requests must not duplicate a player, the wallet for the approved scope, or its initial Demo credit.
+- Player initialization, guest promotion, and identity linking must be atomic backend operations, not front-end table updates.
 
-```text
-Supabase Auth identity
-  -> Looty player_account
-    -> Looty wallet_account
-    -> Mahjong player mapping and game data
-```
+## Persistent Guest Rules
 
-## Guest 規則
+- A player who chooses guest access should recover the same guest player and existing platform and game wallets while the approved local session or installation identity remains valid.
+- Clearing browser data, uninstalling the app, or changing devices does not guarantee guest recovery.
+- Reliable cross-device recovery requires promotion to an approved registered account.
+- The interface should explain this limitation before local guest state is lost and provide an account-upgrade path.
+- Signing out of a registered account must not silently create a new guest. The player must explicitly choose the next entry method.
+- The guest credential mechanism, storage location, rotation, expiry, inactivity policy, and cleanup policy remain undecided.
 
-- 玩家選擇快速登入時，Looty 建立或恢復同一個 Guest 身份。
-- 同一個有效安裝或瀏覽器 session 再次開啟遊戲時，應恢復原玩家與錢包。
-- Guest 未升級前，不保證清除瀏覽器資料、移除 App 或更換裝置後仍可找回。
-- 介面必須提醒 Guest 升級正式帳號，才能可靠跨裝置復原。
-- Guest 保存期限與實際使用 Supabase anonymous sign-in 或過渡 token，施工前再決定。
+The operational impact of current guest growth is tracked in `../operations/KNOWN_ISSUES.md`; the identity and retention decisions remain owned here.
 
-## Guest 升級與身份連結
+## Guest Promotion and Identity Linking
 
-Guest 升級的核心規則是「換登入方式，不換玩家」。
+The core rule is: change the sign-in method, not the player.
 
-- 保留同一筆 `player_accounts.id`。
-- 保留原平台錢包與交易流水。
-- 保留麻將戰績、對局資料與其他遊戲資料。
-- 將核准的 Google、LINE、Apple 或 Email identity 連到原玩家。
-- 升級流程必須由 Looty Auth / backend 處理，遊戲只能接收結果。
+A successful guest promotion must preserve:
 
-若 Provider identity 已屬於另一個玩家：
+- The same `player_accounts.id`.
+- All existing platform and game-scoped wallets and their transaction histories.
+- Existing game mappings and game-owned data associated with that player reference.
+- The right to reuse the same player from future Looty Lobby entry.
 
-- 不可只憑 Email、名稱或前端參數自動合併。
-- 停止升級，要求玩家先驗證既有帳號。
-- 第一版只做必要的衝突提示與安全返回；完整帳號合併另行規劃。
+If the selected provider identity already resolves to another player:
 
-## 帳號生命週期
+- Stop the promotion and require verification of the existing account.
+- Do not merge by email address, display name, client parameter, or provider profile similarity.
+- Return a clear, recoverable conflict state.
+- Keep full registered-account merging outside phase one until a separate reviewed policy exists.
 
-### 登出
+The current Gateway creates or reuses a registered player from an Auth user ID, but it does not upgrade an existing guest row. The promotion operation and any supporting schema changes must be designed and reviewed before implementation.
 
-- 登出只清除目前裝置的登入 session，不刪除玩家、錢包或遊戲資料。
-- 登出後不得自動把正式帳號變成新的 Guest；玩家要再次選擇登入方式。
+## Entry Surfaces and Launch Handoff
 
-### 帳號復原
-
-- Email + 密碼需要忘記密碼與重設流程。
-- Google、LINE、Apple 使用各 Provider 的復原流程。
-- Guest 沒有正式身份時，只能依仍有效的本機登入狀態恢復。
-
-### 帳號刪除
-
-- Android、iOS 與 H5 都要能找到刪除帳號入口；iOS 上架前要確認符合當期 App Store 規則。
-- 刪除必須由 Looty backend 執行，不讓遊戲直接刪除 Auth、玩家或錢包資料。
-- Auth identity、個人資料、錢包紀錄、麻將資料與依法或查帳需要保留的紀錄要分開定義。
-- 真正的刪除範圍、等待期、復原期與保留期限，正式施工前確認。
-
-## H5、Android 與 iOS
-
-三種入口共用同一套 Looty 身份與後端流程，只調整返回方式：
-
-- H5：使用核准的 HTTPS return URL。
-- Android：使用核准的 App link 或 deep link，並驗證返回來源與 state。
-- iOS：使用核准的 Universal Link 或 callback，並驗證返回來源與 state。
-- App 重新啟動後，應能恢復仍有效的 Looty 登入 session。
-- Provider token、密碼、launch code 與 gateway token 不寫入網址紀錄、Analytics 或一般 log。
-- 一次性 launch code 與短效 gateway token 仍依 `GAME_PLATFORM_INTEGRATION.md` 管理。
-
-## 麻將品牌登入畫面
-
-玩家可以在麻將品牌大廳看到：
-
-- 快速登入按鈕。
-- 首發核准的正式登入按鈕。
-- 登入中、登入失敗與返回遊戲的狀態。
-- 玩家顯示名稱與基本登入狀態。
-- 升級帳號、登出與刪除帳號入口。
-
-這個畫面是 Looty 可重用的會員入口元件套上麻將品牌，不是麻將自己擁有會員資料。麻將 gameplay runtime 與 Game Server 不處理第三方登入憑證。
-
-## 登入後進入遊戲
+The target flow is:
 
 ```text
-Mahjong-branded lobby
-  -> Looty login or persistent Guest restore
-  -> resolve the same player_account and wallet_account
-  -> Looty create-session
-  -> one-time launch code
-  -> Mahjong client exchanges for a short-lived gateway token
-  -> Mahjong authoritative server and game data
+Looty Lobby or Looty-controlled branded game entry
+  -> Looty-controlled sign-in or persistent guest restoration
+  -> Looty backend resolves the stable player and approved wallet scope
+  -> Looty Loader and create-session flow
+  -> existing game launch and Gateway contract
 ```
 
-未來從 Looty Lobby 啟動時，從 `create-session` 開始重用同一條流程，不搬移會員、錢包或麻將資料。
+The member layer ends when it hands a resolved Looty identity to the existing session-creation path. It must not duplicate launch parameters, token lifetimes, wallet endpoints, or game-client rules from `GAME_PLATFORM_INTEGRATION.md`.
 
-## 建議施工順序
+Current constraints that must be resolved before direct entry ships:
 
-1. 決定第一版登入方式。
-2. 決定 Guest 保存期限與升級／衝突規則。
-3. 決定登出、帳號復原、刪除與資料保留規則。
-4. 定義 H5、Android、iOS 的 return URL / deep link。
-5. 設計可重用的 Looty 登入元件與平台 API。
-6. 用小步 migration 補齊 Auth、`player_accounts` 與錢包的關係；遠端執行前先讓使用者確認。
-7. 調整 Gateway，讓同一玩家可恢復同一錢包並建立 game session。
-8. 實作登入、Guest 恢復、升級、登出與刪除流程。
-9. 驗證 H5、Android 與 iOS 的返回及 session 保存。
-10. 完成身份與錢包測試後，再切到 Mahjong Clash 專案做遊戲端串接。
+- H5 entry must use an approved HTTPS origin and callback path.
+- The current `create-session` route requires an allowed browser Origin and does not support an originless native client call.
+- Android app links, iOS Universal Links or callbacks, bundle identifiers, redirect allowlists, and native session storage do not exist in this repository.
+- The location and repository ownership of each branded H5 and native entry surface must be approved before implementation.
+- Administrator and future player entry currently share the default Supabase browser-session storage. The member design must prevent an administrator-only session from silently becoming player membership unless that behavior is explicitly approved.
 
-## 驗收條件
+Platform-specific native wiring belongs in the approved owning repository after Looty defines the trusted backend and callback contract. The gameplay runtime must not perform provider authentication.
 
-- Guest 關閉再開後仍是同一玩家與錢包。
-- Guest 升級正式帳號後，玩家 id、錢包與麻將資料不變。
-- 同一正式帳號可在 H5、Android 與 iOS 解析到同一玩家。
-- 重複登入、回呼重送或網路重試不會重複建立玩家、錢包或發放初始點數。
-- 帳號衝突不會被靜默合併。
-- 遊戲端拿不到密碼、Provider token、service role key 或可直接改錢包的權限。
-- 登入成功後可以建立 Looty session，並使用一次性 launch code 進入遊戲。
-- 未公開完整 Looty Lobby 時，麻將直接入口仍可獨立運作。
+## Branded Standalone Entry Boundary
 
-## 尚未定案
+- A game may launch through its own branded H5 or native entry before the public Looty Lobby is released.
+- Every approved branded entry uses the shared Looty Auth identity and stable Looty player ID; it does not create a separate member master.
+- Listing the same game in the future Looty Lobby does not require replacing or redirecting its existing branded entry.
+- Entering through the branded surface or the Looty Lobby resolves the same member. The product's approved wallet scope and game-owned progress determine what is shared, not the visual entry point.
+- The gameplay runtime still does not receive provider credentials or own authentication logic.
 
-- 第一版實際啟用快速登入、Google、LINE、Apple、Email 中的哪些組合。
-- Guest 採用 Supabase anonymous sign-in 或過渡 token。
-- Guest 的保存期限與清理規則。
-- Email 使用密碼、OTP 或兩者並存。
-- Provider identity 衝突時的玩家操作流程。
-- Android / iOS 的正式 bundle id、return URL、deep link 與安全儲存方案。
-- 帳號刪除的等待期、資料保留與麻將資料匿名化規則。
-- Demo POINT 與未來正式 POINT 的帳號資格和保存規則。
+## Account Lifecycle
+
+### Sign-Out
+
+- Sign-out ends the current device's Looty Auth session.
+- It does not delete the player, wallet, transaction, session, or game data.
+- The user should return to an explicit entry choice rather than be assigned a new guest automatically.
+
+### Recovery
+
+- Email-and-password accounts require an approved password-reset and email-verification flow.
+- Provider accounts use their provider's recovery path, followed by Looty session restoration.
+- A guest without a registered identity can recover only while its approved local credential remains valid.
+
+### Closure and Deletion
+
+- Looty must provide the backend workflow; a game must not delete Auth, player, wallet, or platform records directly.
+- The design must separately classify Auth credentials, player profile data, wallet and transaction records, game-owned data, and records that require retention or anonymization.
+- Waiting period, recovery period, hard deletion, account closure, anonymization, audit retention, and game-data coordination remain undecided.
+- Store and legal requirements must be checked against the target release and jurisdiction when this work begins.
+
+The current schema must not be treated as a ready-made deletion workflow. A registered player requires a non-null Auth user ID, while wallet, transaction, session, and game relationships have their own retention constraints. Account deletion therefore needs an explicit ordered backend design rather than a direct Auth-user deletion.
+
+## Security and Privacy Requirements
+
+- Passwords, provider credentials, Looty member access or refresh tokens, and account-recovery secrets must never be passed to a game.
+- Looty may persist only the platform session material required for approved session restoration, in platform-controlled storage. The H5 and native storage designs remain subject to review.
+- Launch codes and Gateway tokens remain memory-only under `GAME_PLATFORM_INTEGRATION.md`.
+- OAuth and native callbacks must validate approved redirects and anti-forgery state; replay and concurrent callback handling must be idempotent.
+- URLs, browser history, Analytics, general logs, game save data, and support screenshots must not expose credentials or recovery secrets.
+- Front-end possession of a member session must not grant direct access to protected player, wallet, session, round, or transaction tables.
+
+## Delivery Order
+
+1. Approve the first sign-in methods, persistent guest mechanism, member-versus-admin session boundary, entry-surface location, and lifecycle policies.
+2. Define the identity state transitions, trust boundaries, provider callbacks, native return contract, and failure states.
+3. Design the smallest required Auth, player, identity-linking, and wallet-scope changes.
+4. Prepare small reviewable database migrations and obtain user confirmation before any remote database operation.
+5. Implement idempotent backend flows for guest restoration, registered-player resolution, promotion, conflicts, sign-out, recovery, and deletion requests.
+6. Implement the reusable Looty-controlled H5 member entry and connect it to the existing Loader session flow.
+7. Implement approved Android and iOS return and storage integrations in their owning repositories.
+8. Verify identity, wallet, retry, conflict, security, and lifecycle behavior across the approved surfaces.
+9. Only after the Looty contract passes those checks, switch to each named game repository for its game-side integration.
+
+This order describes technical dependencies. It does not require every game to ship H5, Android, and iOS, and it does not approve a universal store-release order.
+
+## Acceptance Criteria
+
+- A guest reopening the same retained browser profile or app installation resolves to the same player and existing platform and game wallets.
+- Guest promotion preserves the player ID, all wallet scopes, transaction histories, and game mappings.
+- The same registered account resolves to the same Looty player across every approved H5, Android, and iOS entry.
+- The same title resolves the same game profile and progress whether entered through its Looty-controlled branded surface or the public Looty Lobby.
+- An independent game resolves only its game-scoped wallet; a Looty-native game resolves the shared platform wallet.
+- A platform-wallet initial credit is granted once per player rather than once per Looty-native game.
+- Duplicate sign-in, callback replay, network retry, and concurrent requests do not create duplicate players, duplicate wallet scopes, or repeated initial credits.
+- A provider conflict is never merged silently.
+- Administrator-only Auth state cannot silently define player membership unless that behavior has been explicitly approved.
+- The game receives no password, provider credential, Looty member token, service-role key, or direct table permission.
+- Account closure and deletion follow the approved retention and game-data coordination policy.
+- A resolved identity can enter the existing Looty game-session flow without changing the game runtime contract.
+- A Looty-controlled branded game entry can operate without requiring the player to begin at the public Lobby.
+- A branded standalone entry and the future Looty Lobby resolve the same Looty member without requiring an entry-point replacement.
+- No current UI or API implies that the nominal `1:1` currency ratio provides conversion, transfer, redemption, or withdrawal.
+- Looty financial round records can be correlated with the authoritative game record without storing the game's full gameplay history.
+
+## Open Decisions
+
+- Which combination of persistent guest, Google, LINE, Apple, email and password, and Email OTP ships first.
+- Whether persistent guests use Supabase anonymous sign-in, a Looty-issued transition credential, or another reviewed mechanism.
+- Guest credential storage, rotation, expiry, inactivity, retention, and cleanup rules.
+- Whether email uses passwords, OTP, or both.
+- Which transactional email provider, if any, is used; neither Resend nor Amazon SES is approved by this plan.
+- Whether multiple providers link inside one Supabase Auth user or through a separate Looty identity mapping.
+- How the Gateway distinguishes approved player membership from administrator-only or other Auth users.
+- Whether administrator and player sessions use separate clients, storage namespaces, paths, subdomains, or another isolation design.
+- The exact provider-conflict experience and any future manual account-merge process.
+- Where each Looty-controlled branded H5 and native entry surface lives and which repository owns it.
+- The trusted native-to-Looty session and `create-session` handoff model.
+- Android and iOS bundle identifiers, redirect URLs, app links, Universal Links or callbacks, and secure storage.
+- Which platforms each game ships on and its H5, Android, and iOS release order.
+- Account-deletion waiting and recovery periods, audit retention, hard-deletion boundaries, and coordination with each game's data.
+- The schema and migration path from the current undifferentiated Demo `POINT` wallet to explicit platform and game wallet scopes.
+- Initial-credit rules and amounts for the platform wallet and each independent game wallet.
+- The name and detailed accounting meaning of any future Looty platform currency.
+- The trusted product classification and catalog fields that select platform-wallet or game-wallet scope.
+- The minimum player, session, and round correlation contract each game-owned schema must implement.
+- Exact custom-schema, scoped-role, migration, backup, and future extraction conventions for the shared Supabase project.
+- Final branded entry copy, visual treatment, and localization.
+
+Conversion between independent game wallets and the platform wallet, cross-wallet transfer, redemption, and withdrawal are deliberately deferred rather than unresolved phase-one requirements. They must not be implemented until the user opens a separate product decision. Looty-native games sharing one platform wallet are not performing conversions or transfers between games.

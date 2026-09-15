@@ -53,6 +53,8 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | CSP and `X-Frame-Options` | Reports failures | Owns |
 | Rendering and resources | Does not own | Owns |
 | Gameplay rules | Does not own | Owns |
+| Financial round summary for wallet settlement | Owns | Supplies stable round references through authorized calls |
+| Authoritative rooms, matches, hands, actions, results, and history | Does not own | Owns in its game database |
 | Game-specific save data | Provides a platform adapter when applicable | Owns the payload |
 
 Do not modify a game repository from a Looty repository task. Switch to the named game repository for game-side changes.
@@ -265,12 +267,16 @@ The same `round_id` may exist safely in different game sessions because rounds a
 - The current wallet is Demo only.
 - The only accepted Demo currency is `POINT`.
 - A new Demo `POINT` wallet currently receives 10,000 points.
+- The current database reuses one active wallet per player and currency, so the current `POINT` balance is not game-scoped.
 - The credit is recorded as a deposit transaction.
 - The database-level Demo currency constraint is intentionally on hold. Do not recreate or apply it without a new user decision.
 - Gateway checks remain authoritative while that database constraint is on hold.
 - Demo points do not represent real money.
+- No platform-to-game, game-to-platform, or game-to-game conversion endpoint exists.
 
 Production-money behavior requires a separate reviewed design.
+
+The approved future multi-game direction has two wallet scopes: a full independently operated game resolves a game-scoped wallet, while Looty-native games that depend on the shared platform resolve one common platform wallet. The current schema cannot make that trusted product-aware choice. Do not make a game depend on the future behavior until the schema, catalog configuration, Gateway, tests, and this contract are updated together. Games must never select their own wallet scope.
 
 ## Security and Failure Behavior
 
@@ -308,9 +314,11 @@ On failure:
 
 ## Member and Direct Entry Boundary
 
-The platform may launch a session as a member when the browser already has a valid Looty authentication session. Authentication, provider login, persistent guest identity, account linking, and the Mahjong-branded direct entry are not game responsibilities.
+The platform may launch a session as a member when the browser already has a valid Looty authentication session. Authentication, provider login, persistent guest identity, account linking, and Looty-controlled branded game entry are not game responsibilities.
 
 Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Looty session contract without copying identity-provider logic into the game.
+
+This member contract applies only when the Looty Client is active. CrazyGames and other external platform clients must use their own identity services and must not initialize Looty Auth, sessions, or wallets.
 
 ## Database Boundary
 
@@ -322,6 +330,10 @@ The Gateway currently operates through protected RPCs over:
 - `game_sessions`
 - `game_rounds`
 - `gateway_rate_limits`
+
+`game_rounds` is a platform wallet and settlement summary. It does not store authoritative gameplay state, card or tile history, player actions, reconnect state, progression, or rankings. Each game must keep those records in its game-owned schema and backend boundary.
+
+The game may correlate its authoritative record with Looty by using the supplied player reference and game-session ID together with its own stable `round_id`. These values do not authorize direct table access in either direction. Even when the initial deployment shares one Supabase project, game code must not access Looty-owned tables, another game's schema, or a project-wide service-role key. Wallet mutations remain behind the Looty Gateway.
 
 The browser and game do not receive direct table access. Legacy `players`, `player_balances`, and `ensure_my_player_v1()` must not be restored.
 
@@ -337,7 +349,7 @@ Before publishing a game on Looty:
 4. Verify the game runs with the documented iframe sandbox and permissions.
 5. Implement an explicit Looty Client; do not detect Looty from iframe presence.
 6. Exchange `looty_launch_code` once and keep the Gateway token in memory.
-7. Use a stable `round_id` and idempotency key strategy.
+7. Use a stable `round_id` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
 9. Verify launch, balance, bet, payout, refund, close-round, retry, and insufficient-balance behavior as applicable.
 10. Confirm no launch code, Gateway token, member JWT, or provider credential reaches storage, logs, analytics, or save data.

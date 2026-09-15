@@ -53,13 +53,15 @@ Current behavior:
 
 - The public member login entry is disabled.
 - Most Loader launches therefore create guest platform records.
-- Direct Mahjong entry and persistent guest behavior are still a plan, not an implemented feature.
+- Looty-controlled branded game entry and persistent guest behavior are still a plan, not implemented features.
+- The current Demo `POINT` wallet is keyed by player and currency without an explicit product scope. Multiple games therefore share one balance today whether or not the product should use an independent game wallet.
 
 Risk:
 
 - Player continuity is weak and guest data grows with launches.
+- Current wallet behavior cannot yet distinguish an independent game's wallet from the shared wallet approved for Looty-native games.
 
-The design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. Do not invent an identity merge or guest-retention policy in this document.
+The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
 
 ## Scale and Operations
 
@@ -110,23 +112,6 @@ Direction:
 If production evidence shows abuse, evaluate edge protection, CAPTCHA, device attestation, or a stronger issuance design. Do not add these preemptively without an observed need and a privacy review.
 
 ## Test Gaps
-
-### Dependency Audit Finding
-
-On 2026-09-15, `npm audit --audit-level=low` reported one high-severity advisory:
-
-```text
-vite 7.3.6 -> postcss 8.5.25 -> nanoid 3.3.16
-GHSA-2v37-7h3g-55p8
-```
-
-The production build, local smoke check, and Gateway unit check still pass. Treat this as dependency-maintenance work, not evidence that the runtime flow is currently broken.
-
-When dependency maintenance is in scope:
-
-- Apply the smallest compatible lockfile or dependency update.
-- Review the resulting dependency tree instead of running a blind major upgrade.
-- Rerun `npm audit`, `npm run build`, `npm run smoke`, and `npm run test:gateway`.
 
 ### Automation Coverage
 

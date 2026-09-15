@@ -11,7 +11,7 @@ Looty is a lightweight H5 game platform that gives players one place to discover
 The product is intentionally small enough for one person to operate:
 
 - Static front end on Cloudflare Pages.
-- Supabase for catalog, administration, platform data, and the Gateway.
+- One managed Supabase project initially for shared Auth, catalog, administration, platform data, the Gateway, and permission-separated game schemas.
 - Independent game deployments embedded through a stable platform contract.
 - Minimal platform-specific adapters inside games that target more than one distribution platform.
 
@@ -20,7 +20,7 @@ The product is intentionally small enough for one person to operate:
 Looty succeeds when:
 
 - A player can discover a published game and launch it reliably from the Lobby.
-- A direct game entry can eventually use the same Looty identity, session, and wallet without requiring the public Lobby.
+- A direct game entry can eventually use the same Looty identity and the correct platform or game-scoped wallet without requiring the public Lobby.
 - A game integrates once with the documented Looty contract instead of implementing platform ownership itself.
 - Administrators can manage catalog metadata without exposing protected platform data.
 - The platform can diagnose launch and wallet failures without storing secrets or sensitive player data.
@@ -41,7 +41,7 @@ Implemented today:
 Not implemented today:
 
 - Public member login or account management UI.
-- Persistent guest identity across devices.
+- Persistent guest reuse within a retained browser profile or app installation.
 - Production money movement.
 - Full analytics, dashboards, alerts, or health monitoring.
 - A general game SDK package.
@@ -59,6 +59,7 @@ Looty owns:
 - Game-session creation.
 - Launch-code and Gateway-token issuance.
 - Wallet authority and transaction records.
+- The minimum financial round summary required for wallet settlement.
 - The Loader iframe shell, permissions, timeout, and platform error states.
 - Lobby cover images and platform presentation.
 - Platform analytics and monitoring.
@@ -72,6 +73,7 @@ Each game owns:
 - CSP, `X-Frame-Options`, and iframe compatibility.
 - Its calls to the active platform client.
 - Game-specific settings or save payloads.
+- Its game-owned schema and backend boundary, player mapping, authoritative match state, actions, results, history, progression, and rankings.
 
 A game must not:
 
@@ -79,6 +81,7 @@ A game must not:
 - receive provider credentials.
 - write player or wallet tables.
 - change a Looty balance directly.
+- write gameplay data into Looty-owned platform tables or another game's schema.
 - infer a platform from iframe presence alone.
 
 ### Sibling Flash Modules
@@ -103,20 +106,43 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 
 ### Member and Direct Game Entry
 
-Looty needs a minimal platform identity layer so a player can enter through the Lobby or through a branded game entry and still reach the same platform session and wallet.
+Looty needs a minimal platform identity layer so a player can enter through the Lobby or a Looty-controlled branded game entry and still reach the same platform player and the approved wallet scope.
 
-`Mahjong Clash` is the first approved direction for a direct member entry. This is a platform entry surface, not in-game authentication. The game runtime must never receive Google, Apple, Facebook, or other provider credentials.
+This direction applies to every Looty game. `Mahjong Clash` is an initial adoption case, not a product-specific identity architecture. A game may launch through its own branded entry before the public Looty Lobby, but the entry still uses the shared Looty Auth identity and player ID. A branded entry is a platform surface, not in-game authentication. The game runtime must never receive Google, Apple, Facebook, or other provider credentials.
+
+A branded standalone entry may remain available after the same title is listed on Looty and does not need to redirect customers through the Lobby. Both surfaces resolve the same Looty member, while wallet and game-progress behavior follows the product's approved scope.
+
+This shared identity applies to Looty-operated surfaces, including the Lobby and Looty-controlled branded entries. A separate CrazyGames build or another external platform channel uses its own approved platform client and must not call Looty identity, session, or wallet services.
 
 The detailed design, unresolved login choices, persistent guest behavior, account linking, and delivery phases are owned by `../platform/MEMBER_AUTH_PLAN.md`. That plan remains separate and must be reviewed before implementation.
 
 ## Wallet Direction
 
-- The platform is the only wallet authority.
+Entry style and wallet scope are separate decisions. A game can have its own branded entry while still sharing Looty membership.
+
+| Product model | Member identity | Wallet | Persistent game data |
+| --- | --- | --- | --- |
+| Full game with an independent economy | Shared Looty member on Looty-operated surfaces | One game-scoped wallet per player and game | Dedicated game-owned schema and backend boundary |
+| Looty-native shared-economy game, such as a platform slot or compact table game | Shared Looty member | Common Looty platform wallet | Dedicated game or approved family schema and backend boundary |
+
+- Looty is the only wallet authority for Looty-launched sessions.
 - The current wallet mode is Demo and supports only `POINT`.
 - New Demo `POINT` wallets currently receive a 10,000-point test credit.
+- The current implementation reuses one active wallet per player and currency across games.
 - Demo transactions do not represent real money.
 - The database-level Demo currency constraint is deliberately on hold and must not be implemented without a new user decision.
+- Full independently operated games use a separate game-scoped wallet per player and game.
+- Looty-native games that depend on a shared platform service use one common Looty platform wallet per player.
+- Activity in one independent game does not change another independent game's wallet or the platform wallet.
+- Activity in one Looty-native game intentionally changes the platform balance available to other Looty-native games.
+- Game currencies use a common nominal unit with a `1:1` reference ratio to a possible future Looty platform currency.
+- The `1:1` ratio does not provide a current exchange, transfer, redemption, or withdrawal right.
+- Looty-native games sharing the platform wallet do not convert currency; they spend the same balance directly.
+- Currency conversion between an independent game wallet and Looty, or between independent game wallets, is deliberately deferred and must not be implemented without a separate user decision.
+- A platform-wallet initial credit is granted once per player, not once per Looty-native game. Every platform-wallet transaction retains its originating game ID.
 - Production wallet requirements must be designed as a separate phase with security, audit, settlement, and recovery requirements.
+
+The initial architecture may host Looty and game data in one managed Supabase project to control cost, but ownership and access remain separated by custom schema, explicit permissions, and backend boundaries. A game or intentionally shared game family owns its detailed rooms, matches, hands, actions, results, progression, and history in its own schema. Looty's `game_rounds` remains only a platform financial summary. The systems correlate through stable platform references and documented session and round identifiers, and the design must preserve a path to move a game into an independent database later.
 
 ## Catalog Direction
 
@@ -143,6 +169,8 @@ Unless the user changes the product direction, Looty does not own:
 - CrazyGames services for gambling products.
 - Game-controlled login or balance mutation.
 - A front-end path to service-role database RPCs.
+- A separate member master for a branded game entry.
+- Conversion between independent game wallets and the Looty platform wallet in the current phase.
 - Pre-launch legacy data compatibility.
 - Responsibilities that belong to unrelated Flash products.
 
