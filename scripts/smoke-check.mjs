@@ -42,6 +42,7 @@ try {
       && !normalizedText.includes("game list failed to load")
   }, "Home loads")
 
+  await expectLaunchUrlPolicy(client)
   await expectGameIframeSecurity(client)
   await expectLobbyThumbnailFallback(client)
 
@@ -359,6 +360,34 @@ async function expectGameIframeSecurity(client) {
   }
 
   console.log("OK Game iframe security attributes")
+}
+
+async function expectLaunchUrlPolicy(client) {
+  const evaluation = await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    returnByValue: true,
+    expression: `
+      import("/src/lib/urls.js").then(({ appendQueryParams, normalizeLaunchUrl }) => ({
+        secure: normalizeLaunchUrl("https://game.example/play") === "https://game.example/play",
+        rootRelative: normalizeLaunchUrl("/game/local/?mode=test") === "/game/local/?mode=test",
+        localHttp: normalizeLaunchUrl("http://localhost:8080/play") === "http://localhost:8080/play",
+        externalHttpBlocked: normalizeLaunchUrl("http://game.example/play") === "",
+        protocolRelativeBlocked: normalizeLaunchUrl("//game.example/play") === "",
+        insecureAppendBlocked: appendQueryParams("http://game.example/play", { session: "test" }) === "",
+      }))
+    `,
+  })
+
+  if (evaluation.exceptionDetails) {
+    throw new Error(`Launch URL policy check failed: ${evaluation.exceptionDetails.text}`)
+  }
+
+  const result = evaluation.result.value || {}
+  if (!Object.values(result).every(Boolean)) {
+    throw new Error(`Launch URL policy check failed: ${JSON.stringify(result)}`)
+  }
+
+  console.log("OK Launch URL policy")
 }
 
 async function expectLobbyThumbnailFallback(client) {

@@ -20,14 +20,16 @@ export function normalizeLaunchUrl(rawValue) {
 
   try {
     const url = new URL(value)
-    return url.href
+    if (url.protocol === "https:") return url.href
+    if (url.protocol === "http:" && isLocalDevelopmentUrl(url)) return url.href
+    return ""
   } catch {
     return ""
   }
 }
 
 export function appendQueryParams(rawValue, params) {
-  const value = String(rawValue || "").trim()
+  const value = normalizeLaunchUrl(rawValue)
   if (!value) return ""
 
   try {
@@ -51,4 +53,23 @@ export function appendQueryParams(rawValue, params) {
 
 function getBaseOrigin() {
   return globalThis.location?.origin || "http://localhost"
+}
+
+function isLocalDevelopmentUrl(url) {
+  try {
+    const baseUrl = new URL(getBaseOrigin())
+    return baseUrl.protocol === "http:"
+      && isLoopbackHostname(baseUrl.hostname)
+      && isLoopbackHostname(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+function isLoopbackHostname(hostname) {
+  return hostname === "localhost"
+    || hostname.endsWith(".localhost")
+    || hostname === "[::1]"
+    || hostname === "::1"
+    || /^127(?:\.\d{1,3}){3}$/.test(hostname)
 }

@@ -1,331 +1,318 @@
-# CrazyGames Game Integration Guide
+# CrazyGames Integration Guide
 
-這份文件給製作遊戲、準備 CrazyGames Build 或處理 CrazyGames 上架的 AI / Codex 讀。
+This document is the internal source of truth for preparing a non-gambling game build for CrazyGames. It covers platform separation, SDK behavior, ads, saves, quality requirements, and submission assets.
 
-Looty 串接契約看 `GAME_PLATFORM_INTEGRATION.md`。兩個平台共用同一套遊戲本體時，仍要把平台功能隔離，不要讓 CrazyGames Build 呼叫 Looty Gateway。
+Looty runtime integration is defined in `GAME_PLATFORM_INTEGRATION.md`. A shared game core must still keep the two platform clients isolated.
 
-這份 repo 文件是 CrazyGames 串接規範的唯一內部真相來源，不再維護平行的雲端版本。規範依 CrazyGames 官方文件整理，正式提交前仍要重新確認官方最新版本。
+Version: 1.1.
 
-版本：1.0。
-最後核對：2026-07-28。
+Last external requirements review: 2026-09-15. Recheck the official CrazyGames documentation before every submission because platform requirements may change.
 
-## 適用範圍
+## Eligibility
 
-這份規範只適用於非博弈遊戲。
+This guide applies only to non-gambling games.
 
-博弈相關產品不接 CrazyGames，包括以投注、下注、派彩、可兌價值錢包、賭場或類賭博機制為主要內容的產品。這類遊戲不建立 CrazyGames Client、CrazyGames Build、廣告串接或上架素材。
+Do not create a CrazyGames Client, build, SDK integration, ad flow, or store submission for a product whose core loop includes betting, wagering, payouts, a redeemable-value wallet, casino mechanics, or equivalent gambling behavior.
 
-是否屬於博弈產品要看實際玩法與交易機制，不能只用 Looty 的 `games.type` 判斷。例如一般牌類、街機或捕魚玩法不一定屬於博弈；一旦包含投注、派彩或類賭博核心循環，就不適用 CrazyGames。
+Classification is based on actual gameplay and transaction mechanics, not only Looty's `games.type`. Every product in `D:\Studio\Project-Gaming` is treated as gambling unless the user explicitly moves and reclassifies it.
 
-## 一句話
+## Non-Negotiable Separation
 
-CrazyGames Build 只使用 CrazyGames SDK 與允許的 CrazyGames 功能，不讀 Looty launch code、不呼叫 Looty Gateway，也不載入 Looty 錢包。
+A CrazyGames build:
 
-## 給遊戲 AI 的最短規則
+- Uses the CrazyGames SDK and CrazyGames-approved services only.
+- Does not read a Looty launch code or Gateway token.
+- Does not call the Looty Gateway.
+- Does not initialize a Looty wallet.
+- Does not perform Looty bet, payout, refund, or round operations.
 
-- 遊戲本體、關卡、物理、UI、美術與音效維持共用。
-- 先確認遊戲不是博弈相關產品；博弈產品不要建立 CrazyGames Build。
-- CrazyGames 使用獨立 Build 或明確的平台發布設定。
-- 不用「是否在 iframe」判斷平台，因為 Looty 與 CrazyGames 都可能使用 iframe。
-- CrazyGames SDK v3 必須先初始化完成，才可呼叫 SDK。
-- SDK environment 只能在 `local` 或 `crazygames` 時使用；`disabled` 時不得呼叫。
-- Basic Launch 沒有廣告，遊戲仍必須完整可玩。
-- Full Launch 正確送出 Gameplay start / stop。
-- Midgame 與 Rewarded 廣告分開處理。
-- Rewarded 只有完整播放成功後才給獎勵。
-- 廣告開始時暫停遊戲、禁止操作並靜音；結束或失敗後恢復。
-- 使用 Data 模組時，CrazyGames Build 不再另外使用自己的 `localStorage` 存檔。
-- 平台 `muteAudio` 優先於玩家自己的音效設定。
-- CrazyGames Build 不可呼叫 Looty Gateway、錢包、下注、派彩或退款。
+A Looty build must not initialize the CrazyGames SDK or load CrazyGames ads.
 
-## 與 Looty 共用遊戲的架構
+## Shared Game Architecture
 
 ```text
-Shared Game
-  -> Platform Client
-    -> Looty Client
-    -> CrazyGames Client
-    -> Local Client
+Shared Game Core
+  └─ Explicit Platform Client
+       ├─ Looty Client
+       ├─ CrazyGames Client
+       └─ Local Client
 ```
 
-CrazyGames Client 負責：
+The CrazyGames Client owns:
 
-- CrazyGames SDK 初始化與 environment 驗證。
-- Gameplay start / stop。
-- Data 存檔。
-- Midgame / Rewarded / Banner 廣告。
-- 平台靜音與聊天設定。
-- 適用時的 User、多人房間、邀請與內購。
+- SDK initialization and environment validation.
+- Gameplay start and stop events.
+- Data-module saves.
+- Midgame, rewarded, and banner ads.
+- Platform mute and chat settings.
+- User, multiplayer, invitation, and purchase modules when applicable.
 
-CrazyGames Client 不負責：
+It does not own Looty identity, sessions, credentials, Gateway calls, wallet operations, or settlement.
 
-- Looty session。
-- Looty launch code / gateway token。
-- Looty Gateway。
-- Looty 玩家帳號。
-- Looty 錢包、下注、派彩、退款或 Round 結算。
+The platform client must finish `init()` before the game calls platform features. Expose platform capabilities explicitly and disable unsupported features safely.
 
-平台 Client 必須先完成 `init()`，遊戲才可執行平台存檔、廣告或其他平台操作。平台功能用 capabilities 表示；不支援的功能要安全停用，不可偷偷改用另一個平台的實作。
+The Local Client is for development only. If a CrazyGames build cannot initialize its platform client, show a clear error or disable affected platform features; do not silently switch to the Local Client.
 
-Local Client 只供本機開發測試，不是第三個正式發布平台。CrazyGames Build 初始化失敗時要停用平台功能並顯示錯誤，不可自動降級成 Local Client。
+## Build and Release Strategy
 
-## 發布方式
+Recommended:
 
-建議：
+- One Git repository and shared gameplay source.
+- One game version.
+- Explicit platform entry points or build settings.
+- A separate CrazyGames upload artifact.
+- A separate Looty deployment URL.
 
-- 同一個 Git 專案。
-- 同一套遊戲本體與素材。
-- 同一個遊戲版本號。
-- Looty 與 CrazyGames 各自有發布入口或平台設定。
-- CrazyGames 上傳自己的 Build。
-- Looty 繼續載入自己的獨立網址。
+Do not force the two platforms to share one production URL. They may contain the same gameplay version while producing distinct platform configurations and artifacts.
 
-不建議讓兩個平台硬共用同一個正式 URL。兩邊可以使用完全相同的遊戲程式版本，但平台 SDK、設定與發布產物應分開。
+Select the platform from build configuration. Runtime detection is a secondary validation only; iframe state, hostname, or query parameters alone are not reliable enough.
 
-平台應由發布設定選定，runtime 偵測只做第二層驗證。不要只靠 query string、hostname 或 iframe 狀態猜測平台。
-
-## 上架流程
+## Launch Stages
 
 ### Basic Launch
 
-- 先通過基本 QA，以有限玩家測試。
-- CrazyGames SDK 為選用。
-- 若已接 SDK，玩家真正進入可玩狀態時要送出 Gameplay start。
-- 廣告與內購停用，不會產生廣告分潤。
-- 沒有廣告時，所有遊戲流程仍要正常。
-- 平台主要觀察平均遊玩時間、進入遊戲比例與留存。
-
-官方指南中的平均遊玩時間、次日留存與轉換率只能當參考方向，不是保證通過的固定門檻。
+- The game enters limited platform testing.
+- SDK integration is optional.
+- If the SDK is present, send Gameplay start when the player actually reaches interactive gameplay.
+- Ads and in-game purchases are disabled.
+- Every game flow must remain playable with no ads.
+- Platform performance metrics are evaluation signals, not guaranteed acceptance thresholds.
 
 ### Full Launch
 
-- 通過 Basic Launch 並獲平台選中後進入。
-- 必須完成 CrazyGames SDK 與完整 QA。
-- 必須正確送出 Gameplay start / stop。
-- 有持續進度時，要使用 CrazyGames 允許的存檔方式。
-- 有帳號或玩家身分時，要接 User 模組。
-- 廣告與分潤才會啟用。
-- 遊戲內購買只適用於受邀遊戲。
+- The game has passed Basic Launch and platform selection.
+- CrazyGames SDK integration and full QA are required.
+- Gameplay start and stop events must be accurate.
+- Ongoing progress must use an allowed save design.
+- Games with platform accounts use the User module.
+- Ads and revenue sharing become available.
+- In-game purchases are available only to invited games.
 
-## 技術與檔案限制
+## Technical Limits
 
-- 遊戲總容量最多 250 MB。
-- 檔案總數最多 1,500 個。
-- 初始下載量最多 50 MB。
-- 要進入手機首頁，初始下載量目標需在 20 MB 以內。
-- 未接 SDK 時，平台可能以整包遊戲容量判斷初始下載量。
-- 外部載入素材時，原則上需在 20 秒內進入可玩狀態。
-- 遊戲包內資源使用相對路徑。
-- Chrome 與 Edge 必須正常運作。
-- Safari 無法正常運作時，平台可能停用 Safari 版本。
-- Chromebook / Chromium OS 需能在約 4 GB RAM 裝置順暢運作。
-- 不可有嚴重錯誤、當機、卡死或無法繼續的流程。
-- 若使用 sitelock，要允許 CrazyGames 需要的網域。
+- Maximum total game size: 250 MB.
+- Maximum file count: 1,500.
+- Maximum initial download: 50 MB.
+- Mobile-homepage initial-download target: 20 MB or less.
+- Without SDK loading signals, the platform may treat the full package as the initial download.
+- A game that loads external assets should generally become playable within 20 seconds.
+- Package resources use relative paths.
+- Chrome and Edge must work.
+- Safari may be disabled if the game cannot support it.
+- The game should run acceptably on a Chromebook or Chromium OS device with about 4 GB of RAM.
+- No critical errors, crashes, dead ends, or unrecoverable flows.
+- A sitelock must allow the domains required by CrazyGames.
 
-## 畫面、裝置與操作
+## Display, Device, and Input
 
-- 桌面版需能在橫式畫面正常遊玩。
-- 直式遊戲可以上架，桌面版可在左右顯示黑邊或背景。
-- 支援手機時必須支援觸控。
-- 電腦版需支援合適的滑鼠或鍵盤操作。
-- 文字、圖片與按鈕需在手機、16:9 iframe 與 DPR 1 下清楚可讀。
-- 手機方向由 CrazyGames 提交設定控制，不自行強制旋轉。
-- 手機全螢幕需處理安全區，避免 UI 被瀏海、圓角或系統區域遮住。
-- 避免長按、雙擊造成文字選取、放大鏡或系統選單。
-- iOS 音訊被中斷後，要能在玩家再次操作時恢復。
-- CrazyGames 會提供全螢幕功能，遊戲內不要自行放全螢幕按鈕。
+- Desktop gameplay must work in landscape.
+- Portrait games may use side bars or a background on desktop.
+- Mobile support requires touch controls.
+- Desktop requires appropriate mouse or keyboard controls.
+- Text, images, and controls must remain readable on mobile, in a 16:9 iframe, and at device-pixel ratio 1.
+- Mobile orientation is controlled by submission settings; do not force rotation independently.
+- Full-screen mobile UI must respect safe areas.
+- Prevent long-press and double-click browser behaviors from disrupting play where appropriate.
+- Recover iOS audio after interruption when the player interacts again.
+- Do not add an in-game full-screen button; CrazyGames provides full-screen behavior.
 
-## 遊戲內容與品質
+## Content and Quality
 
-- 遊戲名稱、素材與內容需具原創性。
-- 內容需符合 PEGI 12，平台主要面向 13 歲以上玩家。
-- 文字與圖片清楚，不可模糊、破圖或明顯像素化。
-- 不宣傳其他遊戲平台，也不放外部廣告。
-- 不直接放 App Store 或 Google Play 連結。
-- 隱私權政策與服務條款可以保留。
-- 社群、Discord 或開發者網站連結只能放在選單，不可成為主要按鈕。
-- Steam / Epic 等商店連結只適用於電腦遊戲，且只能放主選單或 Demo 結束位置。
-- Full Launch 的新玩家應直接進入實際遊玩；若遊戲特性不允許，最多一次點擊後開始。
-- 新手教學盡量放進實際遊戲並允許跳過。
-- 避免大段說明，優先使用圖像與操作提示。
-- 操作反應、畫風、解析度、音效與音量要一致。
-- 按鈕不可故意延遲、誤導或誘導玩家點廣告。
+- The title, art, and game content must be original or properly licensed.
+- Content must fit PEGI 12; the platform mainly serves players aged 13 and older.
+- The game must provide English localization. Additional translations must be accurate, use the SDK locale when available, and fall back to English.
+- Text and art must be clear, with no broken, blurred, or visibly degraded presentation.
+- Do not promote another game portal or include external advertising.
+- Do not link directly to the App Store or Google Play.
+- Privacy policies and terms may remain.
+- Community, Discord, and developer-site links belong in a menu and must not be the primary call to action.
+- Steam or Epic links apply only to desktop games and belong in the main menu or at the end of a demo.
+- A new Full Launch player should reach gameplay immediately or with at most one click when the game design requires it.
+- Prefer in-context and skippable tutorials over large instruction blocks.
+- Controls, art direction, resolution, audio, and volume should feel consistent.
+- Buttons must not use delay, deception, or ad-click inducement.
 
-## SDK 初始化與事件
+## SDK Initialization and Gameplay Events
 
-HTML5 使用 CrazyGames SDK v3 時：
+For CrazyGames SDK v3:
 
 ```js
 await window.CrazyGames.SDK.init()
 ```
 
-初始化完成前不可呼叫 SDK。完成後再檢查：
+Do not call SDK features before initialization completes. Then validate:
 
 ```js
 window.CrazyGames.SDK.environment
 ```
 
-只有 `local` 與 `crazygames` 可使用 SDK；`disabled` 時停用 CrazyGames 平台功能。
+Use SDK features only when the environment is `local` or `crazygames`. Disable the CrazyGames platform features when it is `disabled`.
 
-Gameplay 事件原則：
+Gameplay event rules:
 
-- Gameplay start：玩家真正進入可操作、可遊玩的狀態時送出，不包含主選單與額外載入。
-- Gameplay stop：暫停、關卡結束、進入選單或離開實際遊玩狀態時送出。
-- 玩家恢復遊玩、復活或進入下一關時，再送 Gameplay start。
-- 不因切換瀏覽器焦點自行送 stop，平台會處理頁面焦點。
-- Load start / stop 為選用，用於回報額外載入階段。
+- Send Gameplay start when the player reaches real, interactive gameplay.
+- Do not send it for the main menu or an extra loading screen.
+- Send Gameplay stop when gameplay pauses, a level ends, or the player enters a menu.
+- Send Gameplay start again after resume, revival, or the next level.
+- Do not send stop merely because browser focus changes; the platform handles focus.
+- Load start and stop are optional events for additional loading stages.
 
-平台設定：
+Platform settings:
 
-- `muteAudio = true` 時必須靜音。
-- 平台靜音優先於遊戲內音效開關。
-- 要監聽 settings change，不能只在初始化時讀一次。
-- `disableChat = true` 時，有聊天功能的遊戲必須停用聊天。
+- `muteAudio = true` must mute the game.
+- Platform mute overrides the player's internal audio preference.
+- Listen for settings changes instead of reading settings only once.
+- If `disableChat = true`, disable the game's chat feature.
 
-## 廣告
+## Advertising
 
-只能使用 CrazyGames SDK 廣告。不可串接自己的廣告商、Looty 廣告或其他平台廣告。
+Use only CrazyGames SDK ads. Do not integrate another ad network, Looty ads, or another platform's ads in this build.
 
 ### Basic Launch
 
-- 所有廣告會被平台停用。
-- 遊戲沒有廣告時仍要完整可玩。
-- 不留下按下後沒有反應的獎勵廣告按鈕。
-- 不因廣告停用而卡在關卡切換、復活或結算。
+- Ads are disabled.
+- The complete game remains playable.
+- Rewarded-ad controls must not become dead buttons.
+- Level changes, revivals, and settlement must not depend on an available ad.
 
-### Midgame
+### Midgame Ads
 
-- 只放在死亡、關卡完成或階段切換等自然中斷點。
-- 不突然打斷玩家操作。
-- 不在玩家尚未體驗合理內容前播放。
-- 不因點擊首頁、設定、商店或一般導覽按鈕而強制播放。
-- 廣告請求與播放期間暫停遊戲並禁止操作。
-- 廣告真正開始播放後靜音。
-- 沒有廣告或發生錯誤時正常恢復遊戲。
+- Use only at natural breaks such as death, level completion, or stage transition.
+- Do not interrupt active input.
+- Do not show an ad before the player has experienced reasonable gameplay.
+- Do not trigger ads from ordinary navigation such as home, settings, or shop buttons.
+- Pause the game and block input during the ad request and playback.
+- Mute when playback actually begins.
+- Restore the game after success, no-fill, or error.
 
-### Rewarded
+### Rewarded Ads
 
-- 必須由玩家主動選擇。
-- 事前清楚說明觀看後的獎勵。
-- 不觀看的選項直接可見，不隱藏或延遲。
-- 建議提供不看廣告的替代方式。
-- 只有完整播放並收到成功結果後才給獎勵。
-- 失敗、取消、AdBlock 或沒有廣告時不給獎勵，但遊戲仍可繼續。
-- 不要求連續觀看多支廣告才得到一份獎勵。
-- 不讓遊戲只能依賴獎勵廣告繼續。
-- 同一個轉換點不重複播放 Midgame 並同時要求 Rewarded。
+- The player chooses to watch.
+- State the reward before the request.
+- Keep the decline option immediately visible.
+- Prefer a non-ad alternative.
+- Grant the reward only after a confirmed complete playback.
+- Do not grant it after cancellation, failure, AdBlock, or no-fill.
+- The game must remain usable when no reward is granted.
+- Do not require several consecutive ads for one reward.
+- Do not make rewarded ads the only way to continue.
+- Do not combine a midgame ad and a rewarded-ad request at the same transition.
 
-### Banner
+### Banner Ads
 
-- 只放在有實際內容、平均停留至少約 5 秒的頁面。
-- 不放在正式遊玩畫面。
-- 不遮擋 UI，手機與電腦都要檢查。
-- 與遊戲內容清楚區分。
-- 同一畫面最多 2 個 Banner。
+- Place banners only on content screens where players normally stay for about five seconds or more.
+- Do not place banners over active gameplay.
+- Do not cover interface controls.
+- Separate ads visually from game content.
+- Use at most two banners on one screen.
+- Verify both desktop and mobile layout.
 
 ### AdBlock
 
-- 使用 AdBlock 的玩家仍可進行基本遊玩。
-- 不完全封鎖或刻意降低基本能力。
-- 可以停用部分廣告型特殊功能，但要清楚說明。
-- 不留下無作用的廣告按鈕。
+- Basic gameplay must remain available.
+- Do not deliberately degrade core game capability.
+- An ad-funded optional feature may be unavailable, but explain it clearly.
+- Remove or disable controls that cannot work.
 
-## 存檔、帳號與玩家資料
+## Saves, Accounts, and Player Data
 
-CrazyGames Build 的存檔由 CrazyGames Client 決定：
+The CrazyGames Client chooses the save design:
 
-- 使用 Data 模組時，完全使用 Data 模組，不再另寫遊戲自己的 `localStorage`。
-- Data 模組對 Guest 會使用平台管理的本機資料，登入後由平台處理同步。
-- Data 模組上限 1 MB。
-- 寫入前先載入既有資料，避免覆蓋玩家進度。
-- 提交時要正確開啟 Progress Save / Data Module 選項。
-- 如果使用自有後端，要搭配 CrazyGames User 模組。
-- Automatic Progress Save 只在符合平台條件時使用；有遊戲內購買時不得使用。
+- When using the Data module, use it as the save source instead of also writing the same game save to `localStorage`.
+- The platform manages local guest data and signed-in synchronization.
+- The Data module limit is 1 MB.
+- Load existing data before writing to avoid overwriting progress.
+- Enable the correct Progress Save or Data Module submission option.
+- A custom backend must integrate the CrazyGames User module.
+- Use Automatic Progress Save only when the game meets platform conditions; do not use it with in-game purchases.
 
-帳號原則：
+Account rules:
 
-- Guest 可以直接遊玩，不強迫登入。
-- Basic Launch 不提供 Facebook、Google、Email 等外部登入。
-- Full Launch 中，已登入 CrazyGames 的玩家應自動登入或建立對應帳號。
-- 使用 CrazyGames `userId` 作穩定識別，不用可能變更的 username 當唯一識別。
-- 玩家切換 CrazyGames 帳號時，要正確切換進度。
-- 登入按鈕不阻擋遊戲，也不自動彈出登入視窗。
+- Guests can play without forced login.
+- Basic Launch does not offer Facebook, Google, email, or another external login.
+- At Full Launch, a player already signed into CrazyGames should be signed into or mapped to the game account automatically.
+- Use CrazyGames `userId` as the stable identifier, not the changeable username.
+- Switch progress correctly when the CrazyGames account changes.
+- A login button must not block the game or open a login dialog automatically.
 
-若遊戲額外收集 SDK 基本事件以外的個人資料，要提供隱私權政策及／或服務條款。
+If the game collects personal data beyond the SDK's standard events, provide the required privacy policy or terms.
 
-## 多人、聊天與內購
+## Multiplayer, Chat, and Purchases
 
-多人遊戲適用時：
+When multiplayer applies:
 
-- 向 SDK 回報房間、是否可加入及房間狀態。
-- 有好友邀請時接 Invite Link / Instant Multiplayer。
-- 回合結束後，原玩家群組應能繼續一起玩。
-- 使用 CrazyGames 玩家名稱與頭像。
-- 遵守 `disableChat`。
-- 聊天與玩家產生內容要有過濾或審核。
+- Report room identity, joinability, and room state to the SDK.
+- Use Invite Link or Instant Multiplayer when supporting friend invitations.
+- Keep the player group together for another match after a round.
+- Use CrazyGames player names and avatars where required.
+- Honor `disableChat`.
+- Filter or moderate chat and user-generated content.
 
-遊戲內購買只適用於受邀遊戲：
+In-game purchases apply only to invited games:
 
-- Basic Launch 不可使用。
-- Full Launch 且受邀後，使用 CrazyGames 指定的 Xsolla 流程。
-- 只有已登入玩家可購買，Guest 不可購買。
-- 訂單綁定 CrazyGames 使用者。
-- 正式提交前關閉 Sandbox / 測試訂單。
-- CrazyGames App 不支援的付款流程要隱藏或停用。
+- Do not enable purchases during Basic Launch.
+- At invited Full Launch, use the CrazyGames-designated Xsolla flow.
+- Only signed-in players may purchase.
+- Bind orders to the CrazyGames user.
+- Disable sandbox and test orders before production submission.
+- Hide or disable payment flows unsupported by the CrazyGames App.
 
-## 封面、影片與提交資料
+## Submission Media
 
-封面圖片：
+Game covers:
 
-- 橫式：1920 × 1080，16:9。
-- 直式：800 × 1200，2:3。
-- 正方形：800 × 800，1:1。
-- 三張封面維持一致視覺風格。
-- 不模糊、不使用未授權或誤導性素材。
-- 不加入 Play Now、New、Updated、App 或社群圖示。
+- Landscape: 1920 x 1080, 16:9.
+- Portrait: 800 x 1200, 2:3.
+- Square: 800 x 800, 1:1.
+- Keep one coherent visual style across all three.
+- Do not add borders.
+- Only the game title may appear as cover text.
+- Do not use blurred, unauthorized, or misleading content.
+- Do not add Play Now, New, Updated, app-store, or social icons.
 
-預覽影片：
+Preview videos:
 
-- 長度 15–20 秒，超過可能被裁切。
-- 檔案最多 50 MB。
-- 提供 16:9 橫式與 2:3 直式。
-- 不可有聲音。
-- 不可有黑畫面、Logo 轉場、上下黑邊或預設滑鼠游標。
-- 不加入 Play Now、App 或社群圖示。
-- 不自行加速影片。
+- 15 to 20 seconds; longer footage may be trimmed.
+- Maximum 50 MB.
+- Supply 16:9 landscape and 2:3 portrait versions.
+- No audio.
+- No black frames, logo transitions, letterboxing, or default mouse cursor.
+- No Play Now, app-store, or social icons.
+- Do not artificially speed up footage.
 
-提交資料：
+Submission data:
 
-- 可執行的 Web 遊戲 Build。
-- 英文遊戲名稱、說明與操作方式。
-- 平台 Metadata。
-- 三張封面。
-- 橫式與直式預覽影片。
+- A working web build.
+- English title, description, and controls.
+- Platform metadata.
+- Three covers.
+- Landscape and portrait preview videos.
 
-## 上架前檢查表
+## Pre-Submission Checklist
 
-- [ ] 已確認遊戲不是博弈相關產品。
-- [ ] CrazyGames 使用獨立 Build 或明確發布設定。
-- [ ] CrazyGames Build 不含 Looty Gateway 呼叫。
-- [ ] 總容量不超過 250 MB，檔案數不超過 1,500。
-- [ ] 初始下載不超過 50 MB；手機首頁目標不超過 20 MB。
-- [ ] Chrome、Edge、手機與 4 GB Chromebook 測試通過。
-- [ ] 直式 / 橫式、觸控、滑鼠與安全區正常。
-- [ ] 沒有自製全螢幕按鈕、外部廣告與禁止連結。
-- [ ] 英文文字、教學與操作說明完成。
-- [ ] SDK 初始化完成前不呼叫平台功能。
-- [ ] Gameplay start / stop 位置正確。
-- [ ] Basic Launch 無廣告時所有流程仍正常。
-- [ ] Midgame / Rewarded / Banner 位置符合規則。
-- [ ] 廣告期間暫停、禁操作、靜音，失敗時正常恢復。
-- [ ] Rewarded 只在完整播放成功後發獎。
-- [ ] 存檔與帳號方案符合 CrazyGames 規則。
-- [ ] 平台靜音與 settings change 已處理。
-- [ ] PEGI 12、原創性、外部連結與隱私權檢查完成。
-- [ ] 三張封面及兩支預覽影片完成。
-- [ ] CrazyGames Preview / QA 工具測試完成。
+- [ ] The game is confirmed non-gambling.
+- [ ] The CrazyGames platform target is explicit.
+- [ ] The build contains no Looty Gateway or wallet call.
+- [ ] Total size is at most 250 MB and file count at most 1,500.
+- [ ] Initial download is at most 50 MB; mobile-homepage target is at most 20 MB.
+- [ ] Chrome, Edge, mobile, and a 4 GB Chromebook-class device pass.
+- [ ] Orientation, touch, mouse, keyboard, and safe areas work.
+- [ ] There is no custom full-screen button, external ad, or prohibited link.
+- [ ] English text, tutorial, and control instructions are complete.
+- [ ] No platform feature runs before SDK initialization.
+- [ ] Gameplay start and stop events are accurate.
+- [ ] Basic Launch remains complete without ads.
+- [ ] Midgame, rewarded, and banner placements follow the rules.
+- [ ] Ads pause input and audio and restore the game after every outcome.
+- [ ] Rewarded content is granted only after confirmed completion.
+- [ ] Save and account behavior follows the selected CrazyGames modules.
+- [ ] Platform mute and settings changes are handled.
+- [ ] PEGI 12, originality, external-link, privacy, and moderation checks pass.
+- [ ] Three covers and two preview videos are complete.
+- [ ] CrazyGames Preview and QA tools pass.
+- [ ] The official requirements have been rechecked for the current submission date.
 
-## 官方來源
+## Official Sources
 
 - [Requirements Introduction](https://docs.crazygames.com/requirements/intro/)
 - [Technical Requirements](https://docs.crazygames.com/requirements/technical/)
@@ -339,4 +326,4 @@ CrazyGames Build 的存檔由 CrazyGames Client 決定：
 - [Game Module](https://docs.crazygames.com/sdk/game/)
 - [Video Ads](https://docs.crazygames.com/sdk/video-ads/)
 - [Data Module](https://docs.crazygames.com/sdk/data/)
-- [In-game Purchases](https://docs.crazygames.com/sdk/in-game-purchases/)
+- [In-Game Purchases](https://docs.crazygames.com/sdk/in-game-purchases/)

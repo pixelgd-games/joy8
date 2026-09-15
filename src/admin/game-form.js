@@ -91,7 +91,7 @@ async function submitForm(e) {
   const launchUrl = normalizeLaunchUrl(launchUrlInput);
 
   if (launchUrlInput && !launchUrl) {
-    return showValidationError("launch url 只能使用 http(s) 或 / 開頭的站內路徑");
+    return showValidationError("launch url 只能使用 https://、/ 開頭的站內路徑或本機開發網址");
   }
 
   const payload = {

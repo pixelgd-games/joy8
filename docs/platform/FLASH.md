@@ -1,177 +1,85 @@
-# Flash 系統定位說明
+# Flash System Context
 
-這份文件只提供 **Flash 大系統背景與責任邊界**。
+This document provides stable, high-level context for Looty's place in the wider Flash system. It is not the source of truth for Looty routes, database fields, deployment state, or short-term plans.
 
-AI / Codex 閱讀順序：
+Read `../../README.md` for the current repository and `../product/PRODUCT_SCOPE.md` for the approved product boundary.
 
-1. 先讀 `../../README.md`，確認 Looty repo 目前實作。
-2. 再讀 `../product/PRODUCT_SCOPE.md`，確認正式產品邊界。
-3. 最後讀本文件，理解 Looty 在 Flash 裡的位置。
+## System Model
 
-不要把本文件當作 Looty repo 的欄位、路由、部署或短期策略真相來源。
+Flash is a modular game system, not one application or one required request path. Products select only the modules they need.
 
-本專案屬於 **Flash** 整體架構中的其中一個模組。
+| Module | Primary responsibility |
+| --- | --- |
+| Looty | Game entry, player platform, Lobby, platform administration |
+| GD Games | Game content and front-end presentation |
+| Aura | Authoritative logic for general games |
+| Hype5 | Real-time multiplayer and room synchronization |
+| FuGhost | Gambling-game adjudication and probability decisions |
+| Spinnova | Full wallet, ledger, economic settlement |
 
-Flash 不是單一程式，也不是單一網站。
-Flash 是一套由多個可獨立開發、可依需求接入、也可彼此串接的模組化遊戲系統。
+The module names and responsibilities are context, not authorization to add dependencies. A change in Looty must remain within Looty's approved scope unless the user explicitly requests a cross-module design.
 
-目前 Flash 的主要模組包含：
+## Composition Principles
 
-- **Looty**：遊戲入口 / 玩家平台 / Lobby / 後台管理
-- **GD Games**：遊戲內容與前端表現層
-- **Aura**：一般遊戲 authoritative game logic server
-- **Hype5**：即時多人同步 / 房間同步 / room engine
-- **FuGhost**：博奕遊戲結果裁決 / 機率運算 / adjudication engine
-- **Spinnova**：完整錢包 / 經濟結算 / ledger / settlement system
+1. A product does not need every module.
+2. Requests do not pass through every module by default.
+3. Each module keeps a clear, independently maintainable boundary.
+4. Product needs determine integration; the existence of a module does not.
+5. Potential integrations are not fixed architecture.
+6. Repository-local documents remain authoritative for each implementation.
 
-## 模組部署與基礎設施
+## Common Compositions
 
-目前 Flash 相關模組的承載位置可先這樣理解：
+These examples are illustrative:
 
-- `Aura` -> Render Singapore
-- `Hype5` -> Render Singapore
-- `FuGhost` -> 目前 Cloudflare Workers，目標也偏向 Render Singapore
-- 前端站點 -> Cloudflare Pages
-- 資料庫 / Auth / RPC -> Supabase
+| Product shape | Possible modules |
+| --- | --- |
+| General single-player game | Looty, GD Games, Aura |
+| General multiplayer game | Looty, GD Games, Hype5, Aura |
+| Gambling single-player game | Looty, GD Games, FuGhost |
+| Gambling multiplayer game | Looty, GD Games, Hype5, FuGhost |
+| Product requiring a full economic ledger | Add Spinnova where appropriate |
 
-這些資訊的用途是幫助理解系統落點與部署現況，
-不代表 Looty 需要把這些模組直接實作進來，也不代表所有產品都必須走固定相同的部署路徑。
+Do not turn an example into a mandatory dependency chain.
 
-## 重要理解原則
+## Looty's Role
 
-1. **這些模組不是每次都一定要全部一起使用**
-   不同產品、不同遊戲、不同流程，只會接入需要的模組。
+Looty can provide the platform layer for:
 
-2. **不要預設所有流程都必須經過所有模組**
-   Flash 是模組化系統，不是硬式單一路徑架構。
+- Game discovery and entry.
+- Player identity and session entry.
+- Lobby and catalog management.
+- Platform administration.
+- Platform-owned challenges or leaderboard entry surfaces when separately approved.
+- A light platform wallet interface.
+- Integration entry points for other Flash modules.
 
-3. **不要把兄弟模組的責任硬塞進本專案**
-   每個模組都有自己的責任邊界，應優先維持清楚分工。
+The current implemented subset is listed in `../../README.md`.
 
-4. **先理解本專案自己的定位，再理解它在 Flash 裡可能怎麼配合**
-   也就是先看「本專案負責什麼 / 不負責什麼」，再看它可能與哪些模組整合。
+## What Looty Does Not Own
 
-5. **本說明的用途是幫助 AI / Codex 理解系統上下文，不是硬性整合規則**
-   不要因為看到其他模組存在，就自動幫本專案增加不必要的耦合、依賴、流程或抽象層。
+Looty does not own:
 
-## Flash 常見模組協作方式
+- Final authoritative rules for a general game.
+- Real-time multiplayer room synchronization.
+- Gambling result adjudication.
+- Probability or RNG adjudication.
+- A complete production ledger and economic settlement system.
+- A game's primary rendering, animation, audio, or gameplay UI.
 
-以下只是常見協作方向，用來幫助理解整體架構，不代表所有產品都必須照這個路徑：
+Those responsibilities may belong to Aura, Hype5, FuGhost, Spinnova, or GD Games. Looty may integrate with them, but must not duplicate their internals.
 
-- 一般單機遊戲可能會用到：
-  - Looty
-  - GD Games
-  - Aura
-- 一般多人遊戲可能會用到：
-  - Looty
-  - GD Games
-  - Hype5
-  - Aura
-- 博奕單機遊戲可能會用到：
-  - Looty
-  - GD Games
-  - FuGhost
-- 博奕多人遊戲可能會用到：
-  - Looty
-  - GD Games
-  - Hype5
-  - FuGhost
-- 需要幣流 / 經濟結算 / 帳本的產品，可能會額外接入：
-  - Spinnova
+## Infrastructure Context
 
-但再次強調：
+Flash modules may use Cloudflare Pages, Cloudflare Workers, Render, or Supabase according to their own repository and product requirements. This document deliberately does not record current host locations because they can change independently.
 
-- **不是每個專案都必須知道全部細節**
-- **不是每個專案都必須直接依賴其他所有模組**
-- **是否整合、怎麼整合，應由實際產品需求決定**
+Never infer that Looty must adopt another module's deployment model. Looty's current deployment is defined in `../../README.md`.
 
-## 本專案在 Flash 中的定位
+## AI Guidance
 
-本專案是 **Looty**。
-
-Looty 在 Flash 裡的定位是：
-
-- 遊戲入口
-- 玩家平台
-- Lobby
-- 官方挑戰入口
-- 排行榜相關平台層功能
-- 後台管理與遊戲上架管理
-
-## 文件邊界
-
-`FLASH.md` 的用途是提供 **Flash 系統層級的背景脈絡**，
-幫助理解 Looty 在整體架構中的位置與責任邊界。
-
-因此這份文件應盡量保持：
-
-- 穩定
-- 高層
-- 與特定 repo 版本解耦
-
-像是以下內容，不應以這份文件作為最新真相來源：
-
-- 目前 repo 的實作細節
-- 當前資料表欄位與 view 契約
-- 現行 Admin 流程畫面
-- 臨時的產品取捨或短期策略
-
-若要看 Looty repo 的目前實作與交付邊界，請優先參考：
-
-- `../../README.md`
-- `../product/PRODUCT_SCOPE.md`
-
-## Looty 負責什麼
-
-Looty 主要負責：
-
-- 提供玩家進入遊戲的入口
-- 管理遊戲列表 / game list / game lobby
-- 處理玩家身份、平台帳號與輕量平台錢包介面
-- 承接官方挑戰、排行榜、平台型功能
-- 提供 admin / 後台管理介面
-- 作為平台層與其他遊戲模組的接入點
-
-## Looty 不負責什麼
-
-Looty 不負責：
-
-- 一般遊戲最終規則裁決
-- 即時多人房間同步
-- 博奕遊戲結果裁決
-- 機率運算與 RNG 裁決
-- 完整 ledger / 經濟 settlement
-- 遊戲內主要表現、動畫、音效與玩法前端
-
-這些責任應由其他模組處理，例如：
-
-- 一般遊戲規則：Aura
-- 多人同步：Hype5
-- 博奕裁決：FuGhost
-- 經濟結算：Spinnova
-- 遊戲前端表現：GD Games
-
-## Looty 與其他模組的關係
-
-Looty 可以視產品需求接入其他 Flash 模組，
-但不應把其他模組的責任直接實作在 Looty 裡。
-
-例如：
-
-- 可把遊戲導向 GD Games 前端
-- 可把一般遊戲流程接到 Aura
-- 可把多人遊戲流程接到 Hype5
-- 可把博奕產品接到 FuGhost
-- 可把幣流或經濟流程接到 Spinnova
-
-但這些都屬於「視需求接入」，不是 Looty 內部本身的核心責任。
-
-## 給 AI / Codex 的實作提醒
-
-在閱讀本專案時，請遵守以下原則：
-
-1. 先以本專案自身責任邊界為優先，不要因為 Flash 有其他模組，就把其他模組責任混進來。
-2. 可以理解兄弟模組存在，但不要擅自新增跨專案耦合。
-3. 不要把「可能的整合方式」誤解成「固定必經架構」。
-4. 若本專案沒有明確要求整合某模組，就不要主動引入該模組依賴。
-5. 優先維持本專案清楚、可獨立運作、責任單純的架構。
+- Start from Looty's own repository and product boundary.
+- Introduce a sibling-module dependency only when the task explicitly requires it.
+- Verify the sibling module's own instructions before cross-project work.
+- Keep integration contracts narrow and versionable.
+- Report ambiguity before assigning a responsibility to the wrong module.
+- Do not use this background document as evidence that an unimplemented feature already exists.

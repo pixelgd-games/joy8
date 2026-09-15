@@ -1,143 +1,198 @@
 # Looty Known Issues
 
-這份文件只給 AI / Codex 讀，不是對外產品文件。
+This document contains only confirmed, currently relevant limitations, risks, and deferred launch decisions. It is not a work queue by itself; do not implement an item unless the user places it in scope.
 
-目前 repo 實作真相以 `../../README.md` 為準。
+Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-用途：
+Last reviewed: 2026-09-15.
 
-- 記錄已確認的技術問題、風險與改善方向。
-- 避免不同 AI 重複檢查、重複下結論。
-- 區分目前問題、未來風險與刻意保留的測試行為。
+## Status Summary
 
-## 目前結論
+The current Lobby, Loader, Admin, Gateway, and database boundaries are usable and do not require an architectural rewrite.
 
-- 現有正式產品架構可繼續使用，不需要重做。
-- Lobby、Game Loader、Admin、Gateway 與 DB 的責任分工大致正確。
-- 2026-07-31 `npm audit`、`npm run build`、`npm run smoke`、`npm run test:gateway`、全專案 JavaScript 語法與 Gateway TypeScript 解析已通過。
-- 2026-07-31 已確認 Looty linked true；使用者決定暫緩 DB 層 Demo wallet 幣別 migration，未套用檔案已從 active migrations 移除，本機與遠端 16 筆 migrations 同步。
-- 以下問題目前不阻擋公開遊戲啟動主路徑。
+The main launch path is protected by origin checks, database-backed rate limits, request-size limits, upstream timeouts, iframe restrictions, and protected RPC grants. The remaining items below are operational, scale, test, or product-readiness gaps.
 
-## 優先處理
+## Product-Readiness Decisions
 
-### Gateway 防濫用
+### Demo Test Credit
 
-狀態：已部署 Gateway v5，不建立玩家、錢包或 session 的 production security smoke 已通過。
+Current behavior:
 
-`create-session` 現在會拒絕缺少 `Origin` 或來源不在白名單的請求。
+- A new Demo `POINT` wallet receives 10,000 points.
+- The credit is recorded as a deposit transaction.
+- It is test behavior and does not represent production money.
 
-這能擋掉一般無來源腳本，但 `Origin` 不是不可偽造的身份憑證；DB-backed IP rate limit 仍需保留。若正式營運後仍有濫用，再增加 CAPTCHA、裝置證明或邊緣防護，不要只靠 CORS。
+Before production money or a public launch that requires production economics:
 
-### Loader 與 Gateway 逾時
+- Decide when the automatic credit is disabled.
+- Decide how existing test players, wallets, sessions, rounds, and transactions are cleared or isolated.
+- Verify the final wallet initialization path.
 
-狀態：Gateway v5 與 Loader 前端已部署，正式 Lobby、Loader 錯誤路徑與資產已驗證。
+Do not close or redesign this behavior without a user decision.
 
-- Game Loader 等待 iframe `load` 最長 30 秒，逾時會移除 iframe 並顯示 `LOOTY-GAME-006`。
-- Gateway 的 Supabase Auth 逾時為 5 秒，REST RPC 逾時為 8 秒。
-- iframe 若成功載入外框後才在遊戲內卡住，平台無法只靠 `load` 判斷；要更精準需遊戲實作 ready handshake，屬於遊戲本體接入工作。
+### Database-Level Demo Currency Constraint
 
-### iframe 信任邊界
+Current behavior:
 
-狀態：已部署，正式資產與本機 smoke 已驗證。
+- Gateway version 5 rejects a Demo session whose currency is not `POINT`.
+- The additional database constraint and trigger were deliberately placed on hold.
+- No unapplied hold migration should remain in the active migration directory.
 
-Game Loader 現在統一設定 `sandbox`、`allow`、`referrerPolicy=no-referrer` 與全螢幕權限，不開 modal、popup、下載或 top navigation。
+Risk:
 
-同網域遊戲不給 `allow-same-origin`，以 opaque origin 保護 Looty；跨網域遊戲保留 `allow-same-origin`，讓遊戲能使用自己的 storage。未來若遊戲需要新增 iframe 能力，先確認是遊戲必要需求，再調整平台白名單。
+- Gateway enforcement is correct for the current public path, but the database does not independently express the same invariant.
 
-## 資料量增加後處理
+Action boundary:
 
-### Guest 資料成長
+- Revisit before production launch.
+- Do not recreate or apply the database rule without a new user decision.
 
-目前匿名玩家每次啟動遊戲都會建立新的 player account、wallet account 與 game session。前台會員入口停用期間，大部分啟動都會走這條流程。
+### Member and Persistent Guest Direction
 
-Guest 保存期限與清理規則尚未定案。資料量明顯增加前，需要先決定 Guest 是否重用、保留多久，以及哪些資料可以清理。
+Current behavior:
 
-### Gateway runtime cleanup
+- The public member login entry is disabled.
+- Most Loader launches therefore create guest platform records.
+- Direct Mahjong entry and persistent guest behavior are still a plan, not an implemented feature.
 
-目前成功建立 session 後會同步執行 runtime cleanup。清理會依 session 狀態、到期時間與 rate limit 到期時間掃描資料。
+Risk:
 
-資料量增加後應評估：
+- Player continuity is weak and guest data grows with launches.
 
-- 改成排程或低頻清理。
-- 為實際清理條件補適當索引。
-- 避免每次 create-session 都承擔完整清理成本。
+The design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. Do not invent an identity merge or guest-retention policy in this document.
 
-## 測試缺口
+## Scale and Operations
 
-狀態：視需求補強。
+### Guest Data Growth
 
-目前本機 smoke 主要驗證：
+Guest launches currently create platform player, wallet, and session records. Retention and cleanup policy is not finalized.
 
-- Lobby 可載入。
-- iframe sandbox、權限、同／跨網域隔離與載入逾時。
-- Lobby 無效縮圖會切回 placeholder。
-- Loader 缺少 slug 時顯示錯誤。
-- Admin Login 可載入。
-- 共用 Error Modal 可顯示。
+Before volume grows materially, decide:
 
-目前未完整自動驗證：
+- Whether and how a guest identity is reused.
+- How long guest players, wallets, sessions, rounds, and transactions are retained.
+- Which records may be deleted and which must remain auditable.
+- How member conversion or account linking affects existing guest data.
 
-- Loader 成功建立 session 並載入遊戲。
-- Admin 新增、編輯、刪除與排序。
-- URL helper 與 Admin 表單驗證。
-- Gateway 其他 request validation 與錯誤轉換。
+### Synchronous Gateway Runtime Cleanup
 
-Production Gateway security smoke 會建立正式 Demo 測試資料，不要在一般檢查中自動執行。
+After a successful `create-session`, the Gateway calls `looty_cleanup_gateway_runtime` synchronously.
 
-設定 `GATEWAY_NON_MUTATING_SMOKE=1` 時只驗證 Origin、Demo 幣別與欄位上限，不建立玩家、錢包或 session；仍會經過既有 rate limit 計數。
+Risk:
 
-## 維運限制
+- Cleanup cost becomes part of session-creation latency.
+- Larger session and rate-limit tables may turn a small request into a wider scan.
 
-### Repo 無法單獨重建完整 DB
+Direction when evidence shows scale pressure:
 
-目前 repo 不保留 baseline migration，既有 migrations 會假設遠端已存在 `games`、`admin_users` 等核心物件。`supabase/config.toml` 也保留預設 `./seed.sql` 路徑，但 repo 沒有該檔案。
+- Move cleanup to a scheduled or lower-frequency process.
+- Add indexes for the actual cleanup predicates.
+- Measure the cleanup cost before changing the design.
 
-這是目前已知限制，不要自行建立大型 baseline migration。正式營運前應另行確認備份、還原與災難復原流程。
+### No Operational Health Endpoint
 
-## 次要改善
+The repository has no dedicated health endpoint that verifies the deployed Gateway and its critical database dependency without creating player data.
 
-- Error Modal 尚未做完整 focus trap 與關閉後焦點還原。
-- Admin 新增與編輯頁的欄位及 game type options 有重複維護。
-- 前台與錯誤介面的中英文尚未完全統一。
+Impact:
 
-## 模組化方向
+- External uptime checks can verify static pages but cannot cleanly distinguish Gateway availability from a full session flow.
 
-目前不要繼續拆小 Lobby 或 Admin，也不要改成 React / Vue / Next.js。
+Direction:
 
-未來有實際需求時再做：
+- Design a non-mutating health check with no secrets in the response.
+- Rate-limit it and keep it separate from business KPI collection.
+- Add it only with the monitoring implementation described in `ANALYTICS_MONITORING.md`.
 
-- Gateway 新增更多 endpoints 時，再拆分 route、驗證、RPC client、CORS / rate limit。
-- 集中管理 game type，避免 Lobby 與 Admin 選項不同步。
-- 第一款遊戲正式接 Looty wallet 時，再建立最小 Game Gateway client 或 API contract。
-- 優先補測試與逾時處理，不要為了模組化增加不必要抽象。
+### Origin Checks Are Not Identity Proof
 
-## 已處理
+`create-session` requires an allowed Origin and all routes use database-backed IP rate limits. This blocks common cross-origin misuse but does not make Origin an unforgeable client identity.
 
-### 開發依賴漏洞
+If production evidence shows abuse, evaluate edge protection, CAPTCHA, device attestation, or a stronger issuance design. Do not add these preemptively without an observed need and a privacy review.
 
-2026-07-23 已更新 `@supabase/supabase-js`、Vite、ws 與 esbuild；2026-07-31 再更新 PostCSS 與相關安全修正。
+## Test Gaps
 
-`npm audit` 已是 0 vulnerabilities，build 與 smoke 已通過。專案維持 Vite 7，沒有為了追最新版升級到 Vite 8。
+### Dependency Audit Finding
 
-### Demo wallet 幣別
+On 2026-09-15, `npm audit --audit-level=low` reported one high-severity advisory:
 
-Gateway v5 已限制 Demo wallet 只接受 `POINT`。
+```text
+vite 7.3.6 -> postcss 8.5.25 -> nanoid 3.3.16
+GHSA-2v37-7h3g-55p8
+```
 
-使用者決定暫緩 DB 層的幣別 constraint / trigger，正式營運前再處理。未套用的 migration 已從 active migrations 移除，避免未來執行其他 `db push` 時被順便套用。暫緩期間保留新 Demo POINT 錢包 10,000 POINT 的測試餘額。
+The production build, local smoke check, and Gateway unit check still pass. Treat this as dependency-maintenance work, not evidence that the runtime flow is currently broken.
 
-### Gateway 錯誤與 body limit
+When dependency maintenance is in scope:
 
-Gateway 現在以串流限制 request body 16 KiB，Supabase 上游失敗回統一 `503`，非預期 DB 訊息不再直接回傳。
+- Apply the smallest compatible lockfile or dependency update.
+- Review the resulting dependency tree instead of running a blind major upgrade.
+- Rerun `npm audit`, `npm run build`, `npm run smoke`, and `npm run test:gateway`.
 
-本機 `test:gateway` 會模擬 Auth / RPC 已回標頭但 response body 讀取失敗，確認兩者都回 `503`；不連遠端、不建立資料。`create-session` 的 `display_name` 最長 120 字。
+### Automation Coverage
 
-### Lobby 與 Admin 小問題
+Current local checks cover the static build, key pages, iframe restrictions, load timeout behavior, cover fallback, basic error presentation, and selected Gateway validation paths.
 
-- Lobby 封面載入失敗會移除破圖並切回 placeholder。
-- Admin 新增／編輯模式改以頁面路徑決定；編輯網址缺少 `id` 時不再誤新增資料。
+Not fully automated:
 
-## 不列為問題
+- Loader success from session creation through a real game iframe.
+- Admin create, edit, delete, publish, and ordering flows.
+- URL-helper and admin-form validation.
+- Every Gateway request validator and public error mapping.
+- Browser-level member-versus-guest session behavior.
+- Accessibility behavior for modal focus and keyboard navigation.
 
-- 新 Demo 錢包的 10,000 POINT 是正式營運前刻意灌入的測試餘額。
-- 這筆測試餘額目前不要求符合正式 ledger / settlement 規格。
-- 正式營運前再依使用者決定關閉方式與測試資料清理方式。
+`npm run smoke:gateway` targets the deployed Gateway and may create Demo runtime data. Do not run it as a routine local check without reading the script and confirming its mode.
+
+## Database Recovery Limitation
+
+The repository intentionally has no baseline migration. Existing migrations assume earlier catalog and admin objects already exist. `supabase/config.toml` also points to the default `./seed.sql`, but that file is absent.
+
+Impact:
+
+- A fresh local project cannot be reconstructed from this repository alone.
+- Disaster recovery depends on external Supabase backup and restore capability.
+
+Direction:
+
+- Do not create a large baseline migration automatically.
+- Before production launch, document and test backup, restore, and disaster-recovery procedures.
+- If a reproducible local database becomes a requirement, design it as a reviewed project rather than an incidental cleanup.
+
+## User Experience and Maintainability
+
+### Iframe Load Is Not Game Readiness
+
+The Loader's 30-second timeout observes the iframe `load` event. A game can load its document and then stall internally.
+
+A more accurate signal requires an explicit game-ready handshake in the game integration contract. This is cross-repository work and must not be simulated only in the Looty shell.
+
+### Error Modal Accessibility
+
+The shared Error Modal does not yet provide a complete focus trap and focus restoration after close.
+
+Address this when accessibility work is in scope. Preserve the existing error codes and plain fallback content.
+
+### Repeated Admin Form Metadata
+
+Create and edit flows repeat some field and game-type option definitions.
+
+Do not refactor only for aesthetic reuse. Centralize the definitions when a real catalog change needs both paths or when the options become inconsistent.
+
+### Mixed User-Facing Language
+
+Some public and error UI strings are Chinese while a few fallback paths are English.
+
+This documentation cleanup does not change product copy. Decide the intended product language and localization model before normalizing UI strings.
+
+## Stable Constraints
+
+These are not issues:
+
+- Vanilla JavaScript and Vite are intentional.
+- Cloudflare Pages static hosting is intentional.
+- The database is the game catalog source; no local allowlist is needed.
+- The iframe sandbox is intentionally restrictive.
+- Cross-origin games currently receive `allow-same-origin` for their own storage compatibility; same-origin games do not.
+- Games own CSP, `X-Frame-Options`, rendering, and resource failures.
+- Looty does not modify a game repository during platform work.
+- Gambling products do not ship to CrazyGames.
