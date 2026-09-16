@@ -19,7 +19,9 @@ Principles:
 - Reuse dashboard templates and variables across games.
 - Give reporting tools read-only access to purpose-built views.
 - Do not modify a game repository merely to satisfy the first monitoring phase.
-- Keep Demo `POINT`, browser-generated results, and production money clearly separate.
+- Keep test POINT, operational POINT activity, and actual payment receipts separate.
+  A POINT fee or AI funding entry is not cash revenue. The product and integration
+  documents own the corresponding wallet and transaction-source definitions.
 - Add game instrumentation only through the Looty integration contract.
 - Never record credentials, launch codes, Gateway tokens, or complete request bodies.
 
@@ -193,6 +195,10 @@ Rules:
 - Current data can produce only Demo RTP.
 - A browser-generated result is not valid production or redeemable-value RTP.
 - Production RTP requires an authoritative game server or adjudication source.
+- Apply this metric only to games whose approved model defines comparable bet
+  and payout totals. Multiplayer transfers such as Mahjong settlement must not
+  automatically be presented as house-banked RTP; its fees and AI-versus-human
+  reports follow the product's accounting definitions.
 
 ## Gateway Request Event
 
@@ -339,6 +345,11 @@ Before implementation, verify that the selected Supabase plan, database connecti
 
 ## Delivery Phases
 
+These are observability increments within the platform -> product -> integration
+order in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#delivery-order), not a
+replacement project roadmap. Minimum health and recovery checks precede operation;
+full activity dashboards can follow when their trusted data exists.
+
 ### Phase 0: Availability
 
 1. Add a non-mutating Gateway health endpoint.
@@ -374,7 +385,8 @@ Only metrics supported by reliable data are shown.
 Reassess the low-cost stack when any of these becomes true:
 
 - Looty accepts real payments.
-- `POINT` becomes redeemable or exchangeable for value.
+- A separately approved product decision changes the current prohibition on
+  redemption, withdrawal, or prizes of monetary value.
 - A formal uptime SLA is required.
 - Longer log retention is required.
 - Database capacity or query load approaches the current plan's limit.

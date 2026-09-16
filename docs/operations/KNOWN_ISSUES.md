@@ -4,31 +4,45 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-15.
+Last reviewed: 2026-09-16.
 
 ## Status Summary
 
 The current Lobby, Loader, Admin, Gateway, and database boundaries are usable and do not require an architectural rewrite.
 
-The main launch path is protected by origin checks, database-backed rate limits, request-size limits, upstream timeouts, iframe restrictions, and protected RPC grants. The remaining items below are operational, scale, test, or product-readiness gaps.
+The Demo launch path has origin checks, rate limits, request limits, timeouts,
+and protected RPC grants. Those controls do not validate a game result or make
+browser-selected payout amounts safe for operational POINT. The trust and
+accounting gaps below must be closed before operational launch.
 
 ## Product-Readiness Decisions
 
-### Demo Test Credit
+### Operational Accounting and Cutover
 
-Current behavior:
+- Current browser game tokens include payout/refund scopes and accept submitted
+  amounts. A trusted server-only settlement boundary is not implemented.
+- Current wallets are shared by player/currency, without product scope.
+- Active-status wallet uniqueness does not alone prevent replacement wallets
+  or repeated grants after freezing; lifecycle/provisioning needs explicit tests.
+- Current one-session wallet calls do not implement atomic multi-account game
+  settlement, product-account participation, or long-match credential renewal.
+- Existing Demo data and automatic test credit need an explicit cutover decision.
+  Preserve evidence; do not silently relabel test funds as operational balances
+  or clear records during documentation work.
 
-- A new Demo `POINT` wallet receives 10,000 points.
-- The credit is recorded as a deposit transaction.
-- It is test behavior and does not represent production money.
+The requirements and acceptance cases belong in
+[GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#target-operational-contract).
+POINT purchase policy and release timing belong in
+[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
-Before production money or a public launch that requires production economics:
+### Product SQL Drafts
 
-- Decide when the automatic credit is disabled.
-- Decide how existing test players, wallets, sessions, rounds, and transactions are cleared or isolated.
-- Verify the final wallet initialization path.
-
-Do not close or redesign this behavior without a user decision.
+The three `2026091609...` Mahjong SQL files are review-only, not applied and not
+an approved deployable set. They have incomplete account coverage and mismatches
+with product identifiers and occupancy. The product owns the detailed corrections
+in [its data plan](../../../../Project-Gaming/production/table/products/mahjong-clash/docs/DATA_AND_LOOTY_INTEGRATION_PLAN.md#sql-draft-corrections).
+Review them before any database push; their presence in the migration directory
+is not authorization to apply them.
 
 ### Database-Level Demo Currency Constraint
 
@@ -69,12 +83,12 @@ The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH
 
 Guest launches currently create platform player, wallet, and session records. Retention and cleanup policy is not finalized.
 
-Before volume grows materially, decide:
+Before volume grows materially:
 
-- Whether and how a guest identity is reused.
-- How long guest players, wallets, sessions, rounds, and transactions are retained.
-- Which records may be deleted and which must remain auditable.
-- How member conversion or account linking affects existing guest data.
+- Implement the approved persistent-guest requirement using the mechanism reviewed in the member plan.
+- Define retention for guest players, wallets, sessions, rounds, and transactions.
+- Define which records may be deleted and which must remain auditable.
+- Verify member conversion and account linking preserve the correct guest data.
 
 ### Synchronous Gateway Runtime Cleanup
 
@@ -141,7 +155,10 @@ Direction:
 
 - Do not create a large baseline migration automatically.
 - Before production launch, document and test backup, restore, and disaster-recovery procedures.
-- If a reproducible local database becomes a requirement, design it as a reviewed project rather than an incidental cleanup.
+- The selected local-test/hosted-operation direction now requires a reproducible
+  local fixture/bootstrap before platform integration tests. Prepare it as a small,
+  reviewed setup without importing production secrets or personal data. Do not
+  turn it into an unconfirmed baseline or reset the hosted database.
 
 ## User Experience and Maintainability
 

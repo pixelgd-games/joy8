@@ -2,7 +2,7 @@
 
 This document defines what Looty is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-15.
+Last reviewed: 2026-09-16.
 
 ## Product Definition
 
@@ -26,27 +26,11 @@ Looty succeeds when:
 - The platform can diagnose launch and wallet failures without storing secrets or sensitive player data.
 - A non-gambling game can share one core build across Looty and CrazyGames while keeping platform services isolated.
 
-## Current Product
+## Current Implementation
 
-Implemented today:
-
-- Public Lobby backed by `public_games_v1`.
-- Published-game Loader with an iframe shell and platform error handling.
-- Google OAuth administrator entry and game catalog CRUD.
-- Guest session creation through `looty-gateway`.
-- One-time launch-code exchange and in-memory Gateway authorization.
-- Demo `POINT` wallet endpoints for balance, bet, payout, refund, and round close.
-- Cloudflare Pages deployment and PWA metadata.
-
-Not implemented today:
-
-- Public member login or account management UI.
-- Persistent guest reuse within a retained browser profile or app installation.
-- Production money movement.
-- Full analytics, dashboards, alerts, or health monitoring.
-- A general game SDK package.
-
-The repository implementation is described in `../../README.md`.
+[README.md](../../README.md) owns the implemented feature list and operating
+instructions. The member, scoped-wallet, and trusted-settlement capabilities
+below are targets, not completed functionality.
 
 ## Ownership Boundaries
 
@@ -104,45 +88,83 @@ Gambling products do not ship to CrazyGames. Every product in `D:\Studio\Project
 
 The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGames requirements are in `../platform/CRAZYGAMES_INTEGRATION.md`.
 
-### Member and Direct Game Entry
+### First Release and Entry Models
 
-Looty needs a minimal platform identity layer so a player can enter through the Lobby or a Looty-controlled branded game entry and still reach the same platform player and the approved wallet scope.
+- First release: H5. Android and iOS are later work, not first-release gates.
+- Sign-in: Google, basic account/password, and persistent guest access.
+  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns their design.
+- Mahjong Clash is the first adopter, not the architectural center of Looty.
+  Platform capabilities must be reusable by other products.
 
-This direction applies to every Looty game. `Mahjong Clash` is an initial adoption case, not a product-specific identity architecture. A game may launch through its own branded entry before the public Looty Lobby, but the entry still uses the shared Looty Auth identity and player ID. A branded entry is a platform surface, not in-game authentication. The game runtime must never receive Google, Apple, Facebook, or other provider credentials.
-
-A branded standalone entry may remain available after the same title is listed on Looty and does not need to redirect customers through the Lobby. Both surfaces resolve the same Looty member, while wallet and game-progress behavior follows the product's approved scope.
-
-This shared identity applies to Looty-operated surfaces, including the Lobby and Looty-controlled branded entries. A separate CrazyGames build or another external platform channel uses its own approved platform client and must not call Looty identity, session, or wallet services.
-
-The detailed design, unresolved login choices, persistent guest behavior, account linking, and delivery phases are owned by `../platform/MEMBER_AUTH_PLAN.md`. That plan remains separate and must be reviewed before implementation.
-
-## Wallet Direction
-
-Entry style and wallet scope are separate decisions. A game can have its own branded entry while still sharing Looty membership.
-
-| Product model | Member identity | Wallet | Persistent game data |
+| Product model | Entry and release | Wallet | Game data |
 | --- | --- | --- | --- |
-| Full game with an independent economy | Shared Looty member on Looty-operated surfaces | One game-scoped wallet per player and game | Dedicated game-owned schema and backend boundary |
-| Looty-native shared-economy game, such as a platform slot or compact table game | Shared Looty member | Common Looty platform wallet | Dedicated game or approved family schema and backend boundary |
+| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Looty Lobby | One game-scoped wallet per player and game | Game-owned schema and authoritative backend |
+| Looty-native shared-economy game, such as a platform slot or compact table game | Operates with the platform and its shared services | One common platform wallet per player | Game-owned or intentionally shared family schema and backend |
 
-- Looty is the only wallet authority for Looty-launched sessions.
-- The current wallet mode is Demo and supports only `POINT`.
-- New Demo `POINT` wallets currently receive a 10,000-point test credit.
-- The current implementation reuses one active wallet per player and currency across games.
-- Demo transactions do not represent real money.
-- The database-level Demo currency constraint is deliberately on hold and must not be implemented without a new user decision.
-- Full independently operated games use a separate game-scoped wallet per player and game.
-- Looty-native games that depend on a shared platform service use one common Looty platform wallet per player.
-- Activity in one independent game does not change another independent game's wallet or the platform wallet.
-- Activity in one Looty-native game intentionally changes the platform balance available to other Looty-native games.
-- Game currencies use a common nominal unit with a `1:1` reference ratio to a possible future Looty platform currency.
-- The `1:1` ratio does not provide a current exchange, transfer, redemption, or withdrawal right.
-- Looty-native games sharing the platform wallet do not convert currency; they spend the same balance directly.
-- Currency conversion between an independent game wallet and Looty, or between independent game wallets, is deliberately deferred and must not be implemented without a separate user decision.
-- A platform-wallet initial credit is granted once per player, not once per Looty-native game. Every platform-wallet transaction retains its originating game ID.
-- Production wallet requirements must be designed as a separate phase with security, audit, settlement, and recovery requirements.
+Both use the same Looty membership on Looty-operated surfaces. Independent
+entry does not create a separate member system. A branded entry may remain
+available after Lobby listing; the player keeps the same identity, wallet,
+and product progress through either entrance. Platform-native products retain
+their shared-entry/shared-wallet model; they need not become standalone games.
+Neither model exempts a game from trusted settlement and security requirements.
 
-The initial architecture may host Looty and game data in one managed Supabase project to control cost, but ownership and access remain separated by custom schema, explicit permissions, and backend boundaries. A game or intentionally shared game family owns its detailed rooms, matches, hands, actions, results, progression, and history in its own schema. Looty's `game_rounds` remains only a platform financial summary. The systems correlate through stable platform references and documented session and round identifiers, and the design must preserve a path to move a game into an independent database later.
+External channels such as CrazyGames use their own approved platform identity
+and must not initialize Looty Auth, sessions, or wallets.
+
+## Wallet and POINT Direction
+
+- Looty owns human-player wallet authority. Trusted catalog configuration
+  chooses platform or game scope; clients and games cannot choose their scope.
+- Independent-game balances do not affect another game's or the platform's
+  balance. Platform-native games intentionally consume the same balance.
+- Platform initial credit is granted once per player, not once per title.
+  Independent-game initial-credit amounts remain product-specific.
+- POINT is intended for operational play, not a disposable Demo-only design.
+  Build one wallet/accounting architecture for testing and operation while
+  isolating their data. The current Demo implementation remains described in
+  [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md).
+- Purchasing POINT is an allowed future product capability. Whether it ships
+  at the first public launch is undecided. No payment provider, purchase price,
+  or payment deployment is authorized by this document.
+- No redemption, withdrawal, or prizes of monetary value are included.
+  Cross-wallet conversion and transfer are also outside the current scope.
+  The existing nominal `1:1` reference between units grants none of these rights.
+- Preserve transaction source: initial grant, promotional grant, purchase,
+  gameplay, fee, and authorized adjustment. AI funding is distinct from human
+  purchases and fee revenue. A POINT fee is not itself a cash-revenue report.
+- Payment orders, verified payment notifications, duplicate protection, and
+  refund/chargeback handling must be designed before purchasing is enabled.
+  Purchase timing does not delay the reusable wallet and settlement foundation.
+- Record the originating game on gameplay transactions and the target scope
+  and source reference on grants, purchases, and adjustments. Platform-wide
+  transactions must not invent a game ID.
+
+Detailed trust, wallet-lifecycle, and atomic-settlement requirements belong in
+[GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md).
+
+## Data and Environment Direction
+
+Use one codebase with a local test environment and one hosted operational
+environment initially. A permanently hosted staging site is not required for
+the initial solo-operator workflow; a temporary isolated preview can be added
+when an integration or release needs it. Different URLs against the same live
+database do not provide test isolation.
+
+Local tests use separate data, credentials, and configuration. Do not promote
+test balances, transactions, or fee totals into operational accounts. Before
+public operation, explicitly review existing Demo data and define the opening
+balances and cutover; this is not authorization to delete or reset data.
+The present repository cannot recreate the full local database from migrations
+alone. A reviewed bootstrap/fixture and backup/restore procedure are prerequisite
+work, tracked in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).
+
+The initial hosted cost model may share one Supabase project across Looty and
+game-owned schemas, with explicit roles and backend boundaries. A game owns
+its detailed gameplay data; Looty keeps only platform and accounting records.
+Shared compute, outages, and backups remain coupled. Keep schema dependencies
+separable so a game can later move without changing its identity/wallet contract.
+Each game's runtime host is a separate assignment; sharing Supabase does not
+choose or provide that host.
 
 ## Catalog Direction
 
@@ -174,15 +196,28 @@ Unless the user changes the product direction, Looty does not own:
 - Pre-launch legacy data compatibility.
 - Responsibilities that belong to unrelated Flash products.
 
-## Current Priorities
+## Delivery Order
 
-1. Review and approve the member and direct-entry plan before implementing it.
-2. Add reliable analytics and monitoring without recording launch codes, Gateway tokens, or sensitive identity data.
-3. Close the documented production-readiness decisions, including the Demo test-credit and database currency-constraint hold.
-4. Continue game catalog and integration work through the stable platform contract.
-5. Keep documentation and verification aligned with the actual repository.
+First align the documents and define the versioned platform contract. Then:
 
-Detailed active risks are tracked in `../operations/KNOWN_ISSUES.md`. Analytics delivery is planned in `../operations/ANALYTICS_MONITORING.md`.
+1. **Platform:** implement reusable membership, both wallet scopes, launch and
+   server authorization, atomic settlement, and minimal recovery/monitoring.
+   Verify with a simulated game, including independent and shared-wallet cases.
+   Do not require Mahjong source code or public Lobby release to finish this stage.
+2. **Product:** in each product repository, implement its rules, authoritative
+   state, persistence, economy, and platform adapter against that contract.
+   A contract simulator may be used for isolated tests, never as a live fallback.
+3. **Integration:** connect real services and verify entry, gameplay, settlement,
+   re-entry, expired credentials, concurrent requests, retries, and failure recovery.
+
+Define request/response fields and failure cases during the platform stage;
+do not postpone the interface design until integration. Documentation changes
+do not imply that implementation, migrations, or deployment have been completed.
+
+Identity details belong in [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md),
+runtime contracts in [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md),
+active blockers in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md), and
+observability in [ANALYTICS_MONITORING.md](../operations/ANALYTICS_MONITORING.md).
 
 ## Decision Rules
 

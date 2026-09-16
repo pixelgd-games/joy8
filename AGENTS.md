@@ -64,7 +64,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - Do not convert Looty to React, Vue, Next.js, or another framework unless the user explicitly asks.
 - Do not change the Cloudflare Pages static deployment architecture.
 - Do not add a local `enabled-games` allowlist.
-- Do not restore the front-end member login UI until the member entry point is redesigned.
+- Implement public member entry only through the reviewed `docs/platform/MEMBER_AUTH_PLAN.md`; do not restore the old login UI as a shortcut.
 - Do not move sibling Flash module responsibilities into Looty.
 - Games must not log players in or modify player balances directly.
 - Looty `game_rounds` stores only platform wallet and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Looty Supabase project physically, but games must not access Looty-owned tables, another game's schema, or a project-wide service-role key.
@@ -118,7 +118,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
 - The current wallet has no explicit product scope. The approved future model uses game-scoped wallets for independently operated games and one shared platform wallet for Looty-native games; wallet scope must be resolved by trusted Looty configuration, never by a game request.
 - Demo wallets use only `POINT`. The database-level currency constraint is deliberately on hold; do not recreate or apply it without a new user decision.
-- Until that decision changes, new Demo `POINT` wallets keep the 10,000-point test credit.
+- Current Demo credit is a baseline behavior, not the operational POINT policy. Follow `docs/product/PRODUCT_SCOPE.md` for the approved direction and review provisioning/cutover before changing balances or enabling purchases.
 
 ## Change Verification
 

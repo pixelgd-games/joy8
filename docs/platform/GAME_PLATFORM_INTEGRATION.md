@@ -4,7 +4,12 @@ This document is the authoritative runtime contract between Looty and a game. It
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Last verified against the repository: 2026-09-15.
+Current v5 implementation reviewed: 2026-09-15. Target contract reviewed: 2026-09-16.
+
+The endpoint examples below describe the existing Demo contract. The section
+"Target Operational Contract" defines required platform work, not callable new
+endpoints. Current browser-issued payout/refund scopes must not be reused as
+operational wallet authority.
 
 ## Core Rule
 
@@ -46,7 +51,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | Game catalog and published status | Owns | Does not own |
 | Member or guest identity | Owns | Does not own |
 | Session and token issuance | Owns | Consumes |
-| Wallet balance and transactions | Owns | Requests through the active client |
+| Wallet balance and transactions | Owns | Reads through authorized sessions; operational mutations require a trusted backend |
 | Loader iframe shell | Owns | Does not own |
 | Sandbox and `allow` permissions | Owns | Must remain compatible |
 | Platform load timeout and error screen | Owns | Reports game-ready state only if a future handshake is added |
@@ -86,7 +91,9 @@ The current Loader requests `POINT` with a one-hour session expiry.
 | `looty_gateway_url` | Gateway base URL | Use for wallet routes |
 | `looty_exchange_url` | Direct exchange URL | Use for launch-code exchange |
 
-All parameters are supplied by Looty. A game must not replace them from user-controlled values.
+The Loader supplies these parameters, but URL values remain untrusted inputs.
+Validate the configured Gateway origin and derive identity, game, wallet, and
+permissions from the trusted exchange result, never from URL claims alone.
 
 ## Iframe Contract
 
@@ -274,9 +281,91 @@ The same `round_id` may exist safely in different game sessions because rounds a
 - Demo points do not represent real money.
 - No platform-to-game, game-to-platform, or game-to-game conversion endpoint exists.
 
-Production-money behavior requires a separate reviewed design.
+The approved two wallet models and operational POINT policy belong in
+[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md). The current schema cannot yet
+select the correct scope. Update schema, catalog configuration, Gateway, and
+tests together before a game depends on the target contract.
 
-The approved future multi-game direction has two wallet scopes: a full independently operated game resolves a game-scoped wallet, while Looty-native games that depend on the shared platform resolve one common platform wallet. The current schema cannot make that trusted product-aware choice. Do not make a game depend on the future behavior until the schema, catalog configuration, Gateway, tests, and this contract are updated together. Games must never select their own wallet scope.
+## Target Operational Contract
+
+Status: design requirements for the platform stage; not implemented. Keep this
+contract reusable for independent and platform-native games. Product rule engines,
+AI behavior, tile/card records, and payout calculation stay outside Looty.
+
+### Identity, Wallet Scope, and Occupancy
+
+- Resolve the canonical player and product classification on the backend.
+  A wallet's durable identity includes player, platform/game scope, currency,
+  and the chosen environment boundary. Status changes must not create another
+  wallet or repeat its initial grant; a frozen wallet is not a missing wallet.
+- Provision wallets and initial grants atomically with stable operation keys.
+  Initial credits are explicit source-typed entries, not a side effect of every
+  login or session creation.
+- Define wallet reservations/occupancy before accepting gameplay that spends
+  an entire available balance. Prevent concurrent matches or external debits
+  from spending the same funds. The product declares its occupancy needs;
+  Looty enforces them. A player's temporary absence does not release an active
+  match's claim. Specify how grants, future purchases, and administrative
+  adjustments interact with an occupied wallet before those paths are enabled.
+
+### Launch and Server Authorization
+
+- Client capabilities permit approved entry, read, and gameplay operations,
+  never caller-selected payouts, refunds, or direct wallet mutation.
+- Authenticate each trusted game backend, scope it to approved game IDs and
+  accounting operations, and support rotation/revocation. A game receives no
+  project-wide service-role key.
+- Define exactly one launch-code redeemer. Prefer a game backend redeeming the
+  code through an authenticated handoff, then issuing its seat/session binding.
+  If a browser exchanges first, the backend needs a separate trusted validation
+  mechanism; the same single-use code cannot be redeemed twice.
+- Specify replay protection, audience/game binding, expiry, renewal, rejoin,
+  revocation, error codes, and cleanup of credentials from URLs.
+- Short-lived client credentials may expire during a long match. Bind settlement
+  to the authorized durable match, not a still-online browser token. Reauthenticate
+  re-entry as the same player without cancelling committed financial obligations.
+  Define the treatment of suspended accounts and outstanding matches explicitly.
+
+### Atomic Settlement
+
+- Define a versioned request/result and stable error codes before product work.
+  A request identifies its game, round/match, operation key, content hash,
+  rule version, participants, and typed accounting entries. Exact endpoint and
+  schema names are selected during platform implementation, not invented by games.
+- Looty validates caller authority, player/session/wallet bindings, scope,
+  occupancy, accounting limits, and balancing. The product validates gameplay
+  and supplies the authoritative result; Looty does not reimplement game rules.
+- Commit every affected account, ledger entry, settlement result, and required
+  product commit marker together, or commit none. In the initial shared database,
+  use a short PostgreSQL transaction and deterministic account-lock order.
+- For product-owned accounts such as AI bankrolls, use a reviewed, narrowly
+  granted product accounting adapter in that same transaction. Do not give the
+  game direct platform-table access or let it select arbitrary tables/functions.
+  The platform owns the transaction contract; each product owns its account rules.
+- Validate entry totals and account bindings, not just header debit/credit equality.
+  Finalized financial entries are immutable; corrections are linked compensating
+  entries. Funding is separate from gameplay and fee revenue.
+- Identical retries return the committed result. Reusing a key with different
+  content is a conflict. Provide an authenticated status/reconciliation lookup
+  when a response is lost; timeout is not proof of rollback or permission to void.
+- A later move to separate databases needs a newly reviewed cross-service
+  recovery protocol. Do not claim that separate HTTP calls form one transaction.
+
+### Platform Acceptance Gate
+
+Use simulated game backends to prove both wallet models, scope isolation,
+unauthorized payout rejection, frozen-account behavior, once-only provisioning,
+concurrent occupancy, session renewal, altered-request rejection, duplicate
+settlement, lost responses, and rollback after an injected failure. A shared-wallet
+game follows the same authority requirements as a standalone game.
+
+The current v5 browser amount/payout flow is a Demo limitation, not an operational
+integration option. Do not mark this target complete until implementation and
+tests agree with the contract. Database function execution grants must also be
+restricted; hiding an endpoint in the UI is insufficient.
+
+References: [PostgreSQL locking](https://www.postgresql.org/docs/current/explicit-locking.html),
+[Supabase function privileges](https://supabase.com/docs/guides/database/functions).
 
 ## Security and Failure Behavior
 
@@ -341,14 +430,18 @@ Database operation rules and the current schema summary are in `../../README.md`
 
 ## Integration Checklist
 
-Before publishing a game on Looty:
+The checks below cover the current Loader/Demo path. Operational publication
+also requires the Target Operational Contract acceptance gate above; passing
+these v5 endpoint checks alone does not approve production accounting.
+
+Before listing a game through the Looty Lobby:
 
 1. Confirm the product is allowed on Looty and classify whether it is gambling.
 2. Confirm the game has a stable HTTPS `launch_url`.
 3. Confirm CSP and `X-Frame-Options` allow Looty embedding.
 4. Verify the game runs with the documented iframe sandbox and permissions.
 5. Implement an explicit Looty Client; do not detect Looty from iframe presence.
-6. Exchange `looty_launch_code` once and keep the Gateway token in memory.
+6. Use the designated single launch-code redeemer; keep client game tokens in memory and validate the server handoff.
 7. Use a stable `round_id` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
 9. Verify launch, balance, bet, payout, refund, close-round, retry, and insufficient-balance behavior as applicable.

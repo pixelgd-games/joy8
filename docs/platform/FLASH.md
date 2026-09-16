@@ -64,10 +64,15 @@ Looty does not own:
 - Real-time multiplayer room synchronization.
 - Gambling result adjudication.
 - Probability or RNG adjudication.
-- A complete production ledger and economic settlement system.
+- A general-purpose accounting suite or the internals of a separate settlement module.
 - A game's primary rendering, animation, audio, or gameplay UI.
 
-Those responsibilities may belong to Aura, Hype5, FuGhost, Spinnova, or GD Games. Looty may integrate with them, but must not duplicate their internals.
+Those responsibilities may belong to a product backend or a selected sibling
+module. The current platform plan explicitly assigns reusable human-wallet
+authority and trusted atomic posting to Looty; this does not assign gameplay
+adjudication to Looty or require Spinnova. A product's own approved backend may
+provide its authority without adopting Aura, Hype5, or FuGhost. Follow the local
+product and integration documents; this context is not a mandatory module chain.
 
 ## Infrastructure Context
 

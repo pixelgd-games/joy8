@@ -27,7 +27,9 @@ Looty does not currently provide:
 - A game runtime or game-specific business logic.
 - CrazyGames integration inside this repository.
 
-See `docs/product/PRODUCT_SCOPE.md` for product boundaries and priorities.
+See [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md) for the H5 release,
+both product models, operational POINT direction, and platform -> product ->
+integration order. These are planned changes, not capabilities of this build.
 
 ## Architecture
 
@@ -175,7 +177,11 @@ The current active wallet key is player plus currency, with no explicit platform
 
 The `game_rounds` table stores only the platform session relationship and aggregate bet, payout, refund, status, and settlement data needed by the wallet flow. It is not a full gameplay or match-history store. Each game owns its authoritative player mapping, rooms, matches, actions, results, progression, and history in its game-owned schema and backend boundary and correlates them with Looty references through the integration contract. The approved initial cost model may host those permission-separated schemas in the same managed Supabase project; no game schema has been added by this repository yet.
 
-The repository has no baseline migration. The active `supabase/migrations/` directory is an incremental history and is currently the database change source. Do not attempt to rebuild the entire schema in one migration.
+The repository has no baseline migration. Existing migrations are incremental
+and cannot reconstruct the full local database alone. Three review-only Mahjong
+drafts (`20260916090000`, `20260916091000`, `20260916092000`) are present locally;
+they are incomplete and have not been applied. Do not bulk-apply the directory.
+Review blockers are tracked in [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Local Development
 
@@ -189,7 +195,11 @@ VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
 
-Do not commit or quote real credentials.
+Do not commit or quote real credentials. A local Vite server still uses the
+database configured in `.env.local`; localhost alone does not isolate data.
+The target local database setup is not yet reproducible from this repository.
+See the environment direction in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md)
+and the recovery limitation in [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 Install and run:
 
