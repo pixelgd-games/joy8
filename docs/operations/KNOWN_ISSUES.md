@@ -10,28 +10,28 @@ Last reviewed: 2026-09-17.
 
 The current Lobby, Loader, Admin, Gateway, and database boundaries are usable and do not require an architectural rewrite.
 
-The Demo launch path has origin checks, rate limits, request limits, timeouts,
-and protected RPC grants. Those controls do not validate a game result or make
-browser-selected payout amounts safe for operational POINT. The trust and
-accounting gaps below must be closed before operational launch.
+The deployed launch path has origin checks, rate limits, request limits,
+timeouts and protected RPC grants. Settlement requires a game-bound backend key;
+each product must still implement and verify authoritative gameplay before activation.
 
 ## Product-Readiness Decisions
 
 ### Operational Accounting and Cutover
 
-- Current browser game tokens include payout/refund scopes and accept submitted
-  amounts. A trusted server-only settlement boundary is not implemented.
-- Current wallets are shared by player/currency, without product scope.
-- Session creation rejects frozen or ambiguous wallets; operational wallet
-  lifecycle and provisioning still require their own implementation and tests.
-- Current one-session wallet calls do not implement atomic multi-account game
-  settlement, product-account participation, or long-match credential renewal.
-- Existing Demo data and automatic test credit need an explicit cutover decision.
-  Preserve evidence; do not silently relabel test funds as operational balances
-  or clear records during documentation work.
+- The deployed foundation implements scope, backend authority, reservation,
+  atomic settlement, product adapters and renewal. Browser amount RPCs are removed.
+  Per-product configuration and real backend integration remain unverified;
+  passing local fixture tests does not activate products.
+- Operational opening credit is decided: 0 POINT pending a later grant decision.
+  The approved reset removed test accounting; no old balance was transferred.
+- Each product still needs reviewed scope/limits, keys, its authoritative backend
+  and any accounting adapter. No product policy or key is installed by the platform migrations.
+- No general compensation/funding API exists. Define the reviewed linked
+  compensation procedure before funded operation; immutable records cannot be
+  edited to repair an accounting discrepancy.
 
 The requirements and acceptance cases belong in
-[GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#target-operational-contract).
+[GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#operational-protocol-v1).
 POINT purchase policy and release timing belong in
 [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
@@ -43,23 +43,6 @@ with product identifiers and occupancy. The product owns the detailed correction
 in [its data plan](../../../../Project-Gaming/production/table/products/mahjong-clash/docs/DATA_AND_LOOTY_INTEGRATION_PLAN.md#sql-draft-corrections).
 They are preserved under `supabase/drafts/mahjong-clash/`, outside active migration
 discovery. See [draft review instructions](../../supabase/drafts/README.md).
-
-### Database-Level Demo Currency Constraint
-
-Current behavior:
-
-- The Gateway rejects a Demo session whose currency is not `POINT`.
-- The additional database constraint and trigger were deliberately placed on hold.
-- No unapplied hold migration should remain in the active migration directory.
-
-Risk:
-
-- Gateway enforcement is correct for the current public path, but the database does not independently express the same invariant.
-
-Action boundary:
-
-- Revisit before production launch.
-- Do not recreate or apply the database rule without a new user decision.
 
 ### Member and Persistent Guest Direction
 
@@ -77,15 +60,15 @@ Current behavior:
   implemented. The member migrations and Gateway are active; the matching front
   end is released from main. Real provider acceptance remains outstanding.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
-- The current Demo `POINT` wallet is keyed by player and currency without an explicit product scope. Multiple games therefore share one balance today whether or not the product should use an independent game wallet.
+- Wallet scope is resolved by trusted platform/game policy. No product policy is
+  enabled until its integration is reviewed.
 
 Risk:
 
-- Hosted guest entry and repeated game launch passed the limited acceptance in
+- Hosted guest entry and the earlier launch flow passed the limited acceptance in
   [README.md](../../README.md#verification). Cross-browser continuity and real
   provider promotion remain unverified. Isolated SQL tests, including native
   PostgreSQL 17.6 races, do not prove real provider linking.
-- Current wallet behavior cannot yet distinguish an independent game's wallet from the shared wallet approved for Looty-native games.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
 
@@ -119,19 +102,22 @@ Direction when evidence shows scale pressure:
 - Add indexes for the actual cleanup predicates.
 - Measure the cleanup cost before changing the design.
 
-### No Operational Health Endpoint
+### External Monitoring Not Configured
 
-The repository has no dedicated health endpoint that verifies the deployed Gateway and its critical database dependency without creating player data.
+POST /health and its protected dependency RPC are deployed and passed the hosted
+health/rejection checks. No external monitor, notification destination or
+alerting vendor has been configured.
 
 Impact:
 
-- External uptime checks can verify static pages but cannot cleanly distinguish Gateway availability from a full session flow.
+- No automatic alert currently reports Gateway dependency failures. The health
+  route checks dependencies, not a complete gameplay or settlement flow.
 
 Direction:
 
-- Design a non-mutating health check with no secrets in the response.
-- Rate-limit it and keep it separate from business KPI collection.
-- Add it only with the monitoring implementation described in `ANALYTICS_MONITORING.md`.
+- Connect a reviewed monitor to the existing health route; do not poll session
+  creation. Verify alerts with an approved outage simulation.
+- Follow the minimum runbook and reconciliation checks in `ANALYTICS_MONITORING.md`.
 
 ### Origin Checks Are Not Identity Proof
 
@@ -162,7 +148,7 @@ Not fully automated:
 - Browser-level member-versus-guest session behavior.
 - Accessibility behavior for modal focus and keyboard navigation.
 
-`npm run smoke:gateway` targets the deployed Gateway and may create Demo runtime data. Do not run it as a routine local check without reading the script and confirming its mode.
+`npm run smoke:gateway` now checks only replacement health and rejected requests. It does not create business records, but changes rate counters and requires explicit hosted execution approval. Its hosted health/rejection checks have passed.
 
 ## Database Recovery Limitation
 

@@ -54,7 +54,7 @@ in the owning repository, not a first-release platform dependency.
 - Deletion requests, cleanup/retention, and branded cross-origin entry are not
   implemented. Same-origin `/account/` belongs to Looty and returns only to the
   Lobby or a validated `/game/?slug=...` route.
-- Wallet scope is not implemented. Consume the platform wallet work rather
+- Wallet scope is deployed and awaits per-product activation. Consume the platform wallet work rather
   than introducing wallet logic into login screens.
 
 ## Identity Invariants
@@ -139,6 +139,9 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
 - **Email delivery:** configure a production SMTP provider and test delivery
   before public password registration. Supabase's default sender is for testing;
   no paid provider or account change is authorized here.
+  Supabase Auth continues to issue and validate verification/recovery tokens.
+  Custom delivery does not mean rebuilding password authentication or storing
+  passwords in Looty tables.
 - **Closure/deletion:** expose a request flow, and separately define Auth/profile
   deletion or anonymization, transaction retention, game-data coordination, and
   waiting/recovery periods. Do not directly delete Auth users: current player
@@ -175,6 +178,32 @@ third stage; no product needs a separate temporary membership system.
 First-release platforms and sign-in methods are already decided; do not reopen
 them as a provider-selection task. Native callbacks and extra providers are
 deferred. Purchase launch timing belongs in the product plan.
+
+## Email Delivery Setup and Acceptance
+
+The user has not selected a production sender or sending domain. Do not guess
+either or deploy a new mail server. Keep custom SMTP configuration pending until
+the service/domain and scope are confirmed. Never request credentials in chat.
+
+1. Confirm the sending domain and sender mailbox; complete the selected provider's
+   domain/DNS verification and delivery authentication.
+2. Configure the provider's SMTP host, port, username/password and sender in the
+   Looty project's Auth settings using the authorized account. Store secrets in
+   provider settings only, not front-end environment variables or source.
+3. Retain Looty's approved Site URL and account callback allowlist. Keep the
+   verification link semantics supplied by Auth; no custom token issuer is needed.
+4. Test a new email/password signup, unverified-login rejection, verification,
+   password reset, guest email promotion, expired/replayed links and an already
+   registered address. Confirm the same player and all wallet scopes survive
+   promotion. Do not infer email delivery from a successful API response.
+5. Test delivery to a non-project-team mailbox, because the default Supabase
+   sender is restricted to team recipients. Record failures without mail content,
+   passwords, codes or token-bearing links.
+
+Google real-account binding acceptance is deferred by the user. Keep it marked
+pending; fixture and guest tests do not replace provider acceptance. Hosted
+password/abuse settings, guest retention, closure policy and branded-entry
+ownership remain separate release gates above.
 
 ## Technical References
 

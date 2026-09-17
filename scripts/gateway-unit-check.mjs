@@ -105,7 +105,7 @@ try {
     }
     if (name === "create_game_session") return Response.json([{
       session_id: "session-1", player_account_id: "player-1", game_id: "game-1",
-      launch_code: "one-use-code", account_type: "guest", currency: "POINT", wallet_mode: "demo",
+      launch_code: "one-use-code", account_type: "guest", currency: "POINT", protocol: "server-v1",
     }])
     if (name === "looty_cleanup_gateway_runtime") return Response.json([])
     throw new Error(`Unexpected RPC ${name}`)
@@ -146,7 +146,53 @@ try {
   assert.equal((await launched.json()).account_type, "guest")
   assert.equal(rpcCalls.find(({ name }) => name === "create_game_session").args.p_auth_user_id, "verified-user")
 
-  console.log("Gateway unit check passed, including member authorization boundaries.")
+  for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
+    assert.equal((await request(route, {}, "", null)).status, 404)
+  }
+  const key = "a".repeat(64)
+  let serverError = null, health = true
+  const serverCalls = []
+  globalThis.fetch = async (url, options) => {
+    const name = url.split("/").at(-1)
+    if (name === "looty_consume_gateway_rate_limit") return Response.json(true)
+    if (name === "looty_platform_health_v1") return Response.json(health)
+    serverCalls.push({ name, args: JSON.parse(options.body) })
+    return serverError ? Response.json(serverError, { status: 400 }) : Response.json({ version: 1, state: "open" })
+  }
+  const expected = {
+    exchange: "looty_server_session_v1", renew: "looty_server_session_v1",
+    open: "looty_open_match_v1", settle: "looty_settle_match_v1",
+    status: "looty_match_status_v1", cancel: "looty_match_status_v1",
+  }
+  for (const [action, name] of Object.entries(expected)) {
+    const route = `server-${action}-v1`
+    assert.equal((await request(route, {}, key)).status, 403)
+    assert.equal((await request(route, {}, "member-token", null)).status, 401)
+    assert.equal((await request(route, {}, "", null)).status, 401)
+    const body = { version: 1, match_ref: "fixture" }
+    assert.equal((await request(route, body, key, null)).status, 200)
+    assert.equal(serverCalls.at(-1).name, name)
+    assert.equal(serverCalls.at(-1).args.p_secret, key)
+    assert.deepEqual(serverCalls.at(-1).args.p_request, body)
+    if (["exchange", "renew"].includes(action)) assert.equal(serverCalls.at(-1).args.p_action, action)
+    if (["status", "cancel"].includes(action)) assert.equal(serverCalls.at(-1).args.p_cancel, action === "cancel")
+  }
+  const count = serverCalls.length
+  assert.equal((await request("server-open-v1", [], key, null)).status, 400)
+  assert.equal((await request("server-open-v1", { data: "x".repeat(17000) }, key, null)).status, 400)
+  assert.equal(serverCalls.length, count)
+  for (const [code, status] of [["LOOTY_BACKEND_UNAUTHORIZED", 401], ["LOOTY_IDEMPOTENCY_CONFLICT", 409], ["LOOTY_WALLET_INACTIVE", 403], ["LOOTY_MATCH_NOT_FOUND", 404]]) {
+    serverError = { message: code }
+    const response = await request("server-settle-v1", {}, key, null)
+    assert.equal(response.status, status)
+    assert.deepEqual(await response.json(), { error: code })
+  }
+  serverError = { message: "private database diagnostic", details: key }
+  assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "LOOTY_UPSTREAM_UNAVAILABLE" })
+  assert.deepEqual(await (await request("health", {}, "", null)).json(), { status: "ok" })
+  health = false
+  assert.equal((await request("health", {}, "", null)).status, 503)
+  console.log("Gateway unit check passed, including member, server authority and health boundaries.")
 } finally {
   globalThis.fetch = originalFetch
   delete globalThis.Deno

@@ -592,6 +592,7 @@ async function expectLaunchUrlPolicy(client) {
         externalHttpBlocked: normalizeLaunchUrl("http://game.example/play") === "",
         protocolRelativeBlocked: normalizeLaunchUrl("//game.example/play") === "",
         insecureAppendBlocked: appendQueryParams("http://game.example/play", { session: "test" }) === "",
+        staleExchangeRemoved: !appendQueryParams("https://game.example/?looty_exchange_url=old", { looty_exchange_url: "" }).includes("looty_exchange_url"),
       }))
     `,
   })

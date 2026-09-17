@@ -1,12 +1,13 @@
 # Looty Analytics and Monitoring
 
-Status: planned; not implemented.
+Status: dashboards/alerts planned. Gateway health is deployed; read-only
+reconciliation queries are available for manual operations.
 
 This document owns operational analytics, KPI definitions, dashboards, request telemetry, health checks, alerts, and the initial reliability rollout. It does not own member authentication or the game runtime contract.
 
 Current repository behavior is defined in `../../README.md`.
 
-Last reviewed: 2026-09-15.
+Last reviewed: 2026-09-17.
 
 ## Goals
 
@@ -46,7 +47,7 @@ This is a plan, not an installed dependency. Recheck current pricing, quotas, re
 - Successfully created launch sessions.
 - Sessions grouped by game and `games.type`.
 - Guest, wallet, transaction, and round record counts.
-- Demo `POINT` bet, payout, and refund totals where games use the Gateway.
+- Net POINT movements and fee totals after the scoped settlement release is active.
 - Open or expired sessions and rounds.
 - Database size and growth, when reported from the database service.
 - Static Lobby availability through an external synthetic check.
@@ -73,7 +74,7 @@ Initial panels:
 - Session trend and ranking by game.
 - Session distribution by game type.
 - Counts of platform players, wallets, transactions, and rounds.
-- Demo `POINT` bet, payout, and refund totals.
+- Net POINT settlements and fee totals after activation.
 - Open and overdue sessions or rounds.
 - Database size and growth.
 - Lobby and Gateway health after non-mutating health checks exist.
@@ -106,7 +107,7 @@ Create this only after there are enough games and reliable activity:
 - Active accounts, sessions, and trusted rounds by `games.type`.
 - Game ranking within each type.
 - Average play time when heartbeat exists.
-- Demo bet, payout, refund, and RTP where valid.
+- Net POINT movements; RTP remains unavailable without authoritative gross stake/win data.
 - Error and latency breakdown.
 
 Do not create a second analytics classification beside `games.type`.
@@ -117,7 +118,7 @@ Use one dashboard template with a game variable:
 
 - Game name, type, and published status.
 - Launch sessions and trend.
-- Existing Gateway rounds and Demo wallet transactions.
+- Trusted match settlements and scoped wallet transactions after activation.
 - Open sessions and rounds.
 - Gateway errors when request telemetry exists.
 - Later: active accounts, concurrent users, play time, game-load success, trusted rounds, RTP, and latency.
@@ -158,7 +159,7 @@ Do not use `game_sessions.status = active` alone; it overstates concurrency when
 
 ### Round
 
-A round is uniquely identified by `game_session_id + round_id`.
+A financial match is uniquely identified by `game_id + match_ref`; a session may expire before that match settles.
 
 Only include a round after the game reports it through the authorized platform contract. For a game that does not use Gateway rounds, show `unavailable`, not zero.
 
@@ -192,7 +193,7 @@ Rules:
 
 - Do not display RTP when valid bet total is zero.
 - Exclude refunded rounds according to an explicitly reviewed calculation.
-- Current data can produce only Demo RTP.
+- Net wallet settlements do not expose gross wager/win turnover and cannot establish RTP.
 - A browser-generated result is not valid production or redeemable-value RTP.
 - Production RTP requires an authoritative game server or adjudication source.
 - Apply this metric only to games whose approved model defines comparable bet
@@ -278,7 +279,13 @@ It must not depend on a specific game remaining published.
 
 ### Gateway
 
-Add a lightweight, non-mutating health endpoint before monitoring the Gateway.
+The deployed implementation provides `POST /health` with `{}` and no credential.
+It returns only `{"status":"ok"}` (200) or unavailable (503). Gateway rate-limit
+failure may return 429/503 before the probe. The dependency RPC reads the catalog
+and verifies critical member/session/settlement function presence. It does not
+exercise financial writes or prove Google, SMTP, product backend or iframe health.
+The rate limiter may update runtime counters; no business records are created.
+The hosted health/rejection check passed against Gateway version 7.
 
 It should distinguish:
 
@@ -293,6 +300,33 @@ It must not:
 - Become a high-cost database query.
 
 Do not monitor health by repeatedly calling `create-session`.
+
+### Minimal Incident and Reconciliation Runbook
+
+1. Check the static Lobby and Gateway health independently. If the Lobby works
+   but health fails, inspect Edge Function request IDs and Supabase availability.
+   Never include request bodies or credentials in an incident record.
+2. On an uncertain settlement response, the product calls `server-status-v1` and
+   retries the original content/key if needed. A timeout is not a cancellation.
+3. Before every database read, verify `scripts/supabase-looty.cmd projects list`
+   selects the linked Looty project. After platform SQL application, run the
+   same wrapper with `db query --linked --file scripts/sql/platform-reconciliation.sql`.
+   Wallet-ledger, reservation, fee and balancing mismatch counts should be zero.
+   These checks cover Looty accounting; each adapter must also reconcile its
+   product balances and commit markers. They do not prove legitimate gameplay.
+4. Open matches older than 24 hours are a diagnostic signal, not an automatic
+   void rule. Inspect authoritative product state before completing or cancelling.
+   Keep reservations until the authorized product confirms the outcome.
+5. For an accounting mismatch, stop new activity through the affected game's
+   enabled policy flag and preserve evidence. Do not mutate
+   finalized rows, replace balances or grant browser payout permissions. Existing
+   obligations need review; a frozen wallet deliberately blocks settlement.
+6. Credential compromise requires reviewing/revoking that game's backend key,
+   provisioning a replacement privately and reconciling in-flight operations.
+   Do not rotate the project service key merely to rotate one product's access.
+
+This is a manual operating path. External scheduling, alert delivery and dashboard
+accounts remain unconfigured; there is no claim of unattended monitoring.
 
 ## Alert Levels
 
@@ -334,6 +368,18 @@ The initial proposed process:
 - Use the local `.env.supabase.local` route without copying credentials into scripts, documentation, or chat.
 
 Before implementation, verify that the selected Supabase plan, database connection method, storage provider, encryption, and retention meet current needs. Disaster recovery remains an active limitation in `KNOWN_ISSUES.md`.
+
+A real recovery acceptance must identify an available backup, restore into an
+isolated destination, and verify schema, roles/grants, Auth/player references,
+wallet/ledger totals, reservations, settlements and product markers. Check Storage
+objects and provider/Edge Function settings separately; database restoration
+alone does not prove these services are restored. Never test by overwriting the
+live Looty project. Local synthetic SQL tests are not a hosted backup restore.
+The storage destination, credentials and actual restore test remain pending;
+do not mark recovery complete based on a preflight query.
+
+Official procedures: [Supabase CLI backup/restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
+and [restoring a downloaded backup locally](https://supabase.com/docs/guides/local-development/restoring-downloaded-backup).
 
 ## Operating Rhythm
 

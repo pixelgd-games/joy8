@@ -67,7 +67,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - Implement public member entry only through the reviewed `docs/platform/MEMBER_AUTH_PLAN.md`; do not restore the old login UI as a shortcut.
 - Do not move sibling Flash module responsibilities into Looty.
 - Games must not log players in or modify player balances directly.
-- Looty `game_rounds` stores only platform wallet and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Looty Supabase project physically, but games must not access Looty-owned tables, another game's schema, or a project-wide service-role key.
+- Looty match/accounting tables store only platform reservations and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Looty Supabase project physically, but games must not access Looty-owned tables, another game's schema, or a project-wide service-role key.
 - Do not modify a game repository during a Looty repository task. Switch to the named game repository for game-side work.
 - The Looty launch code and Gateway token stay in memory only. Never write them to browser storage, logs, or Analytics.
 - Looty owns the Loader iframe shell, permissions, load timeout, and platform error screens.
@@ -116,9 +116,9 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
 - Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
-- The current wallet has no explicit product scope. The approved future model uses game-scoped wallets for independently operated games and one shared platform wallet for Looty-native games; wallet scope must be resolved by trusted Looty configuration, never by a game request.
-- Demo wallets use only `POINT`. The database-level currency constraint is deliberately on hold; do not recreate or apply it without a new user decision.
-- Current Demo credit is a baseline behavior, not the operational POINT policy. Follow `docs/product/PRODUCT_SCOPE.md` for the approved direction and review provisioning/cutover before changing balances or enabling purchases.
+- The wallet model uses game-scoped wallets for independently operated games and one shared platform wallet for Looty-native games; wallet scope must be resolved by trusted Looty configuration, never by a game request.
+- Do not recreate the superseded Demo currency hold migration. Current POINT enforcement belongs to the scoped wallet policies and trusted session protocol.
+- Do not preserve an old Demo runtime or add old/new compatibility. Historical migration files are deployment history, not an active fallback. Follow `docs/product/PRODUCT_SCOPE.md` for the approved direction and review provisioning/cutover before changing balances or enabling purchases.
 
 ## Change Verification
 

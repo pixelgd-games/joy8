@@ -114,9 +114,8 @@ async function main() {
     looty_launch_code: launchSession.launch_code,
     looty_game_id: launchSession.game_id,
     looty_currency: launchSession.currency,
-    looty_wallet_mode: launchSession.wallet_mode,
     looty_gateway_url: gatewayUrl,
-    looty_exchange_url: gatewayUrl ? `${gatewayUrl}/exchange` : "",
+    looty_protocol: "server-v1",
   })
 
   if (!sessionGameUrl) {
@@ -145,7 +144,7 @@ async function createLaunchSession(gameSlug) {
     throw error
   }
 
-  if (!data?.session_id || !data?.launch_code) {
+  if (!data?.session_id || !data?.launch_code || data.protocol !== "server-v1") {
     throw new Error("Looty gateway returned an empty session.")
   }
 

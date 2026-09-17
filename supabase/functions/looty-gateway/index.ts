@@ -1,6 +1,7 @@
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 type CreateSessionRow = {
+  protocol: string
   session_id: string
   player_account_id: string
   wallet_account_id: string
@@ -9,21 +10,6 @@ type CreateSessionRow = {
   launch_code_expires_at: string
   account_type: string
   currency: string
-  wallet_mode: string
-  expires_at: string
-}
-
-type ExchangeSessionRow = {
-  session_id: string
-  player_account_id: string
-  wallet_account_id: string
-  game_id: string
-  gateway_token: string
-  gateway_token_expires_at: string
-  gateway_token_scopes: string[]
-  account_type: string
-  currency: string
-  wallet_mode: string
   expires_at: string
 }
 
@@ -34,31 +20,6 @@ type BalanceRow = {
   currency: string
   balance: number | string
   locked_balance: number | string
-}
-
-type WalletTransactionRow = {
-  transaction_id: string
-  wallet_account_id: string
-  game_session_id: string
-  game_id: string
-  round_id: string
-  transaction_type: string
-  amount: number | string
-  balance_before: number | string
-  balance_after: number | string
-  currency: string
-}
-
-type CloseRoundRow = {
-  game_round_id: string
-  game_session_id: string
-  game_id: string
-  round_id: string
-  status: string
-  bet_amount: number | string
-  payout_amount: number | string
-  refund_amount: number | string
-  settled_at: string
 }
 
 type RpcResult = {
@@ -82,7 +43,7 @@ type RateLimitConfig = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-const DEMO_CURRENCY = "POINT"
+const POINT_CURRENCY = "POINT"
 const MAX_BODY_BYTES = 16 * 1024
 const AUTH_REQUEST_TIMEOUT_MS = 5000
 const RPC_REQUEST_TIMEOUT_MS = 8000
@@ -95,48 +56,36 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://127.0.0.1:4173",
 ]
 const ROUTES = new Set([
+  "health",
+  "server-exchange-v1",
+  "server-renew-v1",
+  "server-open-v1",
+  "server-settle-v1",
+  "server-status-v1",
+  "server-cancel-v1",
   "member",
   "enroll-member",
   "create-session",
-  "exchange",
   "balance",
-  "bet",
-  "payout",
-  "refund",
-  "close-round",
 ])
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
+  health: { limit: 30, windowSeconds: 60 },
+  "server-exchange-v1": { limit: 120, windowSeconds: 60 },
+  "server-renew-v1": { limit: 120, windowSeconds: 60 },
+  "server-open-v1": { limit: 120, windowSeconds: 60 },
+  "server-settle-v1": { limit: 120, windowSeconds: 60 },
+  "server-status-v1": { limit: 120, windowSeconds: 60 },
+  "server-cancel-v1": { limit: 120, windowSeconds: 60 },
   member: { limit: 120, windowSeconds: 60 },
   "enroll-member": { limit: 30, windowSeconds: 300 },
   "create-session": { limit: 30, windowSeconds: 300 },
-  exchange: { limit: 60, windowSeconds: 300 },
   balance: { limit: 120, windowSeconds: 60 },
-  bet: { limit: 120, windowSeconds: 60 },
-  payout: { limit: 120, windowSeconds: 60 },
-  refund: { limit: 120, windowSeconds: 60 },
-  "close-round": { limit: 120, windowSeconds: 60 },
 }
 const PUBLIC_RPC_MESSAGES = new Set([
-  "amount must be greater than zero",
-  "expires_in_seconds must be between 60 and 86400",
-  "game is not available",
-  "game round is already closed",
-  "game round was not found",
-  "game session is not active",
-  "game slug is required",
-  "gateway token expiry must be between 300 and 86400",
-  "idempotency_key conflicts with another transaction",
-  "idempotency_key is required",
-  "insufficient wallet balance",
-  "launch code is invalid or expired",
-  "launch_code is required",
-  "metadata must be a json object",
-  "player account is not active",
-  "player membership is required",
-  "verified member identity is required",
-  "round_id is required",
-  "unsupported wallet transaction type",
-  "wallet account is not active",
+  "expires_in_seconds must be between 60 and 86400", "game is not available",
+  "game session is not active", "game slug is required", "player account is not active",
+  "player membership is required", "verified member identity is required", "wallet account is not active",
+  "LOOTY_GAME_NOT_READY", "LOOTY_PLAYER_INACTIVE", "LOOTY_WALLET_INACTIVE", "LOOTY_INVALID_REQUEST",
 ])
 
 const allowedOrigins = (Deno.env.get("LOOTY_ALLOWED_ORIGINS") ?? "")
@@ -203,6 +152,14 @@ async function dispatchRoute(
   request: Request,
   headers: HeadersInit,
 ): Promise<Response> {
+  if (route === "health") {
+    const result = await callRpc("looty_platform_health_v1", {})
+    const healthy = result.ok && result.body === true
+    return jsonResponse({ status: healthy ? "ok" : "unavailable" }, healthy ? 200 : 503, headers)
+  }
+  if (route.startsWith("server-") && route.endsWith("-v1")) {
+    return serverOperation(route, request, headers)
+  }
   if (route === "member" || route === "enroll-member") {
     return resolveMember(request, headers, route === "enroll-member")
   }
@@ -211,23 +168,50 @@ async function dispatchRoute(
     return createSession(request, headers)
   }
 
-  if (route === "exchange") {
-    return exchangeLaunchCode(request, headers)
-  }
-
   if (route === "balance") {
     return getBalance(request, headers)
   }
 
-  if (route === "bet" || route === "payout" || route === "refund") {
-    return applyWalletTransaction(route, request, headers)
-  }
-
-  if (route === "close-round") {
-    return closeRound(request, headers)
-  }
-
   return jsonResponse({ error: "Route not found" }, 404, headers)
+}
+
+async function serverOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
+  const match = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{64})$/)
+  if (!match) return jsonResponse({ error: "LOOTY_BACKEND_UNAUTHORIZED" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
+  const action = route.slice(7, -3)
+  const args: Record<string, unknown> = { p_secret: match[1], p_request: body.value }
+  let name: string
+  if (action === "exchange" || action === "renew") {
+    name = "looty_server_session_v1"
+    args.p_action = action
+  } else if (action === "open" || action === "settle") {
+    name = action === "open" ? "looty_open_match_v1" : "looty_settle_match_v1"
+  } else {
+    name = "looty_match_status_v1"
+    args.p_cancel = action === "cancel"
+  }
+  const result = await callRpc(name, args)
+  if (!result.ok) {
+    const error = result.body as { message?: string; code?: string } | null
+    const code = error?.message ?? ""
+    const statuses: Record<string, number> = {
+      LOOTY_BACKEND_UNAUTHORIZED: 401, LOOTY_GAME_NOT_READY: 403, LOOTY_PLAYER_INACTIVE: 403,
+      LOOTY_WALLET_INACTIVE: 403, LOOTY_SESSION_INVALID: 403, LOOTY_ADAPTER_UNAVAILABLE: 503,
+      LOOTY_ADAPTER_REJECTED: 409, LOOTY_INVALID_REQUEST: 400, LOOTY_INVALID_AMOUNT: 400,
+      LOOTY_INVALID_ENTRY: 400, LOOTY_LIMIT_EXCEEDED: 400, LOOTY_RULE_MISMATCH: 409,
+      LOOTY_IDEMPOTENCY_CONFLICT: 409, LOOTY_MATCH_FINALIZED: 409, LOOTY_MATCH_NOT_FOUND: 404,
+      LOOTY_UNBALANCED_SETTLEMENT: 400, LOOTY_WALLET_OCCUPIED: 409, LOOTY_INSUFFICIENT_BALANCE: 409,
+    }
+    if (statuses[code]) return jsonResponse({ error: code }, statuses[code], headers)
+    if (error?.code === "22P02") return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
+    return jsonResponse({ error: "LOOTY_UPSTREAM_UNAVAILABLE" }, 503, headers)
+  }
+  if (!result.body || typeof result.body !== "object" || Array.isArray(result.body)) {
+    return jsonResponse({ error: "LOOTY_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  }
+  return jsonResponse(result.body as JsonValue, 200, headers)
 }
 
 async function resolveMember(request: Request, headers: HeadersInit, enroll: boolean): Promise<Response> {
@@ -284,8 +268,8 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     return jsonResponse({ error: "Invalid currency" }, 400, headers)
   }
 
-  if (currency !== DEMO_CURRENCY) {
-    return jsonResponse({ error: "Demo wallet only supports POINT" }, 400, headers)
+  if (currency !== POINT_CURRENCY) {
+    return jsonResponse({ error: "Wallet only supports POINT" }, 400, headers)
   }
 
   if (expiresInSeconds < 60 || expiresInSeconds > 86400) {
@@ -318,7 +302,7 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
 
   const row = firstRpcRow<CreateSessionRow>(rpcResult.body)
 
-  if (!row?.session_id || !row.launch_code) {
+  if (!row?.session_id || !row.launch_code || row.protocol !== "server-v1") {
     return jsonResponse({ error: "Gateway returned an empty session" }, 502, headers)
   }
 
@@ -332,49 +316,7 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     launch_code_expires_at: row.launch_code_expires_at,
     account_type: row.account_type,
     currency: row.currency,
-    wallet_mode: row.wallet_mode,
-    expires_at: row.expires_at,
-  }, 200, headers)
-}
-
-async function exchangeLaunchCode(request: Request, headers: HeadersInit): Promise<Response> {
-  const body = await readJsonBody(request)
-
-  if (!body.ok) {
-    return jsonResponse({ error: body.error }, 400, headers)
-  }
-
-  const launchCode = normalizeRequiredText(body.value.launch_code, 128)
-
-  if (!launchCode) {
-    return jsonResponse({ error: "launch_code is required" }, 400, headers)
-  }
-
-  const rpcResult = await callRpc("exchange_game_launch_code", {
-    p_launch_code: launchCode,
-    p_gateway_expires_in_seconds: 3600,
-  })
-
-  if (!rpcResult.ok) {
-    return jsonResponse(toPublicRpcError(rpcResult.body), statusFromRpcError(rpcResult.body), headers)
-  }
-
-  const row = firstRpcRow<ExchangeSessionRow>(rpcResult.body)
-
-  if (!row?.session_id || !row.gateway_token) {
-    return jsonResponse({ error: "Gateway token was not created" }, 502, headers)
-  }
-
-  return jsonResponse({
-    session_id: row.session_id,
-    game_id: row.game_id,
-    player_account_ref: row.player_account_id,
-    gateway_token: row.gateway_token,
-    gateway_token_expires_at: row.gateway_token_expires_at,
-    scopes: row.gateway_token_scopes,
-    account_type: row.account_type,
-    currency: row.currency,
-    wallet_mode: row.wallet_mode,
+    protocol: row.protocol,
     expires_at: row.expires_at,
   }, 200, headers)
 }
@@ -412,120 +354,6 @@ async function getBalance(request: Request, headers: HeadersInit): Promise<Respo
     currency: row.currency,
     balance: row.balance,
     locked_balance: row.locked_balance,
-  }, 200, headers)
-}
-
-async function applyWalletTransaction(
-  transactionType: "bet" | "payout" | "refund",
-  request: Request,
-  headers: HeadersInit,
-): Promise<Response> {
-  const body = await readJsonBody(request)
-
-  if (!body.ok) {
-    return jsonResponse({ error: body.error }, 400, headers)
-  }
-
-  const gatewayToken = normalizeRequiredText(body.value.gateway_token, 256)
-  const roundId = normalizeRequiredText(body.value.round_id, 120)
-  const idempotencyKey = normalizeRequiredText(body.value.idempotency_key, 180)
-  const amount = normalizeAmount(body.value.amount)
-  const metadata = normalizeMetadata(body.value.metadata)
-
-  if (!gatewayToken) {
-    return jsonResponse({ error: "gateway_token is required" }, 400, headers)
-  }
-
-  if (!roundId) {
-    return jsonResponse({ error: "round_id is required" }, 400, headers)
-  }
-
-  if (!amount) {
-    return jsonResponse({ error: "amount must be greater than zero" }, 400, headers)
-  }
-
-  if (!idempotencyKey) {
-    return jsonResponse({ error: "idempotency_key is required" }, 400, headers)
-  }
-
-  if (!metadata.ok) {
-    return jsonResponse({ error: metadata.error }, 400, headers)
-  }
-
-  const rpcResult = await callRpc(`wallet_${transactionType}`, {
-    p_gateway_token: gatewayToken,
-    p_round_id: roundId,
-    p_amount: amount,
-    p_idempotency_key: idempotencyKey,
-    p_metadata: metadata.value,
-  })
-
-  if (!rpcResult.ok) {
-    return jsonResponse(toPublicRpcError(rpcResult.body), statusFromRpcError(rpcResult.body), headers)
-  }
-
-  const row = firstRpcRow<WalletTransactionRow>(rpcResult.body)
-
-  if (!row?.transaction_id) {
-    return jsonResponse({ error: "Wallet transaction was not created" }, 502, headers)
-  }
-
-  return jsonResponse({
-    transaction_id: row.transaction_id,
-    session_id: row.game_session_id,
-    game_id: row.game_id,
-    round_id: row.round_id,
-    type: row.transaction_type,
-    amount: row.amount,
-    balance_before: row.balance_before,
-    balance_after: row.balance_after,
-    currency: row.currency,
-  }, 200, headers)
-}
-
-async function closeRound(request: Request, headers: HeadersInit): Promise<Response> {
-  const body = await readJsonBody(request)
-
-  if (!body.ok) {
-    return jsonResponse({ error: body.error }, 400, headers)
-  }
-
-  const gatewayToken = normalizeRequiredText(body.value.gateway_token, 256)
-  const roundId = normalizeRequiredText(body.value.round_id, 120)
-
-  if (!gatewayToken) {
-    return jsonResponse({ error: "gateway_token is required" }, 400, headers)
-  }
-
-  if (!roundId) {
-    return jsonResponse({ error: "round_id is required" }, 400, headers)
-  }
-
-  const rpcResult = await callRpc("close_game_round", {
-    p_gateway_token: gatewayToken,
-    p_round_id: roundId,
-  })
-
-  if (!rpcResult.ok) {
-    return jsonResponse(toPublicRpcError(rpcResult.body), statusFromRpcError(rpcResult.body), headers)
-  }
-
-  const row = firstRpcRow<CloseRoundRow>(rpcResult.body)
-
-  if (!row?.game_round_id) {
-    return jsonResponse({ error: "Game round was not found" }, 404, headers)
-  }
-
-  return jsonResponse({
-    game_round_id: row.game_round_id,
-    session_id: row.game_session_id,
-    game_id: row.game_id,
-    round_id: row.round_id,
-    status: row.status,
-    bet_amount: row.bet_amount,
-    payout_amount: row.payout_amount,
-    refund_amount: row.refund_amount,
-    settled_at: row.settled_at,
   }, 200, headers)
 }
 
@@ -681,6 +509,7 @@ function buildCorsHeaders(
 }
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
+  if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
   if (!origin) {
     return !memberRoute
@@ -793,41 +622,6 @@ function normalizeRequiredText(value: unknown, maxLength: number): string {
   }
 
   return text
-}
-
-function normalizeAmount(value: unknown): number | null {
-  const text = typeof value === "number"
-    ? String(value)
-    : typeof value === "string"
-      ? value.trim()
-      : ""
-
-  if (!/^(?:0|[1-9]\d{0,15})(?:\.\d{1,2})?$/.test(text)) {
-    return null
-  }
-
-  const amount = Number(text)
-
-  if (!Number.isFinite(amount) || amount <= 0) {
-    return null
-  }
-
-  return amount
-}
-
-function normalizeMetadata(value: unknown): (
-  | { ok: true; value: Record<string, JsonValue> }
-  | { ok: false; error: string }
-) {
-  if (value === undefined || value === null) {
-    return { ok: true, value: {} }
-  }
-
-  if (typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false, error: "metadata must be an object" }
-  }
-
-  return { ok: true, value: value as Record<string, JsonValue> }
 }
 
 function firstRpcRow<T>(body: unknown): T | undefined {

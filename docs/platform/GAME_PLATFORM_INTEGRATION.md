@@ -4,16 +4,11 @@ This document is the authoritative runtime contract between Looty and a game. It
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-17. Target contract reviewed: 2026-09-16.
-
-The member foundation is active in the hosted database and Gateway. The matching
-front end is released from main; [README.md](../../README.md) owns current
-verification limits. Game-token and wallet routes retain the Demo contract.
-
-The endpoint examples below describe the existing Demo contract. The section
-"Target Operational Contract" defines required platform work, not callable new
-endpoints. Current browser-issued payout/refund scopes must not be reused as
-operational wallet authority.
+Current source reviewed: 2026-09-17. The single server-authorized protocol below
+is deployed in the hosted database and Gateway; see [README.md](../../README.md)
+for verification and product-activation limits. There is no
+old/new compatibility path in the replacement. Existing game clients must adopt
+this protocol in their own repositories before activation.
 
 ## Core Rule
 
@@ -68,7 +63,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 
 Do not modify a game repository from a Looty repository task. Switch to the named game repository for game-side changes.
 
-## Current Looty Launch Flow
+## Looty Launch Flow
 
 1. A player opens `/game/?slug=<slug>`.
    The Lobby checks membership before navigating there. Missing member
@@ -80,11 +75,11 @@ Do not modify a game repository from a Looty repository task. Switch to the name
 4. It calls `looty-gateway/create-session`.
 5. The Gateway requires a verified Supabase user session and existing enrollment,
    including a persistent anonymous Auth session for guests.
-6. The reviewed session RPC resolves the enrolled platform player and Demo wallet.
+6. The reviewed session RPC resolves the enrolled platform player and configured wallet.
 7. The Loader appends the returned session parameters to the game URL.
 8. The Loader creates the iframe.
-9. The game exchanges the launch code once for a Gateway token.
-10. The game keeps that token only in memory and uses it for wallet calls.
+9. The game backend exchanges the launch code once, then gives the client a balance-only token.
+10. The client keeps that token in memory; financial operations belong to the game backend.
 
 The current Loader requests `POINT` with a one-hour session expiry.
 
@@ -96,9 +91,8 @@ The current Loader requests `POINT` with a one-hour session expiry.
 | `looty_launch_code` | One-time exchange credential | Exchange immediately; keep in memory; never log |
 | `looty_game_id` | Looty game identifier | Treat as platform metadata |
 | `looty_currency` | Session currency | Currently `POINT` |
-| `looty_wallet_mode` | Wallet mode | Currently Demo |
+| `looty_protocol` | Protocol version | Must be `server-v1` |
 | `looty_gateway_url` | Gateway base URL | Use for wallet routes |
-| `looty_exchange_url` | Direct exchange URL | Use for launch-code exchange |
 
 The Loader supplies these parameters, but URL values remain untrusted inputs.
 Validate the configured Gateway origin and derive identity, game, wallet, and
@@ -150,7 +144,7 @@ Request:
 Rules:
 
 - `slug` must identify an available published game.
-- `currency` defaults to `POINT` and Demo currently accepts only `POINT`.
+- `currency` defaults to `POINT`; no other currency is currently supported.
 - `expires_in_seconds` must be from 60 to 86,400.
 - `display_name` is optional and limited to 120 characters.
 - A valid Supabase bearer token and explicit player enrollment are required.
@@ -170,217 +164,198 @@ Relevant response fields:
   "launch_code_expires_at": "...",
   "account_type": "guest",
   "currency": "POINT",
-  "wallet_mode": "demo",
+  "protocol": "server-v1",
   "expires_at": "..."
 }
 ```
 
 The launch code is valid for two minutes and can be used once.
 
-## Launch-Code Exchange
+## Operational Protocol v1
 
-Endpoint:
+Status: deployed through the platform migrations and Gateway version 7. This protocol is
+for both wallet models. There is no browser payout or legacy Demo path.
 
-```text
-POST /exchange
+### Configuration and Credentials
+
+Looty selects the wallet from `looty_game_policies` and `looty_wallet_policies`.
+A null policy game ID means the shared platform wallet; a game ID means that
+game's independent wallet. A durable wallet cannot be replaced by freezing or
+closing it. A missing or disabled policy denies launch/open. The replacement
+has one accounting flow; test execution uses isolated local data. Disable a policy
+to pause new activity while retaining durable references for existing matches.
+
+Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
+`Content-Type: application/json` and no browser Origin. Looty stores a SHA-256
+hash, game ID, allowed actions, expiry and revocation time for each key. The key
+authorizes one game; no request can select another game or wallet scope. Origin
+checks are additional protection, not proof of identity. Products never receive
+the project service-role key or direct platform table grants.
+
+Provision keys only during reviewed product activation. Generate them with a
+cryptographically secure random source, deliver the plaintext only to the
+product backend's secret store, and retain only the hash in Looty. For rotation,
+provision a replacement with the same reviewed scope, update the backend,
+verify it, then revoke the old key. Revoke a compromised key immediately;
+replacement credentials must retain access to status/retry for existing matches.
+
+All routes below use POST, a 16 KiB body limit and an IP-based limit of 120 calls
+per route per minute. Unknown request fields are rejected. Amounts are decimal
+**strings**, such as `"100.00"`, with at most two decimal places; JSON numbers,
+exponents and extra precision are rejected. Player IDs in entries use canonical
+lowercase UUID strings. Request hashes are computed by Looty from PostgreSQL
+JSONB text, not supplied by the caller. JSON object order is irrelevant; array
+order and value spelling are part of the retry identity.
+
+### Exchange, Renewal and Re-entry
+
+The Loader supplies `looty_protocol=server-v1`,
+the one-use launch code and public correlation IDs. There is no browser exchange endpoint.
+The game sends the code to its own authenticated backend handoff; that backend
+is the sole redeemer through `server-exchange-v1`:
+
+```json
+{"version":1,"launch_code":"<one-use 64-character code>"}
 ```
 
-Request:
+The backend must validate its configured Looty Gateway host and use only the
+exchange result for player/game binding. Return fields are `version`,
+`session_id`, `game_id`, `player_account_ref`, `account_type`, `wallet_scope`
+(`platform` or `game`), `currency` (`POINT`),
+`gateway_token`, `gateway_token_expires_at`, `expires_at`, and `scopes:["balance"]`.
+The game may receive the short-lived balance token, never the backend key.
+Capture and remove launch credentials from the game's URL before telemetry,
+resource links or game navigation. Keep game credentials only in memory.
+
+`server-renew-v1` takes `{"version":1,"session_id":"<UUID>"}` and returns the
+same shape with a new balance token. Renewal invalidates the previous token;
+the backend serializes renewal per session. Tokens last at most 15 minutes and
+never outlive the original game session (the Loader currently requests one hour).
+Renewal does not extend the game session. Expired/revoked sessions and inactive
+players/wallets cannot renew or start a new match.
+
+For re-entry, obtain a new platform launch, exchange it and match the trusted
+`player_account_ref` to the product's existing match participant. Do not create a
+replacement player/wallet or reopen the financial match. Product gameplay state
+and its own connection authentication are product-owned. A lost exchange response
+needs a fresh platform launch; a used code cannot be redeemed a second time.
+
+Operational browser `balance` reports available POINT (`balance - locked_balance`)
+and the locked amount. Browser `bet`, `payout`, `refund` and `close-round` cannot
+be called: those routes and their database functions are removed.
+
+### Open and Settle
+
+`server-open-v1` takes:
 
 ```json
 {
-  "launch_code": "..."
+  "version":1,"match_ref":"product-match-123","rule_version":"rules-v1",
+  "participants":[{"session_id":"<UUID>","reserve":"100.00"}],
+  "product_participants":[{"account_ref":"bot-1","reserve":"100.00"}]
 }
 ```
 
-Relevant response fields:
+`product_participants` is optional. There must be at least one human participant;
+the combined count must fit the trusted per-game limit (default 16, maximum 64).
+Reserve the maximum authorized loss, not merely the first action's stake.
+The reserve must be positive and within the configured entry limit. Looty checks
+redeemed live sessions, active players/wallets, available funds and scope. A
+wallet can occupy only one open match, including across shared-wallet titles.
+The opening locks funds without moving the balance. Its response is
+`{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
+current state; changing the opening under the same game/match reference conflicts.
+
+`server-settle-v1` takes the authoritative result from the game backend:
 
 ```json
 {
-  "session_id": "...",
-  "game_id": "...",
-  "player_account_ref": "...",
-  "gateway_token": "...",
-  "gateway_token_expires_at": "...",
-  "scopes": ["balance", "bet", "payout", "refund", "close-round"],
-  "account_type": "guest",
-  "currency": "POINT",
-  "wallet_mode": "demo",
-  "expires_at": "..."
+  "version":1,"match_ref":"product-match-123","rule_version":"rules-v1",
+  "operation_key":"settle:product-match-123",
+  "entries":[
+    {"kind":"player","account_ref":"<player UUID>","amount":"80.00","source":"gameplay"},
+    {"kind":"product","account_ref":"bot-1","amount":"-90.00","source":"gameplay"},
+    {"kind":"fee","account_ref":"<game UUID>","amount":"10.00","source":"fee"}
+  ],
+  "product_commit":{}
 }
 ```
 
-The Gateway token is valid for at most one hour and is bound to its session, game, player, wallet, and scopes. Keep it only in runtime memory.
+Entries are signed changes, unique by kind/account, nonzero and limited to 65
+entries. Their exact sum must be zero. Omit participants whose change is zero;
+an empty list settles a draw and releases reservations. Players and product
+accounts must belong to the opening. Loss cannot exceed the recorded reserve;
+every absolute entry must fit the opening's snapshotted limit. Fee entries are
+positive, game-bound and separate from player or AI funding.
 
-## Wallet Calls
+Looty validates authority, rules reference, account binding and accounting;
+the game backend and its adapter validate the actual gameplay result. All human
+wallet changes, product-account changes, fee entries, immutable settlement rows,
+product commit marker and reservation releases commit in one transaction.
+Wallets lock in UUID order. A frozen wallet or adapter failure rolls back all
+participants. Player suspension, browser logout or session expiry after opening
+does not erase the authorized match obligation; trusted settlement may complete.
 
-### Balance
+Response fields are `version`, `settlement_id`, `match_id`, `state:"settled"`,
+`request_hash` and `settled_at`. Exact retries return the saved response.
+The operation key is unique within a game; changed content conflicts. Another
+operation key cannot settle an already finalized match.
 
-```text
-POST /balance
-```
+### Product Accounting Adapter
 
-```json
-{
-  "gateway_token": "..."
-}
-```
+Trusted configuration may register one `regprocedure` per game, snapshotted at
+opening. The signature is `(text,uuid,jsonb) returns jsonb` in a product schema.
+It must be SECURITY DEFINER under a non-superuser, non-BYPASSRLS owner with no
+platform/Auth table access; it must use a fixed empty search path and fully
+qualified objects. The product runtime cannot own, replace or invoke it directly.
+Review owner grants, schema CREATE grants, EXECUTE grants and dependencies before
+registration. Do not grant the runtime membership in its deployment owner role.
+The platform validates the registered signature/owner boundary and requires
+`{"committed":true}`; the caller cannot select a function or table.
 
-The response contains the session reference, player reference, currency, available balance, and locked balance.
+Actions are `open`, `settle` and `cancel`; the second argument is the Looty match
+UUID. Payload always includes `version:1`, trusted `game_id` and `request`.
+Settlement also supplies `settlement_id` and `request_hash`. The adapter validates
+its game binding and authoritative product state, reserves/reconciles product
+accounts in deterministic order, and writes its durable commit marker. It must
+throw on any mismatch. It cannot make external HTTP side effects or commit a
+separate transaction. Product-only locks follow platform wallet/fee locks; no
+other product path may hold those locks and then call back into Looty.
 
-### Bet, Payout, and Refund
+The fixture adapter demonstrates rollback and permission isolation only. Each
+product still implements/reviews its own gameplay and AI accounting invariants.
+There is no distributed-transaction promise for products in another database.
 
-Endpoints:
+### Recovery and Errors
 
-```text
-POST /bet
-POST /payout
-POST /refund
-```
+`server-status-v1` and `server-cancel-v1` take only
+`{"version":1,"match_ref":"product-match-123"}` and return
+`{version,match_id,state,result}`. Result is null until settled. After a timeout,
+query status and retry the same operation/content; never invent a new operation
+key or assume failure. Cancellation releases reservations without changing
+balances, calls the adapter atomically, and is repeatable. It cannot reverse a
+settled match. Only cancel when the product confirms the match is void; age,
+browser disconnection and token expiry do not authorize cancellation.
 
-Request:
+| HTTP | Stable errors |
+| --- | --- |
+| 400 | `LOOTY_INVALID_REQUEST`, `LOOTY_INVALID_AMOUNT`, `LOOTY_INVALID_ENTRY`, `LOOTY_LIMIT_EXCEEDED`, `LOOTY_UNBALANCED_SETTLEMENT` |
+| 401 | `LOOTY_BACKEND_UNAUTHORIZED` |
+| 403 | `LOOTY_GAME_NOT_READY`, `LOOTY_PLAYER_INACTIVE`, `LOOTY_WALLET_INACTIVE`, `LOOTY_SESSION_INVALID` |
+| 404 | `LOOTY_MATCH_NOT_FOUND` |
+| 409 | `LOOTY_IDEMPOTENCY_CONFLICT`, `LOOTY_MATCH_FINALIZED`, `LOOTY_RULE_MISMATCH`, `LOOTY_WALLET_OCCUPIED`, `LOOTY_INSUFFICIENT_BALANCE`, `LOOTY_ADAPTER_REJECTED` |
+| 429 | Existing Gateway rate-limit response with `Retry-After` |
+| 502/503 | Invalid/upstream-unavailable response; `LOOTY_UPSTREAM_UNAVAILABLE` or `LOOTY_ADAPTER_UNAVAILABLE` |
 
-```json
-{
-  "gateway_token": "...",
-  "round_id": "game-generated-round-id",
-  "amount": 100,
-  "idempotency_key": "stable-key-for-this-operation",
-  "metadata": {}
-}
-```
-
-Rules:
-
-- `amount` must be greater than zero.
-- `round_id` is required and identifies the game round within the current session.
-- `idempotency_key` is required and must remain stable for retries of the same operation.
-- Reusing an idempotency key with different transaction content is an error.
-- `metadata` is optional but must be a JSON object.
-- The Gateway verifies token, scope, session state, game, wallet, currency, and rate limit before calling a database RPC.
-- A bet cannot exceed the available balance.
-- Do not simulate a successful wallet mutation after the Gateway rejects it.
-
-The response includes the transaction reference, session, game, round, type, amount, balance before, balance after, and currency.
-
-### Close Round
-
-```text
-POST /close-round
-```
-
-```json
-{
-  "gateway_token": "...",
-  "round_id": "game-generated-round-id"
-}
-```
-
-Closing returns the round totals and settlement time. A closed round cannot accept another wallet transaction.
-
-The same `round_id` may exist safely in different game sessions because rounds and transactions are bound to `game_session_id`.
-
-## Wallet Semantics
-
-- The current wallet is Demo only.
-- The only accepted Demo currency is `POINT`.
-- A new Demo `POINT` wallet currently receives 10,000 points.
-- The current database reuses one active wallet per player and currency, so the current `POINT` balance is not game-scoped.
-- The credit is recorded as a deposit transaction.
-- The database-level Demo currency constraint is intentionally on hold. Do not recreate or apply it without a new user decision.
-- Gateway checks remain authoritative while that database constraint is on hold.
-- Demo points do not represent real money.
-- No platform-to-game, game-to-platform, or game-to-game conversion endpoint exists.
-
-The approved two wallet models and operational POINT policy belong in
-[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md). The current schema cannot yet
-select the correct scope. Update schema, catalog configuration, Gateway, and
-tests together before a game depends on the target contract.
-
-## Target Operational Contract
-
-Status: design requirements for the platform stage; not implemented. Keep this
-contract reusable for independent and platform-native games. Product rule engines,
-AI behavior, tile/card records, and payout calculation stay outside Looty.
-
-### Identity, Wallet Scope, and Occupancy
-
-- Resolve the canonical player and product classification on the backend.
-  A wallet's durable identity includes player, platform/game scope, currency,
-  and the chosen environment boundary. Status changes must not create another
-  wallet or repeat its initial grant; a frozen wallet is not a missing wallet.
-- Provision wallets and initial grants atomically with stable operation keys.
-  Initial credits are explicit source-typed entries, not a side effect of every
-  login or session creation.
-- Define wallet reservations/occupancy before accepting gameplay that spends
-  an entire available balance. Prevent concurrent matches or external debits
-  from spending the same funds. The product declares its occupancy needs;
-  Looty enforces them. A player's temporary absence does not release an active
-  match's claim. Specify how grants, future purchases, and administrative
-  adjustments interact with an occupied wallet before those paths are enabled.
-
-### Launch and Server Authorization
-
-- Client capabilities permit approved entry, read, and gameplay operations,
-  never caller-selected payouts, refunds, or direct wallet mutation.
-- Authenticate each trusted game backend, scope it to approved game IDs and
-  accounting operations, and support rotation/revocation. A game receives no
-  project-wide service-role key.
-- Define exactly one launch-code redeemer. Prefer a game backend redeeming the
-  code through an authenticated handoff, then issuing its seat/session binding.
-  If a browser exchanges first, the backend needs a separate trusted validation
-  mechanism; the same single-use code cannot be redeemed twice.
-- Specify replay protection, audience/game binding, expiry, renewal, rejoin,
-  revocation, error codes, and cleanup of credentials from URLs.
-- Short-lived client credentials may expire during a long match. Bind settlement
-  to the authorized durable match, not a still-online browser token. Reauthenticate
-  re-entry as the same player without cancelling committed financial obligations.
-  Define the treatment of suspended accounts and outstanding matches explicitly.
-
-### Atomic Settlement
-
-- Define a versioned request/result and stable error codes before product work.
-  A request identifies its game, round/match, operation key, content hash,
-  rule version, participants, and typed accounting entries. Exact endpoint and
-  schema names are selected during platform implementation, not invented by games.
-- Looty validates caller authority, player/session/wallet bindings, scope,
-  occupancy, accounting limits, and balancing. The product validates gameplay
-  and supplies the authoritative result; Looty does not reimplement game rules.
-- Commit every affected account, ledger entry, settlement result, and required
-  product commit marker together, or commit none. In the initial shared database,
-  use a short PostgreSQL transaction and deterministic account-lock order.
-- For product-owned accounts such as AI bankrolls, use a reviewed, narrowly
-  granted product accounting adapter in that same transaction. Do not give the
-  game direct platform-table access or let it select arbitrary tables/functions.
-  The platform owns the transaction contract; each product owns its account rules.
-- Validate entry totals and account bindings, not just header debit/credit equality.
-  Finalized financial entries are immutable; corrections are linked compensating
-  entries. Funding is separate from gameplay and fee revenue.
-- Identical retries return the committed result. Reusing a key with different
-  content is a conflict. Provide an authenticated status/reconciliation lookup
-  when a response is lost; timeout is not proof of rollback or permission to void.
-- A later move to separate databases needs a newly reviewed cross-service
-  recovery protocol. Do not claim that separate HTTP calls form one transaction.
-
-### Platform Acceptance Gate
-
-Use simulated game backends to prove both wallet models, scope isolation,
-unauthorized payout rejection, frozen-account behavior, once-only provisioning,
-concurrent occupancy, session renewal, altered-request rejection, duplicate
-settlement, lost responses, and rollback after an injected failure. A shared-wallet
-game follows the same authority requirements as a standalone game.
-
-The current browser amount/payout flow is a Demo limitation, not an operational
-integration option. Do not mark this target complete until implementation and
-tests agree with the contract. Database function execution grants must also be
-restricted; hiding an endpoint in the UI is insufficient.
-
-References: [PostgreSQL locking](https://www.postgresql.org/docs/current/explicit-locking.html),
-[Supabase function privileges](https://supabase.com/docs/guides/database/functions).
+Internal database diagnostics are not returned. No generic player compensation,
+purchase or funding endpoint is enabled. Correcting a committed result requires
+a separately reviewed linked compensating transaction; never edit immutable
+history or restore a browser payout route as a correction tool. Complete that operating procedure
+before activating a funded operational product.
 
 ## Security and Failure Behavior
 
-Current Gateway safeguards:
+Gateway safeguards:
 
 - Route and HTTP method validation.
 - Origin and CORS checks.
@@ -399,8 +374,9 @@ Current database-backed limits are keyed by route and client address:
 | `create-session` | 30 | 5 minutes |
 | `member` | 120 | 1 minute |
 | `enroll-member` | 30 | 5 minutes |
-| `exchange` | 60 | 5 minutes |
-| `balance`, `bet`, `payout`, `refund`, `close-round` | 120 per route | 1 minute |
+| `health` | 30 | 1 minute |
+| Each `server-*-v1` route | 120 | 1 minute |
+| `balance` | 120 | 1 minute |
 
 A 429 response includes `Retry-After`. Clients must wait instead of bypassing the limit with repeated retries.
 
@@ -432,12 +408,15 @@ The Gateway currently operates through protected RPCs over:
 - `wallet_accounts`
 - `wallet_transactions`
 - `game_sessions`
-- `game_rounds`
+- `looty_matches`, `looty_match_participants`
+- `looty_settlements`, `looty_settlement_entries`, `looty_fee_accounts`
+- `looty_wallet_policies`, `looty_game_policies`, `looty_backend_keys`
 - `gateway_rate_limits`
 
-`game_rounds` is a platform wallet and settlement summary. It does not store authoritative gameplay state, card or tile history, player actions, reconnect state, progression, or rankings. Each game must keep those records in its game-owned schema and backend boundary.
-
-The game may correlate its authoritative record with Looty by using the supplied player reference and game-session ID together with its own stable `round_id`. These values do not authorize direct table access in either direction. Even when the initial deployment shares one Supabase project, game code must not access Looty-owned tables, another game's schema, or a project-wide service-role key. Wallet mutations remain behind the Looty Gateway.
+Looty stores match reservations and platform accounting results, not authoritative
+rooms, gameplay actions, progression or rankings. Products correlate their own
+records using stable game/match and player references. Their schema and runtime
+roles remain isolated even inside the same physical Supabase project.
 
 The browser and game do not receive direct table access. Legacy `players`, `player_balances`, and `ensure_my_player_v1()` must not be restored.
 
@@ -445,9 +424,8 @@ Database operation rules and the current schema summary are in `../../README.md`
 
 ## Integration Checklist
 
-The checks below cover the current Loader/Demo path. Operational publication
-also requires the Target Operational Contract acceptance gate above; passing
-these Demo endpoint checks alone does not approve production accounting.
+The platform fixture verifies the protocol, not a product's actual gameplay or
+hosted integration. Complete the owning product's integration before activation.
 
 Before listing a game through the Looty Lobby:
 
@@ -459,7 +437,7 @@ Before listing a game through the Looty Lobby:
 6. Use the designated single launch-code redeemer; keep client game tokens in memory and validate the server handoff.
 7. Use a stable `round_id` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
-9. Verify launch, balance, bet, payout, refund, close-round, retry, and insufficient-balance behavior as applicable.
+9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance.
 10. Confirm no launch code, Gateway token, member JWT, or provider credential reaches storage, logs, analytics, or save data.
 11. Add the Looty-managed `750 x 1000` WebP cover in this repository.
 12. Test Lobby to Loader to iframe on the target production origin.

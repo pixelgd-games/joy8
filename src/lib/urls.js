@@ -35,9 +35,15 @@ export function appendQueryParams(rawValue, params) {
   try {
     const isRootRelative = ROOT_RELATIVE_PATH.test(value)
     const url = new URL(value, isRootRelative ? getBaseOrigin() : undefined)
+    for (const key of [...url.searchParams.keys()]) {
+      if (key.startsWith("looty_")) url.searchParams.delete(key)
+    }
 
     for (const [key, paramValue] of Object.entries(params || {})) {
-      if (paramValue === undefined || paramValue === null || paramValue === "") continue
+      if (paramValue === undefined || paramValue === null || paramValue === "") {
+        url.searchParams.delete(key)
+        continue
+      }
       url.searchParams.set(key, String(paramValue))
     }
 

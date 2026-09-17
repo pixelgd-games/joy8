@@ -2,7 +2,7 @@
 
 This document defines what Looty is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-16.
+Last reviewed: 2026-09-17.
 
 ## Product Definition
 
@@ -118,11 +118,15 @@ and must not initialize Looty Auth, sessions, or wallets.
 - Independent-game balances do not affect another game's or the platform's
   balance. Platform-native games intentionally consume the same balance.
 - Platform initial credit is granted once per player, not once per title.
-  Independent-game initial-credit amounts remain product-specific.
+  Operational wallets currently start at **0 POINT**, for both wallet models.
+  Any later opening grant or product-specific amount needs a separate decision.
+  Existing Demo balances must not be carried into operation. Do not maintain an
+  old Demo runtime or an old/new compatibility branch in the replacement platform.
+  The approved cutover clears test accounting while preserving Auth/player identities and catalog/admin data. Future resets require a new explicit decision.
 - POINT is intended for operational play, not a disposable Demo-only design.
   Build one wallet/accounting architecture for testing and operation while
-  isolating their data. The current Demo implementation remains described in
-  [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md).
+  isolating their data. The hosted release and replacement status are recorded in
+  [README.md](../../README.md); the integration document defines the replacement.
 - Purchasing POINT is an allowed future product capability. Whether it ships
   at the first public launch is undecided. No payment provider, purchase price,
   or payment deployment is authorized by this document.
@@ -151,9 +155,9 @@ when an integration or release needs it. Different URLs against the same live
 database do not provide test isolation.
 
 Local tests use separate data, credentials, and configuration. Do not promote
-test balances, transactions, or fee totals into operational accounts. Before
-public operation, explicitly review existing Demo data and define the opening
-balances and cutover; this is not authorization to delete or reset data.
+test balances, transactions, or fee totals into operational accounts. The approved
+cutover cleared test accounting and starts new wallets at 0 POINT. Any further
+reset or balance change requires a separately reviewed scope and authorization.
 The present repository cannot recreate the full local database from migrations
 alone. A reviewed bootstrap/fixture and backup/restore procedure are prerequisite
 work, tracked in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).

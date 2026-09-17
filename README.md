@@ -6,11 +6,11 @@ This file is the source of truth for the repository's current implementation. Pr
 
 Last implementation review: 2026-09-17.
 
-The member foundation includes public Lobby browsing, explicit login or guest
-entry, and persistent player enrollment. Both member migrations are applied to
-the hosted database and Gateway version 6 is active. The matching front end is
-released from `main`. Real Google, email, linking and recovery acceptance remain
-outstanding; this is still a Demo wallet platform.
+The platform includes public Lobby browsing, Google/password/guest member entry,
+persistent player enrollment and one server-authorized wallet/settlement flow.
+The member and four platform migrations are applied; Gateway version 7 is active.
+The matching front end is released through main. Product activation and real
+Google/email/linking/recovery acceptance remain outstanding.
 
 ## Current Scope
 
@@ -24,7 +24,7 @@ Looty currently provides:
   Google, email, linking and recovery still require real provider acceptance.
 - Google OAuth for game administration, with server-side administrator verification.
 - CRUD pages for the `games` catalog.
-- A Supabase Edge Function for launch-code exchange, session authorization, Demo wallet operations, and runtime rate limits.
+- A Supabase Edge Function for trusted game backend authorization, scoped wallets, atomic settlement and runtime rate limits.
 - Cloudflare Pages static deployment from the `main` branch.
 - PWA metadata and install support for the Lobby.
 
@@ -32,14 +32,35 @@ Looty does not currently provide:
 
 - Fully provider-verified public member flows or branded cross-origin handoff.
 - Production money movement.
-- Full analytics, dashboards, alerting, or an operational health endpoint.
+- Full analytics, dashboards, or unattended alerting.
 - A game runtime or game-specific business logic.
 - CrazyGames integration inside this repository.
 
 See [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md) for the H5 release,
 both product models, operational POINT direction, and platform -> product ->
 integration order. The member foundation starts the platform stage; scoped wallets,
-trusted settlement, and product integration are still planned.
+trusted settlement and health are deployed. No game is activated on the new
+protocol yet; product integration and provider acceptance remain outstanding.
+
+### Platform Foundation
+
+The platform has one deployed server-authorized accounting flow. It removes browser exchange/bet/payout/
+refund/close-round routes, their RPCs, automatic Demo credit and the obsolete
+wallet-mode branch. Tests use isolated local data with the same protocol.
+There is no runtime fallback for an unconfigured game.
+
+It includes both wallet scopes, default 0 POINT provisioning, game-scoped backend
+keys, one-time backend exchange, balance-only client tokens, renewal, reservations,
+atomic settlement, cancellation/status and dependency health. No game policy or
+backend key is seeded; products need their own backend/adapter integration before
+activation. Existing game clients cannot launch after this cutover until they
+adopt the new contract. The Lobby and member UI remain available.
+
+The approved reset removed test wallets, ledger, sessions and old rounds. Auth
+identities, player records, catalog and administrator records matched their
+pre-deployment count/hash snapshots. No test balance was carried forward.
+The four incremental platform migrations are in supabase/migrations/.
+Protocol details belong in [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLATFORM_INTEGRATION.md#operational-protocol-v1).
 
 ## Architecture
 
@@ -137,11 +158,10 @@ The iframe receives:
 - `looty_launch_code`
 - `looty_game_id`
 - `looty_currency`
-- `looty_wallet_mode`
+- `looty_protocol` (`server-v1`)
 - `looty_gateway_url`
-- `looty_exchange_url`
 
-The launch code is single-use and valid for two minutes. A game exchanges it for an in-memory Gateway token that is valid for at most one hour. The Loader never passes a Supabase anonymous key, member JWT, or service-role key into the iframe.
+The launch code is single-use and valid for two minutes. The trusted game backend exchanges it for an in-memory, balance-only token valid for at most 15 minutes and no later than session expiry. The Loader never passes a Supabase anonymous key, member JWT, or service-role key into the iframe.
 
 The full game-facing contract is in `docs/platform/GAME_PLATFORM_INTEGRATION.md`.
 
@@ -176,17 +196,11 @@ The front end does not write player, wallet, round, or session tables directly.
 
 ## Gateway
 
-The deployed Gateway version 6 includes member entry. Routes are:
+Hosted Gateway version 7 implements these POST routes:
 
-- `POST /member`
-- `POST /enroll-member`
-- `POST /create-session`
-- `POST /exchange`
-- `POST /balance`
-- `POST /bet`
-- `POST /payout`
-- `POST /refund`
-- `POST /close-round`
+- member, enroll-member, create-session, balance, health.
+- server-exchange-v1, server-renew-v1, server-open-v1,
+  server-settle-v1, server-status-v1, server-cancel-v1.
 
 The public base URL is:
 
@@ -203,9 +217,9 @@ Current safeguards include:
 - Token scope and session validation.
 - Database-backed runtime rate limits.
 - A 5-second authentication timeout and an 8-second RPC timeout.
-- Demo currency enforcement at the Gateway.
-- Idempotent wallet transaction behavior.
-- Cross-session round isolation.
+- POINT validation and trusted per-game wallet policy.
+- Idempotent atomic match settlement.
+- Game-scoped backend keys and reservation/participant isolation.
 
 The Gateway uses `verify_jwt=false` because it performs its own launch-code, token, origin, scope, session, and rate-limit checks. Its protected database RPCs are granted only to `service_role`.
 
@@ -213,33 +227,29 @@ The Gateway uses `verify_jwt=false` because it performs its own launch-code, tok
 
 The Looty Supabase project is `Looty`, ref `lsazydefvnuqglultqii`.
 
-The current public-schema core is:
+The replacement retains games, admin_users, public_games_v1, player_accounts,
+wallet_accounts, wallet_transactions, game_sessions and gateway_rate_limits.
+It introduces trusted policies/backend keys, matches, participants, settlements,
+settlement entries and fee accounts. The old game_rounds table has been removed.
 
-- `games`
-- `admin_users`
-- `public_games_v1`
-- `player_accounts`
-- `wallet_accounts`
-- `wallet_transactions`
-- `game_sessions`
-- `game_rounds`
-- `gateway_rate_limits`
+Protected tables use RLS and service-only RPCs. Products receive no project-wide
+service-role key. A wallet belongs to one trusted platform/game policy and remains
+unique even if frozen or closed. POINT starts at 0 pending a later grant decision.
+There is no conversion, purchase or withdrawal API. Product gameplay data and any
+AI accounting adapter remain in a permission-separated product schema.
 
-The platform skeleton tables and `gateway_rate_limits` have row-level security enabled. Front-end table grants and policies are not provided for the protected platform tables.
-
-Demo wallets currently support only `POINT`. A new Demo `POINT` wallet receives a 10,000-point test credit recorded as a deposit transaction. The additional database-level Demo currency constraint is intentionally on hold; the Gateway still rejects non-`POINT` Demo sessions.
-
-The current active wallet key is player plus currency, with no explicit platform-versus-game scope. Games using `POINT` therefore reuse the same active wallet today. The approved product-aware wallet-scope direction is documented in `docs/product/PRODUCT_SCOPE.md`, but it is not implemented and there is no currency-conversion endpoint.
-
-The `game_rounds` table stores only the platform session relationship and aggregate bet, payout, refund, status, and settlement data needed by the wallet flow. It is not a full gameplay or match-history store. Each game owns its authoritative player mapping, rooms, matches, actions, results, progression, and history in its game-owned schema and backend boundary and correlates them with Looty references through the integration contract. The approved initial cost model may host those permission-separated schemas in the same managed Supabase project; no game schema has been added by this repository yet.
+The reset left wallet/session/transaction/match/settlement tables empty. No game
+policies or backend keys are installed. Before product activation, review its
+scope, limits, key and adapter against the integration contract.
 
 The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain unapplied. Follow their
 [review instructions](supabase/drafts/README.md) before promoting any to migrations.
-The two member migrations are active in `supabase/migrations/`; all 19 local and
-hosted migration records match. Their application preserved existing player,
-wallet, ledger and session counts and total balances.
+The member and platform migrations are active in supabase/migrations/; all 23
+local and hosted migration records match. The reset preserved all 6 Auth identities,
+1,197 player records, 9 catalog games and 1 administrator. These are identity/catalog
+records, not 1,197 verified registered users.
 Review blockers are tracked in [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Local Development
@@ -286,6 +296,7 @@ npm run smoke
 npm run test:gateway
 npm run test:member
 npm run test:member-db
+npm run test:platform-db
 ```
 
 `test:member-db` runs both member migrations in an in-memory PGlite
@@ -297,6 +308,25 @@ browser-role denial, secret hashing/expiry, and transaction rollback.
 PGlite 0.5.8 uses PostgreSQL 18.3 and one connection; this is not validation of
 hosted PostgreSQL 17 concurrency, Supabase Auth internals, or provider behavior.
 The fixture is test-only, not a baseline migration or hosted deployment script.
+
+`test:platform-db` extends that isolated fixture with the four platform migrations.
+Its 20 SQL cases cover both wallet models, zero credit, one-time provisioning,
+server authority, renewal, reservation and available balance, exactly-once
+settlement, draws, fees, frozen wallets, immutable accounting, adapter permissions,
+and injected product failure with rollback of player/product/fee/commit records.
+They also verify reset boundaries, removed legacy RPCs and missing-policy rejection. The simulated product adapter is test-only, not a Mahjong implementation.
+
+The same command runs three cutover guard checks: non-test sessions, outstanding
+reservations and external cascading foreign keys must abort the reset while
+retaining the original data and schema (23 PGlite cases in total).
+
+With `LOOTY_TEST_PG_BIN` set as below, `npm run test:platform-pg` runs those cases
+plus eight actual competing-connection cases on native PostgreSQL 17.6 (28 cases).
+They observe database lock waits for launch, occupancy, duplicate/changed
+settlement, both freeze orderings, key revocation, and rollback/retry. These
+checks do not constitute hosted integration, full Supabase bootstrap, load
+testing, or backup restoration. Gateway mock tests cover the six server routes,
+browser rejection, body bounds, safe error mapping and dependency health.
 
 `test:member-pg` runs the same 14 checks plus eight competing-connection checks
 against a fresh native PostgreSQL 17 cluster. It has passed on PostgreSQL 17.6.
@@ -330,15 +360,15 @@ database concurrency, grants, wallet preservation, or end-to-end recovery.
 10-character minimum password for future local testing; it does not change the
 hosted project. Production provider and abuse settings remain a release gate.
 
-Hosted acceptance has passed on `looty-git.pages.dev` in the desktop in-app
-browser: public Lobby browsing, game-triggered member dialog, real anonymous
-Auth enrollment, and two entries into Arrgh! Hoops. Database reads confirmed
-one enrolled Auth guest, one player, one wallet, two sessions, and one initial
-10,000 POINT credit. The deployed assets match the verified local build. This
-does not verify Google/email sign-in, promotion, recovery, mobile browsers, or
-guest persistence after clearing browser storage.
+Hosted acceptance verifies dependency health, browser/server authorization
+rejection, removed legacy routes and database grants. Identity/catalog snapshots
+matched across cutover; postflight and reconciliation counts passed. Earlier
+member acceptance verified real guest enrollment and repeated entry. After the
+accounting reset, game play requires an activated product backend; no product
+match has been accepted against hosted settlement yet. Google/email, promotion,
+recovery and mobile continuity remain unverified.
 
-`npm run smoke:gateway` targets the deployed Gateway and may create remote runtime data unless it is explicitly configured for a non-mutating check. Read the script and confirm the intended environment before running it.
+`npm run smoke:gateway` tests the replacement health and rejection paths only. It creates no business data but changes runtime rate counters. Hosted execution requires `ALLOW_PRODUCTION_GATEWAY_SMOKE=1` and approval. The deployed Gateway health/rejection check passed.
 
 For Markdown-only changes, validate document links, paths, language, and architecture claims; a production build is not required unless implementation files also changed.
 

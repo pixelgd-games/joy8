@@ -1,207 +1,32 @@
 import assert from "node:assert/strict"
-import crypto from "node:crypto"
 
-const gatewayUrl = (process.env.GATEWAY_URL || "https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway").replace(/\/+$/, "")
-const gameSlug = process.env.GATEWAY_GAME_SLUG || "color-guess"
-const lootyOrigin = process.env.GATEWAY_LOOTY_ORIGIN || "https://looty-git.pages.dev"
-const gameOrigin = process.env.GATEWAY_GAME_ORIGIN || "https://game-smoke.example"
-const anonKey = process.env.GATEWAY_ANON_KEY || ""
-const isProduction = gatewayUrl.includes("lsazydefvnuqglultqii.supabase.co")
-
-if (isProduction && process.env.ALLOW_PRODUCTION_GATEWAY_SMOKE !== "1") {
-  throw new Error("Set ALLOW_PRODUCTION_GATEWAY_SMOKE=1 to run against the Looty production Gateway.")
+const gateway = new URL(process.env.GATEWAY_URL || "https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway")
+const production = gateway.hostname === "lsazydefvnuqglultqii.supabase.co"
+if (production && process.env.ALLOW_PRODUCTION_GATEWAY_SMOKE !== "1") {
+  throw new Error("Set ALLOW_PRODUCTION_GATEWAY_SMOKE=1 after approving the hosted check; runtime rate counters may change.")
 }
-
-const runId = crypto.randomUUID()
-
-const blocked = await post("create-session", {
-  slug: gameSlug,
-  currency: "POINT",
-}, "https://not-looty.example")
-assert.equal(blocked.status, 403, "create-session must reject an unapproved origin")
-
-const missingOrigin = await post("create-session", {
-  slug: gameSlug,
-  currency: "POINT",
-}, null)
-assert.equal(missingOrigin.status, 403, "create-session must reject a missing origin")
-
-const unsupportedCurrency = await post("create-session", {
-  slug: gameSlug,
-  currency: "USD",
-}, lootyOrigin)
-assert.equal(unsupportedCurrency.status, 400, "demo wallet must reject unsupported currency")
-
-const oversizedDisplayName = await post("create-session", {
-  slug: gameSlug,
-  currency: "POINT",
-  display_name: "x".repeat(121),
-}, lootyOrigin)
-assert.equal(oversizedDisplayName.status, 400, "create-session must reject an oversized display name")
-
-if (process.env.GATEWAY_NON_MUTATING_SMOKE === "1") {
-  console.log("Gateway non-mutating security smoke passed.")
-  process.exit(0)
+if (gateway.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includes(gateway.hostname)) {
+  throw new Error("Gateway must use HTTPS outside loopback")
 }
-
-if (anonKey) {
-  const anonymousClient = await post("create-session", {
-    slug: gameSlug,
-    currency: "POINT",
-    expires_in_seconds: 3600,
-  }, lootyOrigin, {
-    apikey: anonKey,
-    Authorization: `Bearer ${anonKey}`,
+const base = gateway.href.replace(/\/+$/, "")
+const origin = process.env.GATEWAY_LOOTY_ORIGIN || "https://looty-git.pages.dev"
+async function post(route, body = {}, browserOrigin = null) {
+  return fetch(base + "/" + route, {
+    method: "POST", headers: { "Content-Type": "application/json", ...(browserOrigin ? { Origin: browserOrigin } : {}) },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(12000),
   })
-  assert.equal(anonymousClient.status, 200, "Supabase anonymous client must create a guest session")
 }
-
-const sessionA = await createSession()
-const sessionB = await createSession()
-const exchangeA = await exchange(sessionA.launch_code)
-const exchangeB = await exchange(sessionB.launch_code)
-
-const reusedCode = await post("exchange", {
-  launch_code: sessionA.launch_code,
-})
-assert.equal(reusedCode.status, 404, "launch code must be single-use")
-
-const invalidToken = await post("balance", {
-  gateway_token: "invalid-gateway-token",
-})
-assert.equal(invalidToken.status, 404, "invalid gateway token must be rejected")
-
-const oversizedBody = await fetch(`${gatewayUrl}/balance`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Origin: gameOrigin,
-  },
-  body: JSON.stringify({ gateway_token: "invalid", padding: "x".repeat(17 * 1024) }),
-})
-assert.equal(oversizedBody.status, 400, "oversized JSON body must be rejected")
-
-const balance = await post("balance", {
-  gateway_token: exchangeA.gateway_token,
-})
-assert.equal(balance.status, 200, "valid gateway token must read balance")
-assert.equal(Number(balance.body?.balance), 10000, "new demo wallet must start with 10,000 POINT")
-
-const sharedRoundId = `smoke-shared-${runId}`
-const payoutKeyA = `smoke-payout-a-${runId}`
-const payoutA = await wallet("payout", exchangeA.gateway_token, sharedRoundId, 100, payoutKeyA)
-const payoutARepeat = await wallet("payout", exchangeA.gateway_token, sharedRoundId, 100, payoutKeyA)
-assert.equal(payoutARepeat.transaction_id, payoutA.transaction_id, "idempotent retry must return the same transaction")
-assert.equal(String(payoutARepeat.balance_after), String(payoutA.balance_after), "idempotent retry must keep the same balance")
-
-const conflictingRetry = await post("payout", {
-  gateway_token: exchangeA.gateway_token,
-  round_id: sharedRoundId,
-  amount: 101,
-  idempotency_key: payoutKeyA,
-  metadata: { source: "gateway-security-smoke", run_id: runId },
-})
-assert.equal(conflictingRetry.status, 409, "conflicting idempotency retry must be rejected")
-
-await wallet("payout", exchangeB.gateway_token, sharedRoundId, 100, `smoke-payout-b-${runId}`)
-
-const foreignRoundId = `smoke-foreign-${runId}`
-await wallet("payout", exchangeB.gateway_token, foreignRoundId, 20, `smoke-foreign-payout-${runId}`)
-
-const crossSessionClose = await post("close-round", {
-  gateway_token: exchangeA.gateway_token,
-  round_id: foreignRoundId,
-})
-assert.equal(crossSessionClose.status, 404, "a session must not close another session's round")
-
-const ownerClose = await post("close-round", {
-  gateway_token: exchangeB.gateway_token,
-  round_id: foreignRoundId,
-})
-assert.equal(ownerClose.status, 200, "the owning session must close its round")
-
-const betRoundId = `smoke-bet-${runId}`
-await wallet("bet", exchangeA.gateway_token, betRoundId, 10, `smoke-bet-${runId}`)
-
-const closeBet = await post("close-round", {
-  gateway_token: exchangeA.gateway_token,
-  round_id: betRoundId,
-})
-assert.equal(closeBet.status, 200, "an open round must close successfully")
-
-if (process.env.TEST_GATEWAY_RATE_LIMIT === "1") {
-  let limited = false
-
-  for (let index = 0; index < 35; index += 1) {
-    const response = await post("create-session", {
-      slug: "",
-      currency: "POINT",
-    }, lootyOrigin)
-
-    if (response.status === 429) {
-      limited = true
-      break
-    }
-  }
-
-  assert.equal(limited, true, "create-session rate limit must return 429")
+assert.equal((await post("create-session", {}, "https://not-looty.example")).status, 403)
+assert.equal((await post("create-session")).status, 403)
+assert.equal((await post("create-session", {}, origin)).status, 401)
+for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
+  assert.equal((await post(route)).status, 404, route + " must be removed")
 }
-
-console.log("Gateway security smoke passed.")
-
-async function createSession() {
-  const response = await post("create-session", {
-    slug: gameSlug,
-    currency: "POINT",
-    expires_in_seconds: 3600,
-  }, lootyOrigin)
-
-  return expectSuccess(response, "create-session")
+for (const action of ["exchange", "renew", "open", "settle", "status", "cancel"]) {
+  assert.equal((await post("server-" + action + "-v1", { version: 1 })).status, 401)
+  assert.equal((await post("server-" + action + "-v1", { version: 1 }, origin)).status, 403)
 }
-
-async function exchange(launchCode) {
-  const response = await post("exchange", {
-    launch_code: launchCode,
-  })
-
-  return expectSuccess(response, "exchange")
-}
-
-async function wallet(route, gatewayToken, roundId, amount, idempotencyKey) {
-  const response = await post(route, {
-    gateway_token: gatewayToken,
-    round_id: roundId,
-    amount,
-    idempotency_key: idempotencyKey,
-    metadata: { source: "gateway-security-smoke", run_id: runId },
-  })
-
-  return expectSuccess(response, route)
-}
-
-async function post(route, body, origin = gameOrigin, extraHeaders = {}) {
-  const headers = {
-    "Content-Type": "application/json",
-    ...extraHeaders,
-  }
-
-  if (origin) {
-    headers.Origin = origin
-  }
-
-  const response = await fetch(`${gatewayUrl}/${route}`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  })
-
-  return {
-    status: response.status,
-    body: await response.json().catch(() => null),
-  }
-}
-
-function expectSuccess(response, label) {
-  assert.equal(response.status, 200, `${label} failed: ${JSON.stringify(response.body)}`)
-  return response.body
-}
+const health = await post("health")
+assert.equal(health.status, 200)
+assert.deepEqual(await health.json(), { status: "ok" })
+console.log("Gateway health and rejection checks passed; no identity, wallet, session or settlement was created.")
