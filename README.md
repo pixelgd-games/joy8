@@ -103,7 +103,10 @@ Vite declares these entries in `vite.config.js`.
 
 1. The Lobby reads published games from `public_games_v1`.
    The platform entry is `/`: browsing the Lobby does not require login or open
-   an authentication page. The top-bar `登入` control opens the shared member UI
+   an authentication page. The top-bar account control shows `登入` when signed
+   out, `訪客帳號` for an Auth guest, and `我的帳號` for a registered Auth user.
+   It follows Auth session changes; the label does not grant player eligibility.
+   The control opens the shared member UI
    in a dismissible dialog; the Lobby remains visible and its URL is unchanged.
    `/account/` remains available for Auth callbacks and recovery.
 2. Cards are rendered from database metadata.

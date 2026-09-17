@@ -4,6 +4,7 @@ import { renderLobby } from "./lobby.js"
 import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { createMemberService, memberErrorMessage } from "../../member/service.js"
 import { createGameEntry } from "../../member/game-entry.js"
+import { memberSupabase } from "../../lib/memberClient.js"
 
 let deferredInstallPrompt = null
 
@@ -51,16 +52,18 @@ export async function initLobbyPage(appRoot) {
 function setupMemberEntry(appRoot) {
   let pending = false
   let enterGame
+  const accountLink = appRoot.querySelector(".member-login-link")
+  memberSupabase.auth.onAuthStateChange((_event, session) => {
+    const user = session?.user
+    accountLink.textContent = user ? user.is_anonymous ? "訪客帳號" : "我的帳號" : "登入"
+  })
 
   const openEntry = async (trigger, next, gameName) => {
     if (pending) return
     pending = true
     trigger.setAttribute("aria-busy", "true")
     try {
-      const [{ openMemberModal }, { memberSupabase }] = await Promise.all([
-        import("../../member/modal.js"),
-        import("../../lib/memberClient.js"),
-      ])
+      const { openMemberModal } = await import("../../member/modal.js")
       if (!next) {
         await openMemberModal(trigger)
         return
