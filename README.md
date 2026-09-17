@@ -327,6 +327,14 @@ database concurrency, grants, wallet preservation, or end-to-end recovery.
 10-character minimum password for future local testing; it does not change the
 hosted project. Production provider and abuse settings remain a release gate.
 
+Hosted acceptance has passed on `looty-git.pages.dev` in the desktop in-app
+browser: public Lobby browsing, game-triggered member dialog, real anonymous
+Auth enrollment, and two entries into Arrgh! Hoops. Database reads confirmed
+one enrolled Auth guest, one player, one wallet, two sessions, and one initial
+10,000 POINT credit. The deployed assets match the verified local build. This
+does not verify Google/email sign-in, promotion, recovery, mobile browsers, or
+guest persistence after clearing browser storage.
+
 `npm run smoke:gateway` targets the deployed Gateway and may create remote runtime data unless it is explicitly configured for a non-mutating check. Read the script and confirm the intended environment before running it.
 
 For Markdown-only changes, validate document links, paths, language, and architecture claims; a production build is not required unless implementation files also changed.

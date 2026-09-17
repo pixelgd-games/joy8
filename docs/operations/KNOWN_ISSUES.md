@@ -81,10 +81,10 @@ Current behavior:
 
 Risk:
 
-- Actual guest continuity and promotion must still be tested against Auth and the
-  hosted database; isolated SQL tests, including native PostgreSQL 17.6 races,
-  verify preservation in the fixture, but mocked Auth responses do not prove
-  real provider linking or continuity.
+- Hosted guest entry and repeated game launch passed the limited acceptance in
+  [README.md](../../README.md#verification). Cross-browser continuity and real
+  provider promotion remain unverified. Isolated SQL tests, including native
+  PostgreSQL 17.6 races, do not prove real provider linking.
 - Current wallet behavior cannot yet distinguish an independent game's wallet from the shared wallet approved for Looty-native games.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
@@ -149,8 +149,9 @@ membership authorization, safe return paths, and responsive member UI. The
 isolated member SQL suite also executes both migrations and checks roles, rollback,
 player/wallet preservation and initial credit. Its engine and fixture limits are
 documented in [README.md](../../README.md#verification). Native PostgreSQL 17.6
-also passes eight competing-connection cases. Real provider behavior, the hosted
-environment and production load remain unverified.
+also passes eight competing-connection cases. Hosted guest acceptance is limited
+to the checks in README; Google/email, linking, recovery and production load
+remain unverified.
 
 Not fully automated:
 
