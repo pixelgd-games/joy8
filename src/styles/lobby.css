@@ -1,5 +1,9 @@
 @import "./theme.css";
 
+html{
+  scrollbar-gutter:stable;
+}
+
 body{
   min-width:320px;
   background:
@@ -58,9 +62,11 @@ body{
   display:flex;
   align-items:center;
   justify-content:flex-end;
+  gap:8px;
   min-width:0;
 }
 
+.member-login-link,
 .install-button{
   display:inline-flex;
   align-items:center;
@@ -76,6 +82,7 @@ body{
   font-weight:850;
   letter-spacing:0;
   white-space:nowrap;
+  text-decoration:none;
   box-shadow:0 10px 24px rgba(0,0,0,.18);
   cursor:pointer;
   -webkit-tap-highlight-color:transparent;
@@ -91,18 +98,21 @@ body{
   outline:none;
 }
 
+.member-login-link:focus-visible,
 .install-button:focus-visible{
   box-shadow:
     0 10px 24px rgba(0,0,0,.18),
     0 0 0 3px rgba(235,255,61,.48);
 }
 
+.member-login-link:active,
 .install-button:active{
   transform:scale(.98);
   background:rgba(235,255,61,.14);
 }
 
 @media (hover:hover) and (pointer:fine){
+  .member-login-link:hover,
   .install-button:hover{
     border-color:rgba(235,255,61,.44);
     background:rgba(235,255,61,.13);

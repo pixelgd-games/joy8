@@ -29,7 +29,7 @@ export async function signInWithGoogle() {
 }
 
 export async function signOut() {
-  const { error } = await supabase.auth.signOut()
+  const { error } = await supabase.auth.signOut({ scope: "local" })
   if (error) {
     showErrorModal({
       code: ERROR_CODES.ADMIN_SIGN_OUT_FAILED,

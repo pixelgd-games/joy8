@@ -4,7 +4,11 @@ This document is the authoritative runtime contract between Looty and a game. It
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current v5 implementation reviewed: 2026-09-15. Target contract reviewed: 2026-09-16.
+Current source reviewed: 2026-09-17. Target contract reviewed: 2026-09-16.
+
+The member foundation is active in the hosted database and Gateway. The matching
+front end is released from main; [README.md](../../README.md) owns current
+verification limits. Game-token and wallet routes retain the Demo contract.
 
 The endpoint examples below describe the existing Demo contract. The section
 "Target Operational Contract" defines required platform work, not callable new
@@ -67,11 +71,16 @@ Do not modify a game repository from a Looty repository task. Switch to the name
 ## Current Looty Launch Flow
 
 1. A player opens `/game/?slug=<slug>`.
+   The Lobby checks membership before navigating there. Missing member
+   session/enrollment on a direct link returns to `/?play=<slug>`, where the
+   published game is selected and the shared member dialog opens over the Lobby.
+   Entry UX and cancellation rules belong to `MEMBER_AUTH_PLAN.md`.
 2. The Loader reads the published game from `public_games_v1`.
 3. It normalizes the `launch_url`. Root-relative platform paths and HTTPS URLs are accepted. HTTP is accepted only between loopback hosts during local development.
 4. It calls `looty-gateway/create-session`.
-5. The Gateway resolves the optional Supabase member session. Without a valid member token, it creates a guest session.
-6. The Gateway creates or selects the platform player and Demo wallet through protected database RPCs.
+5. The Gateway requires a verified Supabase user session and existing enrollment,
+   including a persistent anonymous Auth session for guests.
+6. The reviewed session RPC resolves the enrolled platform player and Demo wallet.
 7. The Loader appends the returned session parameters to the game URL.
 8. The Loader creates the iframe.
 9. The game exchanges the launch code once for a Gateway token.
@@ -117,7 +126,7 @@ The game is responsible for allowing Looty to embed it and for functioning under
 https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway
 ```
 
-The Gateway source in this repository corresponds to version 5. All routes accept `POST` JSON. The Gateway adds `X-Looty-Request-Id` to responses.
+All routes accept `POST` JSON. The Gateway adds `X-Looty-Request-Id` to responses.
 
 ## Session Creation
 
@@ -144,8 +153,10 @@ Rules:
 - `currency` defaults to `POINT` and Demo currently accepts only `POINT`.
 - `expires_in_seconds` must be from 60 to 86,400.
 - `display_name` is optional and limited to 120 characters.
-- A valid Supabase member bearer token binds the session to that member.
-- A missing bearer token, or the browser anonymous-key bearer produced by the Supabase client, creates a guest session.
+- A valid Supabase bearer token and explicit player enrollment are required.
+- A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
+  user's own verified session is supported and remains a guest. Missing enrollment
+  or an inactive player blocks launch; it never creates a replacement guest.
 - The route requires an allowed Looty origin. Localhost development ports are accepted.
 
 Relevant response fields:
@@ -359,7 +370,7 @@ concurrent occupancy, session renewal, altered-request rejection, duplicate
 settlement, lost responses, and rollback after an injected failure. A shared-wallet
 game follows the same authority requirements as a standalone game.
 
-The current v5 browser amount/payout flow is a Demo limitation, not an operational
+The current browser amount/payout flow is a Demo limitation, not an operational
 integration option. Do not mark this target complete until implementation and
 tests agree with the contract. Database function execution grants must also be
 restricted; hiding an endpoint in the UI is insufficient.
@@ -386,6 +397,8 @@ Current database-backed limits are keyed by route and client address:
 | Route | Requests | Window |
 | --- | ---: | ---: |
 | `create-session` | 30 | 5 minutes |
+| `member` | 120 | 1 minute |
+| `enroll-member` | 30 | 5 minutes |
 | `exchange` | 60 | 5 minutes |
 | `balance`, `bet`, `payout`, `refund`, `close-round` | 120 per route | 1 minute |
 
@@ -403,7 +416,9 @@ On failure:
 
 ## Member and Direct Entry Boundary
 
-The platform may launch a session as a member when the browser already has a valid Looty authentication session. Authentication, provider login, persistent guest identity, account linking, and Looty-controlled branded game entry are not game responsibilities.
+The source requires an authenticated, enrolled Looty player before launch, whether
+registered or a persistent guest. Authentication, provider login, guest identity,
+linking and branded entry are platform responsibilities.
 
 Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Looty session contract without copying identity-provider logic into the game.
 
@@ -432,7 +447,7 @@ Database operation rules and the current schema summary are in `../../README.md`
 
 The checks below cover the current Loader/Demo path. Operational publication
 also requires the Target Operational Contract acceptance gate above; passing
-these v5 endpoint checks alone does not approve production accounting.
+these Demo endpoint checks alone does not approve production accounting.
 
 Before listing a game through the Looty Lobby:
 

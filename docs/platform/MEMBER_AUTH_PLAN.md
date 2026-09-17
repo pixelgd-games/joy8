@@ -1,7 +1,7 @@
 # Looty Member and Authentication Plan
 
-Status: target design; public member entry is not implemented.
-Last reviewed: 2026-09-16.
+Status: member migrations and Gateway are active; the matching front end is released from main. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
+Last reviewed: 2026-09-17.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -46,14 +46,14 @@ in the owning repository, not a first-release platform dependency.
 
 ## Current Gaps
 
-- Google login exists only for administrators. The public member entry,
-  persistent guest, upgrade, linking, recovery, and deletion-request flows do not.
-- The current Gateway treats a valid Auth user ID as registered membership and
-  otherwise creates a new guest for each launch. Neither is the target policy.
-- Administrator and player entry currently share browser-session storage;
-  explicit backend player eligibility and appropriate session isolation are needed.
-- Checked-in configuration disables anonymous sign-in and manual identity
-  linking. Hosted provider settings have not been verified by this review.
+- Public member UI and Gateway source now implement the entry/upgrade/recovery
+  foundation. The two member migrations are applied and the Gateway is deployed.
+  Hosted entry settings are enabled, but SMTP and real
+  provider acceptance remain pending. [README.md](../../README.md) owns
+  the implementation details and test limits.
+- Deletion requests, cleanup/retention, and branded cross-origin entry are not
+  implemented. Same-origin `/account/` belongs to Looty and returns only to the
+  Lobby or a validated `/game/?slug=...` route.
 - Wallet scope is not implemented. Consume the platform wallet work rather
   than introducing wallet logic into login screens.
 
@@ -81,8 +81,8 @@ Clearing browser data or changing devices cannot guarantee guest recovery.
 Explain this limitation and provide an upgrade path to Google or Email/password.
 Signing out must return to an explicit entry choice, not silently create a guest.
 
-Supabase anonymous sign-in is the preferred mechanism to evaluate in the platform
-stage; enabling it is not part of this documentation change. Anonymous Auth users
+Supabase anonymous sign-in is the selected mechanism and is enabled in hosted
+Auth; public member deployment still requires acceptance testing. Anonymous Auth users
 have user IDs and use the `authenticated` role. Classify them using verified
 anonymous status rather than interpreting every Auth ID as a registered member.
 Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
@@ -95,8 +95,23 @@ outside this release.
 
 ## H5 Entry and Handoff
 
+The Lobby is public and never requires a login just to browse. Selecting a game
+checks existing player enrollment: an active registered player or persistent
+guest proceeds directly; an unenrolled visitor gets the shared member dialog
+over the unchanged Lobby. The dialog offers Google, Email/password, and explicit
+guest play. Successful entry continues to the selected game. Dismissal cancels
+that selection; opening another game or the top-bar account entry must not reuse
+the previous destination. A service failure must not silently create a guest.
+
+Direct game URLs follow the same membership policy and return missing members
+to the Lobby dialog. `/account/` remains the callback/recovery surface, not the
+default platform entrance. Callback destinations are validated game paths, never
+arbitrary URLs. A future branded Mahjong H5/App entry should likewise allow its
+home screen before requesting identity at game start; native implementation
+remains deferred.
+
 ```text
-Looty Lobby or branded H5 entry
+Public Lobby or branded home -> select a game / start playing
   -> Looty sign-in or persistent guest restoration
   -> backend player and wallet resolution
   -> authorized game-session handoff
@@ -139,6 +154,8 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
    operations, then the reusable H5 UI and session handoff.
 4. Verify Google/password/guest entry, verification, reset, sign-out, refresh,
    callback replay, simultaneous requests, guest loss, and provider conflicts.
+   Verify game selection, cancellation/reselection, late responses after closing
+   a dialog, callback destination preservation, and direct-link entry.
 5. Verify direct and Lobby entries preserve the same player and product progress;
    test both wallet models through the platform contract and a simulated game.
 6. Verify that no game receives member credentials or protected table access.
@@ -150,7 +167,8 @@ third stage; no product needs a separate temporary membership system.
 
 - Exact guest-session retention/cleanup and account-closure retention periods.
 - SMTP provider, delivery configuration, and password/abuse policy.
-- Auth linking model, provider-conflict UI, and member/admin isolation mechanism.
+- Validate implemented linking/conflict handling and member/admin isolation with
+  real providers before release; separate-player merging remains unsupported.
 - Branded H5 entry origins, paths, repository ownership, copy, and localization.
 - Whether future POINT purchases require guest promotion before checkout.
 

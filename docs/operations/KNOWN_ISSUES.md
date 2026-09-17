@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-16.
+Last reviewed: 2026-09-17.
 
 ## Status Summary
 
@@ -22,8 +22,8 @@ accounting gaps below must be closed before operational launch.
 - Current browser game tokens include payout/refund scopes and accept submitted
   amounts. A trusted server-only settlement boundary is not implemented.
 - Current wallets are shared by player/currency, without product scope.
-- Active-status wallet uniqueness does not alone prevent replacement wallets
-  or repeated grants after freezing; lifecycle/provisioning needs explicit tests.
+- Session creation rejects frozen or ambiguous wallets; operational wallet
+  lifecycle and provisioning still require their own implementation and tests.
 - Current one-session wallet calls do not implement atomic multi-account game
   settlement, product-account participation, or long-match credential renewal.
 - Existing Demo data and automatic test credit need an explicit cutover decision.
@@ -41,14 +41,14 @@ The three `2026091609...` Mahjong SQL files are review-only, not applied and not
 an approved deployable set. They have incomplete account coverage and mismatches
 with product identifiers and occupancy. The product owns the detailed corrections
 in [its data plan](../../../../Project-Gaming/production/table/products/mahjong-clash/docs/DATA_AND_LOOTY_INTEGRATION_PLAN.md#sql-draft-corrections).
-Review them before any database push; their presence in the migration directory
-is not authorization to apply them.
+They are preserved under `supabase/drafts/mahjong-clash/`, outside active migration
+discovery. See [draft review instructions](../../supabase/drafts/README.md).
 
 ### Database-Level Demo Currency Constraint
 
 Current behavior:
 
-- Gateway version 5 rejects a Demo session whose currency is not `POINT`.
+- The Gateway rejects a Demo session whose currency is not `POINT`.
 - The additional database constraint and trigger were deliberately placed on hold.
 - No unapplied hold migration should remain in the active migration directory.
 
@@ -63,16 +63,28 @@ Action boundary:
 
 ### Member and Persistent Guest Direction
 
+Hosted member settings have been inspected and the authorized entry changes
+saved through the dashboard. The exact current settings and remaining CLI
+configuration-access limitation are recorded in
+[README.md](../../README.md#hosted-auth-configuration). Do not treat that CLI
+limitation as inability to inspect the project or replace the working token
+without evidence. SMTP, hosted password/abuse policy, and real provider acceptance
+remain release gates.
+
 Current behavior:
 
-- The public member login entry is disabled.
-- Most Loader launches therefore create guest platform records.
-- Looty-controlled branded game entry and persistent guest behavior are still a plan, not implemented features.
+- Member entry, persistent guest, promotion, recovery and enrollment checks are
+  implemented. The member migrations and Gateway are active; the matching front
+  end is released from main. Real provider acceptance remains outstanding.
+- Branded cross-origin handoff and account-deletion requests remain unimplemented.
 - The current Demo `POINT` wallet is keyed by player and currency without an explicit product scope. Multiple games therefore share one balance today whether or not the product should use an independent game wallet.
 
 Risk:
 
-- Player continuity is weak and guest data grows with launches.
+- Actual guest continuity and promotion must still be tested against Auth and the
+  hosted database; isolated SQL tests, including native PostgreSQL 17.6 races,
+  verify preservation in the fixture, but mocked Auth responses do not prove
+  real provider linking or continuity.
 - Current wallet behavior cannot yet distinguish an independent game's wallet from the shared wallet approved for Looty-native games.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
@@ -81,11 +93,13 @@ The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH
 
 ### Guest Data Growth
 
-Guest launches currently create platform player, wallet, and session records. Retention and cleanup policy is not finalized.
+Guest entry creates a persistent Auth identity and enrolled player; game launch
+reuses that player's wallet and creates a session. Retention, cleanup and
+public anonymous-signup abuse controls are not finalized.
 
 Before volume grows materially:
 
-- Implement the approved persistent-guest requirement using the mechanism reviewed in the member plan.
+- Verify guest continuity across the supported browsers and devices.
 - Define retention for guest players, wallets, sessions, rounds, and transactions.
 - Define which records may be deleted and which must remain auditable.
 - Verify member conversion and account linking preserve the correct guest data.
@@ -129,7 +143,14 @@ If production evidence shows abuse, evaluate edge protection, CAPTCHA, device at
 
 ### Automation Coverage
 
-Current local checks cover the static build, key pages, iframe restrictions, load timeout behavior, cover fallback, basic error presentation, and selected Gateway validation paths.
+Current local checks cover the static build, key pages, iframe restrictions,
+load timeout, cover fallback, error presentation, member service logic, Gateway
+membership authorization, safe return paths, and responsive member UI. The
+isolated member SQL suite also executes both migrations and checks roles, rollback,
+player/wallet preservation and initial credit. Its engine and fixture limits are
+documented in [README.md](../../README.md#verification). Native PostgreSQL 17.6
+also passes eight competing-connection cases. Real provider behavior, the hosted
+environment and production load remain unverified.
 
 Not fully automated:
 
@@ -156,8 +177,9 @@ Direction:
 - Do not create a large baseline migration automatically.
 - Before production launch, document and test backup, restore, and disaster-recovery procedures.
 - The selected local-test/hosted-operation direction now requires a reproducible
-  local fixture/bootstrap before platform integration tests. Prepare it as a small,
-  reviewed setup without importing production secrets or personal data. Do not
+  full local bootstrap before platform integration tests. A minimal member SQL
+  fixture now exists, using synthetic data and selected existing migrations; it
+  does not recreate the full Supabase stack or prove backup restoration. Do not
   turn it into an unconfirmed baseline or reset the hosted database.
 
 ## User Experience and Maintainability

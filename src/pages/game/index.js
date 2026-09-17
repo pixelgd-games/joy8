@@ -2,6 +2,8 @@ import { supabase, supabaseFunctionsUrl } from "/src/lib/supabaseClient.js"
 import { appendQueryParams, normalizeLaunchUrl } from "/src/lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "/src/ui/error-modal.js"
 import { mountGameFrame } from "./iframe.js"
+import { memberSupabase } from "/src/lib/memberClient.js"
+import { lobbyGamePath, createMemberService } from "/src/member/service.js"
 
 const params = new URLSearchParams(location.search)
 const slug = params.get("slug")
@@ -51,6 +53,12 @@ async function main() {
       title: "缺少遊戲代碼",
       message: "目前無法判斷要載入哪一款遊戲，請從遊戲列表重新進入。",
     })
+    return
+  }
+
+  const memberService = createMemberService(memberSupabase, { origin: location.origin })
+  if (!(await memberService.membership())) {
+    location.replace(lobbyGamePath(location.pathname + location.search, location.origin))
     return
   }
 
@@ -125,7 +133,7 @@ async function main() {
 }
 
 async function createLaunchSession(gameSlug) {
-  const { data, error } = await supabase.functions.invoke("looty-gateway/create-session", {
+  const { data, error } = await memberSupabase.functions.invoke("looty-gateway/create-session", {
     body: {
       slug: gameSlug,
       currency: "POINT",

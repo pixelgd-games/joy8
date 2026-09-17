@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { spawn, spawnSync } from "node:child_process"
@@ -42,6 +42,10 @@ try {
       && !normalizedText.includes("game list failed to load")
   }, "Home loads")
 
+  await expectMemberModal(client)
+  await expectGameSelection(client, appPort)
+  await expectMemberContinuation(client)
+
   await expectLaunchUrlPolicy(client)
   await expectGameIframeSecurity(client)
   await expectLobbyThumbnailFallback(client)
@@ -49,6 +53,8 @@ try {
   await expectPageText(client, appPort, "/game/", (text) => {
     return text.includes("LOOTY-GAME-001")
   }, "Loader missing slug shows error")
+
+  await expectMemberEntry(client, appPort)
 
   await expectPageText(client, appPort, "/admin/login/", (text) => {
     return text.includes("Looty Admin") && text.includes("Google")
@@ -287,6 +293,218 @@ async function showSyntheticError(client) {
       })
     `,
   })
+}
+
+async function expectMemberEntry(client, appPort) {
+  await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
+    return text.includes("使用 Google 登入") && text.includes("先以訪客遊玩")
+  }, "Standalone callback and recovery entry remains available")
+  const returnCheck = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `location.pathname === "/account/" && new URLSearchParams(location.search).get("next") === "/game/?slug=test"`,
+  })
+  if (!returnCheck.result.value) throw new Error("Member return destination was lost")
+  const controls = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      document.getElementById("register-button").click()
+      const registration = document.getElementById("password").minLength === 10
+        && document.getElementById("password").autocomplete === "new-password"
+      document.getElementById("reset-button").click()
+      const recovery = document.getElementById("password-field").hidden
+        && !document.getElementById("password").required
+      document.getElementById("register-button").click()
+      return registration && recovery && !document.getElementById("password-field").hidden
+    })()`,
+  })
+  if (!controls.result.value) throw new Error("Member form modes failed")
+  for (const width of [320, 390, 1280]) {
+    await client.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 })
+    const layout = await client.send("Runtime.evaluate", {
+      returnByValue: true,
+      expression: `document.documentElement.scrollWidth <= innerWidth && getComputedStyle(document.getElementById("new-password-form")).display === "none"`,
+    })
+    if (!layout.result.value) throw new Error(`Member layout failed at ${width}px`)
+    if (process.env.SMOKE_MEMBER_SCREENSHOT && width === 390) {
+      const { data } = await client.send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true })
+      await writeFile(process.env.SMOKE_MEMBER_SCREENSHOT, Buffer.from(data, "base64"))
+    }
+  }
+  await client.send("Emulation.clearDeviceMetricsOverride")
+  const mock = await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    returnByValue: true,
+    expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
+      memberSupabase.auth.getSession = async () => ({ data: { session: { user: { id: "smoke-guest", is_anonymous: true } } }, error: null })
+      Object.defineProperty(memberSupabase, "functions", { value: {
+        invoke: async () => ({ data: { member: { player_account_ref: "smoke-player", account_type: "guest" } }, error: null })
+      } })
+      window.dispatchEvent(new Event("focus"))
+      return true
+    })`,
+  })
+  if (mock.exceptionDetails) throw new Error("Cannot isolate member browser fixture")
+  await waitForText(client, (text) => text.includes("目前以訪客身分登入") && text.includes("繼續遊玩"), "Persistent guest account UI")
+  const guestControls = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `document.getElementById("guest-button").hidden && document.getElementById("password-field").hidden && !document.getElementById("password").required && document.getElementById("google-button").textContent.includes("綁定")`,
+  })
+  if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
+  console.log("OK Member entry, recovery controls, guest upgrade and responsive layout")
+}
+
+async function expectMemberModal(client) {
+  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("先以訪客遊玩"), "Member dialog opens on the Lobby")
+  const opened = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      const dialog = document.querySelector("#member-dialog")
+      const backdrop = getComputedStyle(dialog, "::backdrop")
+      return location.pathname === "/" && dialog.open
+        && document.querySelector(".hero-image").isConnected
+        && backdrop.backgroundColor === "rgba(0, 0, 0, 0.18)"
+        && backdrop.backdropFilter === "none"
+    })()`,
+  })
+  if (!opened.result.value) throw new Error("Member dialog replaces or obscures the Lobby")
+  await client.send("Runtime.evaluate", { awaitPromise: true, expression: 'new Promise(resolve => { document.querySelector("#member-dialog").addEventListener("close", resolve, { once: true }); document.querySelector(".member-dialog-close").click() })' })
+  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
+  await waitForText(client, (text) => text.includes("使用 Google 登入"), "Member dialog reopens")
+  await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
+  await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
+  const closed = await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    returnByValue: true,
+    expression: `new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve({ open: document.querySelector("#member-dialog").open, scrollLocked: document.body.classList.contains("member-dialog-open"), focusRestored: document.activeElement === document.querySelector(".member-login-link"), count: document.querySelectorAll("#member-dialog").length }))))`,
+  })
+  const dismissal = closed.result.value
+  if (dismissal.open || dismissal.scrollLocked || !dismissal.focusRestored || dismissal.count !== 1) throw new Error(`Member dialog dismissal failed: ${JSON.stringify(dismissal)}`)
+  console.log("OK Member dialog preserves the Lobby and dismisses with focus restored")
+}
+
+async function expectGameSelection(client, appPort) {
+  const deadline = Date.now() + 12000
+  while (Date.now() < deadline) {
+    const count = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'document.querySelectorAll("#gameGrid .game-tile-poster").length' })
+    if (count.result.value >= 2) break
+    await sleep(100)
+  }
+  const gameLinks = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `[...document.querySelectorAll("#gameGrid .game-tile-poster")].slice(0, 2).map(link => ({ path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent }))`,
+  })
+  const games = gameLinks.result.value
+  if (games.length < 2) throw new Error("Game selection smoke needs two published catalog entries")
+  await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
+      memberSupabase.auth.signInWithOAuth = async ({ options }) => {
+        window.smokeCallback = options.redirectTo
+        return { error: { code: "smoke_provider_disabled" } }
+      }
+    })`,
+  })
+  for (let index = 0; index < games.length; index++) {
+    await client.send("Runtime.evaluate", { expression: `document.querySelectorAll("#gameGrid .game-tile-poster")[${index}].click()` })
+    await waitForText(client, (text) => text.includes(`開始玩「${games[index].name}」`) && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
+    const path = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
+    if (path.result.value !== "/") throw new Error("Selecting a game removed the Lobby")
+    await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
+    await waitForText(client, (text) => text.includes("目前無法完成操作"), "Provider fixture stays offline")
+    const target = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
+    if (target.result.value !== games[index].path) throw new Error("Authentication lost the selected game")
+    await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
+  }
+  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && !text.includes("開始玩「"), "Top-bar entry clears previous game choice")
+  await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
+  await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
+  const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
+  if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
+  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`開始玩「${games[0].name}」`) && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
+  const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
+  if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
+  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
+  console.log("OK Game selection, callback destination, cancellation and direct-link entry")
+}
+
+async function expectMemberContinuation(client) {
+  const result = await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    returnByValue: true,
+    expression: `Promise.all([import("/src/member/page.js"), import("/src/member/template.js"), import("/src/lib/memberClient.js")]).then(async ([{ initMemberPanel }, { memberCardMarkup }, { memberSupabase }]) => {
+      const auth = memberSupabase.auth
+      const saved = Object.fromEntries(["getSession", "signInWithPassword", "signInAnonymously", "exchangeCodeForSession"].map(key => [key, auth[key]]))
+      const descriptor = Object.getOwnPropertyDescriptor(memberSupabase, "functions")
+      let user = null
+      const paths = []
+      const roots = []
+      const panels = []
+      auth.getSession = async () => ({ data: { session: user ? { user } : null }, error: null })
+      auth.signInWithPassword = async () => { user = { id: "fixture-member", is_anonymous: false }; return { data: { user }, error: null } }
+      auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
+      auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
+      Object.defineProperty(memberSupabase, "functions", { configurable: true, value: { invoke: async () => ({ data: { member: { player_account_ref: "fixture-player", account_type: user?.is_anonymous ? "guest" : "registered" } }, error: null }) } })
+      const mount = (next, extra = {}) => {
+        const root = document.createElement("div")
+        root.hidden = true
+        root.innerHTML = memberCardMarkup
+        document.body.append(root)
+        roots.push(root)
+        let complete
+        const continued = new Promise(resolve => { complete = resolve })
+        const panel = initMemberPanel(root, { params: new URLSearchParams({ next, ...extra }), onContinue: path => { paths.push(path); complete(path) } })
+        panels.push(panel)
+        return { root, panel, continued }
+      }
+      const submit = root => {
+        root.querySelector("#email").value = "fixture@example.invalid"
+        root.querySelector("#password").value = "fixture-password"
+        root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+      }
+      try {
+        const password = mount("/game/?slug=password-game")
+        await password.panel.ready
+        submit(password.root)
+        await password.continued
+        password.panel.dispose()
+        user = null
+        const guest = mount("/game/?slug=guest-game")
+        await guest.panel.ready
+        guest.root.querySelector("#guest-button").click()
+        await guest.continued
+        guest.panel.dispose()
+        user = null
+        let release
+        let didStart
+        const started = new Promise(resolve => { didStart = resolve })
+        auth.signInWithPassword = () => { didStart(); return new Promise(resolve => { release = () => { user = { id: "late-member", is_anonymous: false }; resolve({ data: { user }, error: null }) } }) }
+        const cancelled = mount("/game/?slug=cancelled-game")
+        await cancelled.panel.ready
+        submit(cancelled.root)
+        await started
+        cancelled.panel.dispose()
+        cancelled.root.remove()
+        release()
+        await new Promise(resolve => setTimeout(resolve, 0))
+        user = null
+        const callback = mount("/game/?slug=callback-game", { code: "fixture-code", flow: "signin" })
+        await callback.panel.ready
+        return paths
+      } finally {
+        for (const panel of panels) panel.dispose()
+        for (const root of roots) root.remove()
+        Object.assign(auth, saved)
+        if (descriptor) Object.defineProperty(memberSupabase, "functions", descriptor)
+        else delete memberSupabase.functions
+      }
+    })`,
+  })
+  if (result.exceptionDetails || JSON.stringify(result.result.value) !== JSON.stringify(["/game/?slug=password-game", "/game/?slug=guest-game", "/game/?slug=callback-game"])) {
+    throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
+  }
+  console.log("OK Password, guest and callback continuation; late completion cannot launch a cancelled game")
 }
 
 async function expectGameIframeSecurity(client) {

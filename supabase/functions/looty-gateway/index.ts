@@ -95,6 +95,8 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://127.0.0.1:4173",
 ]
 const ROUTES = new Set([
+  "member",
+  "enroll-member",
   "create-session",
   "exchange",
   "balance",
@@ -104,6 +106,8 @@ const ROUTES = new Set([
   "close-round",
 ])
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
+  member: { limit: 120, windowSeconds: 60 },
+  "enroll-member": { limit: 30, windowSeconds: 300 },
   "create-session": { limit: 30, windowSeconds: 300 },
   exchange: { limit: 60, windowSeconds: 300 },
   balance: { limit: 120, windowSeconds: 60 },
@@ -128,6 +132,8 @@ const PUBLIC_RPC_MESSAGES = new Set([
   "launch_code is required",
   "metadata must be a json object",
   "player account is not active",
+  "player membership is required",
+  "verified member identity is required",
   "round_id is required",
   "unsupported wallet transaction type",
   "wallet account is not active",
@@ -197,6 +203,10 @@ async function dispatchRoute(
   request: Request,
   headers: HeadersInit,
 ): Promise<Response> {
+  if (route === "member" || route === "enroll-member") {
+    return resolveMember(request, headers, route === "enroll-member")
+  }
+
   if (route === "create-session") {
     return createSession(request, headers)
   }
@@ -220,6 +230,26 @@ async function dispatchRoute(
   return jsonResponse({ error: "Route not found" }, 404, headers)
 }
 
+async function resolveMember(request: Request, headers: HeadersInit, enroll: boolean): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  if (Object.keys(body.value).length) return jsonResponse({ error: "Member request must be empty" }, 400, headers)
+  const result = await callRpc("looty_resolve_member", { p_auth_user_id: auth.userId, p_enroll: enroll })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  const row = firstRpcRow<{ player_account_id: string; account_type: string }>(result.body)
+  if (!row) {
+    if (enroll) return jsonResponse({ error: "Gateway returned an empty member" }, 502, headers)
+    return jsonResponse({ member: null }, 200, headers)
+  }
+  if (!row.player_account_id || !["guest", "registered"].includes(row.account_type)) {
+    return jsonResponse({ error: "Gateway returned an invalid member" }, 502, headers)
+  }
+  return jsonResponse({ member: { player_account_ref: row.player_account_id, account_type: row.account_type } }, 200, headers)
+}
+
 async function createSession(request: Request, headers: HeadersInit): Promise<Response> {
   if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
     return jsonResponse({ error: "Gateway is not configured" }, 500, headers)
@@ -229,6 +259,10 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
 
   if (!auth.ok) {
     return jsonResponse({ error: auth.error }, auth.status, headers)
+  }
+
+  if (!auth.userId) {
+    return jsonResponse({ error: "User session is required" }, 401, headers)
   }
 
   const body = await readJsonBody(request)
@@ -260,6 +294,14 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
 
   if (displayName.length > 120) {
     return jsonResponse({ error: "Display name is too long" }, 400, headers)
+  }
+
+  const memberResult = await callRpc("looty_resolve_member", { p_auth_user_id: auth.userId, p_enroll: false })
+  if (!memberResult.ok) {
+    return jsonResponse(toPublicRpcError(memberResult.body), statusFromRpcError(memberResult.body), headers)
+  }
+  if (!firstRpcRow<{ player_account_id: string }>(memberResult.body)?.player_account_id) {
+    return jsonResponse({ error: "player membership is required" }, 403, headers)
   }
 
   const rpcResult = await callRpc("create_game_session", {
@@ -639,11 +681,12 @@ function buildCorsHeaders(
 }
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
+  const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
   if (!origin) {
-    return route !== "create-session"
+    return !memberRoute
   }
 
-  if (route === "create-session") {
+  if (memberRoute) {
     return allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
   }
 
@@ -804,6 +847,10 @@ function statusFromRpcError(error: unknown): number {
 
   if (code === "22023") {
     return 400
+  }
+
+  if (code === "42501") {
+    return 403
   }
 
   if (code === "P0002") {

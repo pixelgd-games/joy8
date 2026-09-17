@@ -2,6 +2,8 @@ import { fetchPublicGames } from "./data.js"
 import { renderGameGrid, renderGameGridError } from "./game-grid.js"
 import { renderLobby } from "./lobby.js"
 import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
+import { createMemberService, memberErrorMessage } from "../../member/service.js"
+import { createGameEntry } from "../../member/game-entry.js"
 
 let deferredInstallPrompt = null
 
@@ -19,12 +21,22 @@ export async function initLobbyPage(appRoot) {
 
   appRoot.innerHTML = renderLobby()
   setupInstallButton(appRoot)
+  const openEntry = setupMemberEntry(appRoot)
+  const entryParams = new URLSearchParams(location.search)
+  const requestedGame = entryParams.get("play")
+  if (entryParams.has("play")) history.replaceState(null, "", "/")
 
   const gameGrid = appRoot.querySelector("#gameGrid")
 
   try {
     const games = await fetchPublicGames()
     renderGameGrid(gameGrid, games)
+    if (requestedGame) {
+      const game = games.find((item) => item.slug === requestedGame)
+      const trigger = [...gameGrid.querySelectorAll("a")].find((link) => new URL(link.href).searchParams.get("slug") === requestedGame)
+      if (game && trigger) await openEntry(trigger, trigger.href, game.name)
+      else showErrorModal({ code: ERROR_CODES.GAME_NOT_FOUND, title: "找不到遊戲", message: "請從大廳選擇目前開放的遊戲。", reload: false })
+    }
   } catch (error) {
     renderGameGridError(gameGrid)
     showErrorModal({
@@ -34,6 +46,52 @@ export async function initLobbyPage(appRoot) {
       error,
     })
   }
+}
+
+function setupMemberEntry(appRoot) {
+  let pending = false
+  let enterGame
+
+  const openEntry = async (trigger, next, gameName) => {
+    if (pending) return
+    pending = true
+    trigger.setAttribute("aria-busy", "true")
+    try {
+      const [{ openMemberModal }, { memberSupabase }] = await Promise.all([
+        import("../../member/modal.js"),
+        import("../../lib/memberClient.js"),
+      ])
+      if (!next) {
+        await openMemberModal(trigger)
+        return
+      }
+      enterGame ??= createGameEntry({
+        origin: location.origin,
+        membership: () => createMemberService(memberSupabase, { origin: location.origin }).membership(),
+        openMember: openMemberModal,
+        navigate: (path) => location.assign(path),
+      })
+      await enterGame({ trigger, next, gameName })
+    } catch (error) {
+      showErrorModal({ title: "目前無法進入", message: memberErrorMessage(error), reload: false })
+    } finally {
+      pending = false
+      trigger.removeAttribute("aria-busy")
+    }
+  }
+
+  appRoot.addEventListener("click", (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+    const trigger = event.target.closest("a")
+    if (!trigger || !appRoot.contains(trigger)) return
+    const isLogin = trigger.matches(".member-login-link")
+    const isGame = trigger.matches("#gameGrid .game-tile-poster")
+    if (!isLogin && !isGame) return
+    event.preventDefault()
+    const gameName = trigger.closest(".game-tile")?.querySelector(".game-tile-title")?.textContent || ""
+    void openEntry(trigger, isGame ? trigger.href : null, gameName)
+  })
+  return openEntry
 }
 
 function setupInstallButton(appRoot) {

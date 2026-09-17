@@ -8,10 +8,15 @@
     "build": "vite build",
     "preview": "vite preview",
     "smoke": "node scripts/smoke-check.mjs",
+    "test:member": "node --test scripts/member-unit-check.mjs",
+    "test:member-db": "node --test scripts/member-database-check.mjs",
+    "test:member-pg": "node scripts/member-postgres-check.mjs",
     "test:gateway": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/gateway-unit-check.mjs",
     "smoke:gateway": "node scripts/gateway-security-smoke.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "pg": "8.23.0",
     "vite": "^7.3.6",
     "ws": "^8.21.1"
   },
