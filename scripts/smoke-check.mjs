@@ -451,6 +451,23 @@ async function expectMemberModal(client) {
     })()`,
   })
   if (!opened.result.value) throw new Error("Member dialog replaces or obscures the Lobby")
+  for (const [width, height] of [[390, 844], [375, 667], [320, 568]]) {
+    await client.send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: true })
+    const result = await client.send("Runtime.evaluate", {
+      returnByValue: true,
+      expression: `(() => {
+        const dialog = document.querySelector("#member-dialog")
+        const overflow = dialog.scrollHeight - dialog.clientHeight
+        dialog.scrollTop = dialog.scrollHeight
+        const footerVisible = dialog.querySelector("#account-switch").getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1
+        dialog.scrollTop = 0
+        return { overflow, horizontal: dialog.scrollWidth > dialog.clientWidth, scrollbar: getComputedStyle(dialog).scrollbarWidth, footerVisible }
+      })()`,
+    })
+    const layout = result.result.value
+    if (layout.horizontal || layout.scrollbar !== "none" || !layout.footerVisible || (height >= 667 && layout.overflow > 1)) throw new Error(`Member dialog scrollbar failed at ${width}x${height}: ${JSON.stringify(layout)}`)
+  }
+  await client.send("Emulation.clearDeviceMetricsOverride")
   const switched = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {

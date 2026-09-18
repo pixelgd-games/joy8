@@ -29,9 +29,26 @@
 @media (max-width: 380px) { .account-card { padding: 22px; } .account-card h1 { font-size: 26px; } }
 
 body.member-dialog-open { overflow: hidden; }
-.member-dialog { width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; margin: auto; border: 0; border-radius: 24px; background: transparent; color: var(--text); overflow: auto; box-shadow: var(--glass-shadow); }
+.member-dialog { width: min(460px, calc(100% - 32px)); max-height: calc(100dvh - 32px); padding: 0; margin: auto; border: 0; border-radius: 24px; background: transparent; color: var(--text); overflow-x: hidden; overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; box-shadow: var(--glass-shadow); }
+.member-dialog::-webkit-scrollbar { display: none; }
 .member-dialog::backdrop { background: rgba(0, 0, 0, .18); }
 .member-dialog .account-card { padding-top: 36px; background: #12161e; }
 .member-dialog-close { position: absolute; top: 8px; right: 8px; width: 40px; height: 40px; display: grid; place-items: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 26px; cursor: pointer; }
 .member-dialog-close:hover { color: var(--text); background: rgba(255,255,255,.08); }
 .member-dialog-close:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+
+@media (max-width: 600px) {
+  .member-dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); }
+  .member-dialog .account-card { padding: 24px; }
+  .member-dialog .account-card h1 { font-size: 26px; }
+  .member-dialog .account-card form { gap: 6px; }
+  .member-dialog .account-card input { min-height: 42px; margin: 2px 0 4px; }
+  .member-dialog .account-divider { margin: 14px 0; }
+  .member-dialog #guest-button { margin-top: 12px; }
+  .member-dialog .account-switch { margin-top: 14px; padding-top: 12px; }
+  .member-dialog .account-note { line-height: 1.5; }
+}
+
+@media (max-width: 380px) {
+  .member-dialog .account-card { padding: 20px; }
+}
