@@ -141,17 +141,12 @@ function createActionsCell(game) {
   const slug = String(game.slug || "")
   const editUrl = `/admin/games/edit/?id=${encodeURIComponent(game.id)}`
   const loaderUrl = `/game/?slug=${encodeURIComponent(slug)}`
-  const staticUrl = `/game/${encodeURIComponent(slug)}/index.html`
   const launchUrl = normalizeLaunchUrl(game.launch_url)
 
   const actions = [
     createAnchor(editUrl, "編輯"),
     createAnchor(loaderUrl, "Loader", true),
   ]
-
-  if (launchUrl === staticUrl) {
-    actions.push(createAnchor(staticUrl, "靜態", true))
-  }
 
   if (launchUrl) {
     actions.push(createAnchor(launchUrl, "啟動", true))

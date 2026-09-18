@@ -50,8 +50,16 @@ export async function initLobbyPage(appRoot) {
 }
 
 function setupMemberEntry(appRoot) {
-  let pending = false
-  let enterGame
+  const service = createMemberService(memberSupabase, { origin: location.origin })
+  const enterGame = createGameEntry({
+    origin: location.origin,
+    membership: () => service.membership(),
+    openMember: async (...args) => {
+      const { openMemberModal } = await import("../../member/modal.js")
+      await openMemberModal(...args)
+    },
+    navigate: (path) => location.assign(path),
+  })
   const accountLink = appRoot.querySelector(".member-login-link")
   memberSupabase.auth.onAuthStateChange((_event, session) => {
     const user = session?.user
@@ -59,27 +67,10 @@ function setupMemberEntry(appRoot) {
   })
 
   const openEntry = async (trigger, next, gameName) => {
-    if (pending) return
-    pending = true
-    trigger.setAttribute("aria-busy", "true")
     try {
-      const { openMemberModal } = await import("../../member/modal.js")
-      if (!next) {
-        await openMemberModal(trigger)
-        return
-      }
-      enterGame ??= createGameEntry({
-        origin: location.origin,
-        membership: () => createMemberService(memberSupabase, { origin: location.origin }).membership(),
-        openMember: openMemberModal,
-        navigate: (path) => location.assign(path),
-      })
       await enterGame({ trigger, next, gameName })
     } catch (error) {
       showErrorModal({ title: "目前無法進入", message: memberErrorMessage(error), reload: false })
-    } finally {
-      pending = false
-      trigger.removeAttribute("aria-busy")
     }
   }
 

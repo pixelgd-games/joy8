@@ -1,7 +1,7 @@
 # Looty Member and Authentication Plan
 
 Status: member migrations and Gateway are active; the matching front end is released from main. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
-Last reviewed: 2026-09-17.
+Last reviewed: 2026-09-18.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -53,9 +53,18 @@ in the owning repository, not a first-release platform dependency.
   the implementation details and test limits.
 - Deletion requests, cleanup/retention, and branded cross-origin entry are not
   implemented. Same-origin `/account/` belongs to Looty and returns only to the
-  Lobby or a validated `/game/?slug=...` route.
-- Wallet scope is deployed and awaits per-product activation. Consume the platform wallet work rather
-  than introducing wallet logic into login screens.
+  Lobby, a validated `/game/?slug=...`, or `/play-test/?slug=...` route.
+- The local private-test entry is owned by Looty at
+  `http://localhost:5173/play-test/?slug=mahjong-clash`; its game frame is owned by
+  Mahjong at `http://localhost:4391/`. The implemented shared member callback also
+  accepts a validated `/play-test/?slug=...` return path. Authorization belongs to
+  verified membership and backend entry configuration. Active registered members
+  and persistent guests use the same entry without per-player approval. Its SQL
+  and Gateway are installed; real game identity acceptance remains pending.
+  See the [connection review](../../supabase/drafts/MAHJONG_REVIEW.md).
+- Wallet scope is deployed. Mahjong has zero-credit identity-only activation;
+  funded gameplay remains pending. Consume the platform wallet work rather than
+  introducing wallet logic into login screens.
 
 ## Identity Invariants
 

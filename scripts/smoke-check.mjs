@@ -49,6 +49,7 @@ try {
   await expectLaunchUrlPolicy(client)
   await expectGameIframeSecurity(client)
   await expectLobbyThumbnailFallback(client)
+  await expectPrivateEntry(client, appPort)
 
   await expectPageText(client, appPort, "/game/", (text) => {
     return text.includes("LOOTY-GAME-001")
@@ -64,6 +65,7 @@ try {
   await waitForText(client, (text) => {
     return text.includes("LOOTY-SMOKE-001") && text.includes("Smoke test error modal")
   }, "Shared error modal shows code")
+  await expectErrorPresentation(client)
 
   client.ws.close()
   console.log("Smoke check passed.")
@@ -293,6 +295,70 @@ async function showSyntheticError(client) {
       })
     `,
   })
+}
+
+async function expectPrivateEntry(client, appPort) {
+  await expectPageText(client, appPort, "/play-test/?slug=mahjong-clash", text => text.includes("進入測試"), "Private entry waits for explicit start")
+  await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    expression: `import("/src/lib/memberClient.js").then(({memberSupabase}) => {
+      memberSupabase.auth.getSession = async () => ({data:{session:{user:{id:"fixture"}}},error:null})
+      window.privateAllowed=false
+      window.privateCalls=[]
+      Object.defineProperty(memberSupabase,"functions",{configurable:true,value:{invoke:async (route,args) => {
+        window.privateCalls.push({route,args})
+        if(route.endsWith("/member")) return {data:{member:{player_account_ref:"fixture-player",account_type:"registered"}},error:null}
+        if(!window.privateAllowed) return {data:null,error:new Error("denied")}
+        return {data:{session_id:"fixture-session",game_id:"fixture-game",protocol:"server-v1",currency:"POINT",game_name:"Private fixture",launch_code:"fixture-only-code",launch_url:location.origin+"/icons/looty-app-icon-192.png"},error:null}
+      }}})
+      document.getElementById("private-start").click()
+    })`,
+  })
+  await waitForText(client, text => text.includes("目前無法進入測試，請稍後再試。"), "Test entry failure remains recoverable")
+  const denied = await client.send("Runtime.evaluate", { returnByValue:true, expression:'document.querySelectorAll("iframe").length===0 && !document.getElementById("private-start").disabled' })
+  if (!denied.result.value) throw new Error("Private denial mounted a game or blocked retry")
+  await client.send("Runtime.evaluate", { expression:'window.privateAllowed=true;document.getElementById("private-start").click()' })
+  await waitForText(client, () => true, "Private retry dispatched")
+  const launched = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`new Promise(resolve=>setTimeout(()=>{
+    const iframe=document.querySelector("iframe")
+    const url=iframe && new URL(iframe.src)
+    resolve(Boolean(url && url.searchParams.get("looty_launch_code")==="fixture-only-code"
+      && !url.searchParams.has("access_token") && iframe.referrerPolicy==="no-referrer"
+      && window.privateCalls.filter(x=>x.route.endsWith("/private-session")).length===2
+      && !JSON.stringify({...localStorage,...sessionStorage}).includes("fixture-only-code")))
+  },100))` })
+  if (!launched.result.value) throw new Error("Private entry did not preserve the Loader credential boundary")
+  console.log("OK Private entry, denied access, retry, shared iframe and in-memory launch credential")
+}
+
+async function expectErrorPresentation(client) {
+  await client.send("Emulation.setDeviceMetricsOverride", { width: 320, height: 700, deviceScaleFactor: 1, mobile: true })
+  const result = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      const modal = document.querySelector(".looty-error-modal")
+      const dialog = document.querySelector(".looty-error-dialog")
+      const bounds = dialog.getBoundingClientRect()
+      const positioned = getComputedStyle(modal).position === "fixed"
+      document.documentElement.style.setProperty("--text", "rgb(23, 45, 67)")
+      const shared = getComputedStyle(modal).color === "rgb(23, 45, 67)"
+      document.documentElement.style.removeProperty("--text")
+      dialog.querySelector("button").click()
+      const closed = !document.querySelector(".looty-error-modal") && !document.body.classList.contains("looty-error-modal-open")
+      return positioned && shared && bounds.left >= 0 && bounds.right <= innerWidth && closed
+    })()`,
+  })
+  if (!result.result.value) throw new Error("Error modal theme, mobile layout or close action failed")
+  for (const dismiss of [
+    'document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))',
+    'document.querySelector(".looty-error-modal").click()',
+  ]) {
+    await showSyntheticError(client)
+    const dismissal = await client.send("Runtime.evaluate", { returnByValue: true, expression: `${dismiss}; !document.querySelector(".looty-error-modal") && !document.body.classList.contains("looty-error-modal-open")` })
+    if (!dismissal.result.value) throw new Error("Error modal dismissal failed")
+  }
+  await client.send("Emulation.clearDeviceMetricsOverride")
+  console.log("OK Shared error theme, mobile layout and close/button/overlay behavior")
 }
 
 async function expectMemberEntry(client, appPort) {

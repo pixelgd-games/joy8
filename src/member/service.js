@@ -3,10 +3,10 @@ export function safeReturnPath(value, origin) {
     const url = new URL(value || "/", origin)
     if (url.origin !== origin || url.username || url.password || url.hash) return "/"
     if (url.pathname === "/" && !url.search) return "/"
-    if (url.pathname !== "/game/") return "/"
+    if (!["/game/", "/play-test/"].includes(url.pathname)) return "/"
     const slug = url.searchParams.get("slug")
     if (!/^[a-z0-9-]{1,80}$/.test(slug || "")) return "/"
-    return `/game/?slug=${encodeURIComponent(slug)}`
+    return `${url.pathname}?slug=${encodeURIComponent(slug)}`
   } catch {
     return "/"
   }

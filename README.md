@@ -4,13 +4,34 @@ Looty is a lightweight H5 game platform. This repository contains the public Lob
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-17.
+Last implementation review: 2026-09-18.
 
 The platform includes public Lobby browsing, Google/password/guest member entry,
 persistent player enrollment and one server-authorized wallet/settlement flow.
-The member and four platform migrations are applied; Gateway version 7 is active.
+The member migrations, four platform foundation migrations and session-scope
+correction are applied; Gateway version 8 is active.
 The matching front end is released through main. Product activation and real
 Google/email/linking/recovery acceptance remain outstanding.
+
+Wallet-ledger cleanup, continuous per-hand settlement and the Mahjong private
+schema are installed in Supabase. Mahjong has 22 product tables and a hidden
+catalog entry. The private-entry migrations and identity-only activation are
+installed; the game-scoped wallet opens at 0 POINT. Runtime login and a seven-day
+exchange/renew backend key are configured in the game's ignored local environment.
+TLS certificate/hostname verification and restricted access passed against hosted
+Supabase. No wallet, AI funding or public entry was created by installation.
+The key cannot open or settle matches; funded-play configuration remains pending.
+Looty's local `/play-test/` entry is available at `http://localhost:5173` and uses
+normal member/guest authentication and backend entry configuration, with no
+per-player test allowlist. Gateway version 8 is active with the private
+session route and continuous-settlement error mapping. Hosted health, rejection
+and identity-key scope checks passed. The test-entry page is part of the standard
+Cloudflare front-end build, but Mahjong's backend entry remains bound to localhost;
+publishing this page does not publish or enable the Mahjong game. See the
+[identity connection review](supabase/drafts/MAHJONG_REVIEW.md#identity-only-connection).
+The [integration contract](docs/platform/GAME_PLATFORM_INTEGRATION.md#continuous-settlement)
+owns the protocol; [Mahjong activation](supabase/drafts/MAHJONG_REVIEW.md) owns
+the remaining configuration gates.
 
 ## Current Scope
 
@@ -39,8 +60,9 @@ Looty does not currently provide:
 See [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md) for the H5 release,
 both product models, operational POINT direction, and platform -> product ->
 integration order. The member foundation starts the platform stage; scoped wallets,
-trusted settlement and health are deployed. No game is activated on the new
-protocol yet; product integration and provider acceptance remain outstanding.
+trusted settlement and health are deployed. Mahjong has identity-only activation;
+no product has completed hosted gameplay/settlement acceptance. Real product
+integration and provider acceptance remain outstanding.
 
 ### Platform Foundation
 
@@ -51,15 +73,17 @@ There is no runtime fallback for an unconfigured game.
 
 It includes both wallet scopes, default 0 POINT provisioning, game-scoped backend
 keys, one-time backend exchange, balance-only client tokens, renewal, reservations,
-atomic settlement, cancellation/status and dependency health. No game policy or
-backend key is seeded; products need their own backend/adapter integration before
-activation. Existing game clients cannot launch after this cutover until they
-adopt the new contract. The Lobby and member UI remain available.
+atomic settlement, cancellation/status and dependency health. Product policy and
+keys are configured separately; Mahjong currently has an identity-only policy
+and exchange/renew key. Financial activation requires product configuration and
+acceptance. Game clients must adopt this contract; the Lobby and member UI remain
+available independently.
 
 The approved reset removed test wallets, ledger, sessions and old rounds. Auth
 identities, player records, catalog and administrator records matched their
 pre-deployment count/hash snapshots. No test balance was carried forward.
-The four incremental platform migrations are in supabase/migrations/.
+The four platform foundation migrations and the incremental session-scope
+correction are in supabase/migrations/.
 Protocol details belong in [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLATFORM_INTEGRATION.md#operational-protocol-v1).
 
 ## Architecture
@@ -70,11 +94,13 @@ Browser
   ├─ Member entry ──────── Supabase Auth + Gateway member/enroll-member
   ├─ Admin pages ───────── games + is_looty_admin()
   └─ Game Loader
-       ├─ public_games_v1
-       ├─ looty-gateway/create-session
+       ├─ published entry: public_games_v1 + Gateway create-session
+       ├─ test entry: Gateway private-session + backend entry configuration
        └─ game iframe
-            └─ looty-gateway
-                 └─ service-role database RPCs
+            ├─ Gateway balance (in-memory balance token, if supplied)
+            └─ game backend (one-use launch exchange and financial requests)
+                 └─ Gateway server-*-v1
+                      └─ service-role database RPCs
 ```
 
 The front end is a Vite multi-page application written in vanilla JavaScript and
@@ -90,7 +116,8 @@ storage does not grant administrator or player eligibility.
 | --- | --- | --- |
 | `/` | `index.html` | Public Lobby |
 | `/account/` | `account/index.html` | Member entry, Auth callback, guest upgrade and recovery |
-| `/game/` | `game/index.html` | Loader and iframe shell |
+| `/game/` | `game/index.html` | Published-game Loader and iframe shell |
+| `/play-test/` | `play-test/index.html` | Local test entry using normal membership and the shared Loader; no player allowlist |
 | `/admin/login/` | `admin/login/index.html` | Google OAuth entry |
 | `/admin/games/` | `admin/games/index.html` | Game list |
 | `/admin/games/new/` | `admin/games/new/index.html` | Create game |
@@ -106,12 +133,13 @@ Vite declares these entries in `vite.config.js`.
 | `src/pages/lobby/` | Lobby data loading, rendering, and layout |
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
 | `src/admin/` | Admin authentication and game CRUD |
+| `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
 | `src/member/` | H5 member UI and testable authentication flow |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
-| `src/styles/` | Theme and Lobby styles |
+| `src/styles/` | Shared tokens plus theme, Lobby, Loader and error-modal styles |
 | `supabase/functions/looty-gateway/index.ts` | Gateway Edge Function |
 | `supabase/migrations/` | Incremental database migrations |
 | `supabase/drafts/` | Unapproved SQL excluded from automatic migration discovery |
@@ -119,6 +147,10 @@ Vite declares these entries in `vite.config.js`.
 | `public/games/<slug>/cover.webp` | Looty-managed Lobby covers |
 
 ## Runtime Flows
+
+`src/styles/tokens.css` owns the shared font and palette. Loader and error-modal
+styles consume those tokens without applying the Lobby's page layout to Admin.
+Lobby account/game entry shares one pending guard, including lazy dialog loading.
 
 ### Lobby
 
@@ -196,9 +228,9 @@ The front end does not write player, wallet, round, or session tables directly.
 
 ## Gateway
 
-Hosted Gateway version 7 implements these POST routes:
+Hosted Gateway version 8 implements these POST routes:
 
-- member, enroll-member, create-session, balance, health.
+- member, enroll-member, create-session, private-session, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1.
 
@@ -232,24 +264,32 @@ wallet_accounts, wallet_transactions, game_sessions and gateway_rate_limits.
 It introduces trusted policies/backend keys, matches, participants, settlements,
 settlement entries and fee accounts. The old game_rounds table has been removed.
 
+The deployed ledger uses `wallet_transactions.match_ref`; the unused `metadata`
+column is removed. The incremental cleanup preserves ledger values and grants.
+Continuous settlement retains occupancy between hands and releases on final/cancel.
+Historical single-posting fixtures remain useful for migration regression tests.
+
 Protected tables use RLS and service-only RPCs. Products receive no project-wide
 service-role key. A wallet belongs to one trusted platform/game policy and remains
 unique even if frozen or closed. POINT starts at 0 pending a later grant decision.
 There is no conversion, purchase or withdrawal API. Product gameplay data and any
 AI accounting adapter remain in a permission-separated product schema.
 
-The reset left wallet/session/transaction/match/settlement tables empty. No game
-policies or backend keys are installed. Before product activation, review its
+The reset left wallet/session/transaction/match/settlement tables empty. Mahjong has an identity-only policy and expiring exchange/renew key. Before funded product activation, review its
 scope, limits, key and adapter against the integration contract.
 
 The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Three incomplete Mahjong
-drafts are in `supabase/drafts/mahjong-clash/` and remain unapplied. Follow their
-[review instructions](supabase/drafts/README.md) before promoting any to migrations.
-The member and platform migrations are active in supabase/migrations/; all 23
-local and hosted migration records match. The reset preserved all 6 Auth identities,
-1,197 player records, 9 catalog games and 1 administrator. These are identity/catalog
-records, not 1,197 verified registered users.
+drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
+Do not promote them alongside the installed schema; see the
+[installation review](supabase/drafts/MAHJONG_REVIEW.md).
+All 35 local and hosted migration records match, including the eight Mahjong
+installation migrations, two private-entry/identity-activation migrations and
+the removal of the empty test-player allowlist. Installation checks verified unchanged Auth/player IDs,
+existing catalog records and administrator count, with no wallets, sessions,
+transactions or matches created. The hidden Mahjong catalog entry is the only
+catalog addition. Its private schema and effective permissions passed hosted
+postflight; live game/provider acceptance is still pending.
 Review blockers are tracked in [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Local Development
@@ -296,20 +336,26 @@ npm run smoke
 npm run test:gateway
 npm run test:member
 npm run test:member-db
+npm run test:session-scope
+npm run test:ledger-cleanup
 npm run test:platform-db
+npm run test:continuous-db
+node --test scripts/private-entry-check.mjs
 ```
 
-`test:member-db` runs both member migrations in an in-memory PGlite
-database with pgcrypto, a minimal Auth/catalog fixture, and four existing platform
-migrations. It never reads environment credentials or connects to Supabase.
-Its 14 checks execute SQL for enrollment, repeated launch, guest promotion,
-existing player/wallet preservation, once-only Demo credit, inactive accounts,
-browser-role denial, secret hashing/expiry, and transaction rollback.
+`test:member-db` loads the member migrations, four platform foundation migrations
+and deployed session-scope correction in an in-memory PGlite database with pgcrypto
+and a minimal Auth/catalog fixture. It never reads environment credentials or connects to Supabase.
+Its 17 checks cover enrollment without wallet creation, zero-POINT launch without
+automatic grants, shared and independent wallets, guest promotion preserving both
+wallet scopes and actual reservations/ledger, inactive accounts, browser-role denial,
+secret hashing/expiry, uniqueness, transaction rollback and disabled/missing policies.
+It asserts that the obsolete round table, wallet mode and Demo-credit function are absent.
 PGlite 0.5.8 uses PostgreSQL 18.3 and one connection; this is not validation of
 hosted PostgreSQL 17 concurrency, Supabase Auth internals, or provider behavior.
 The fixture is test-only, not a baseline migration or hosted deployment script.
 
-`test:platform-db` extends that isolated fixture with the four platform migrations.
+`test:platform-db` uses the same deployed platform schema with its accounting fixtures.
 Its 20 SQL cases cover both wallet models, zero credit, one-time provisioning,
 server authority, renewal, reservation and available balance, exactly-once
 settlement, draws, fees, frozen wallets, immutable accounting, adapter permissions,
@@ -328,16 +374,54 @@ checks do not constitute hosted integration, full Supabase bootstrap, load
 testing, or backup restoration. Gateway mock tests cover the six server routes,
 browser rejection, body bounds, safe error mapping and dependency health.
 
-`test:member-pg` runs the same 14 checks plus eight competing-connection checks
+`test:ledger-cleanup` has seven isolated checks for metadata/open-match rejection,
+migration ordering, data/balance/permission preservation, actual service-role settlement,
+exact retries and immutable ledger protections. `test:ledger-cleanup-pg` runs the
+same checks on PostgreSQL 17. The cleanup function differs from the deployed
+settlement body only in its ledger column name; the test compares the definitions.
+
+`test:continuous-db` explicitly loads the installed ledger cleanup and extension into the isolated
+PGlite fixture. Its 18 cases cover per-hand posting, final release, rolling human
+and AI reservations, replay/order rejection, zero-reserve occupancy, expired
+sessions, backend rotation, cancellation, frozen wallets, permissions, rollback,
+immutable records and the open-table application guard. With `LOOTY_TEST_PG_BIN`
+set as below, `npm run test:continuous-pg` runs the same cases and seven observed
+lock-contention cases on PostgreSQL 17.6 (25 cases total). These tests neither apply
+hosted SQL nor implement Mahjong's durable adapter; the foundational single-posting
+contract remains separately exercised by `test:platform-db`.
+
+`test:member-pg` runs the same 17 checks plus 14 competing-connection checks
 against a fresh native PostgreSQL 17 cluster. It has passed on PostgreSQL 17.6.
 The race tests observe actual blocked database connections before releasing the
-held transaction. They cover simultaneous enrollment/launch, committed and
-rolled-back promotion, both wallet-freeze orderings, enrollment rollback, and
-independent identities. These are deterministic fixture cases, not a load test
-or proof of hosted Auth behavior.
+held transaction. They cover simultaneous enrollment, launch/promotion/freeze
+orderings separately for both wallet scopes, mixed shared/independent game launches,
+enrollment rollback and independent identities. These are deterministic fixture
+cases, not a load test or proof of hosted Auth behavior. Historical migrations
+remain necessary to construct the fixture and verify cutover; they are not the
+schema used for current member acceptance. Nonzero policy grants exist only in
+isolated preservation/accounting cases and do not authorize operational credit.
+
+`test:session-scope` uses the deployed platform fixture, including
+`supabase/migrations/20260917100000_active_session_scope.sql`, and reapplies that
+correction to verify unchanged data and permissions.
+Its 12 checks cover the corrected balance default, null/unsupported scopes,
+token scope, invalid/expired credentials, revoked sessions, inactive players/wallets,
+unchanged stored data and internal-helper permissions. It uses PGlite by default;
+with `LOOTY_TEST_PG_BIN` configured, run `npm run test:session-scope-pg`
+to run the same checks on native PostgreSQL 17.6. Both engines
+pass. The same correction is loaded by member/platform acceptance tests.
+The internal helper defaults to `balance`; explicit null or other scopes still
+return no session. The existing balance caller and internal-only permissions are
+unchanged. Hosted definition, grants and before/after record counts were verified
+through `scripts/sql/session-scope-verification.sql`. This is not a hosted gameplay
+test. Gateway publication was not required for the database-only correction.
 
 Set `LOOTY_TEST_PG_BIN` to an absolute directory containing PostgreSQL 17's
-`postgres`, `initdb`, and `pg_ctl` executables, then run `npm run test:member-pg`.
+`postgres`, `initdb`, and `pg_ctl` executables, then run the relevant `test:*-pg` command.
+All PostgreSQL entry scripts use the same runner and set
+`LOOTY_TEST_ENGINE=postgres17`; no separate member/platform engine setting is used.
+The shared database factory accepts only `pglite` or `postgres17` and defaults to
+PGlite. Historical cutover guard tests explicitly use PGlite.
 The helper creates an isolated temporary cluster, binds only to `127.0.0.1` on
 an available port, generates a temporary password, and stops/removes its cluster
 after the tests. It takes no database URL and never reads `.env` credentials.
@@ -349,6 +433,10 @@ $lootyPgTools = Join-Path $env:TEMP 'looty-pg17-tools'
 npm install --prefix $lootyPgTools --ignore-scripts --no-audit --no-fund --save-exact '@embedded-postgres/windows-x64@17.6.0-beta.15'
 $env:LOOTY_TEST_PG_BIN = Join-Path $lootyPgTools 'node_modules\@embedded-postgres\windows-x64\native\bin'
 npm run test:member-pg
+npm run test:session-scope-pg
+npm run test:ledger-cleanup-pg
+npm run test:platform-pg
+npm run test:continuous-pg
 ```
 
 Member unit checks use mocked Auth/Gateway services; browser smoke checks cover
@@ -356,6 +444,14 @@ the shared member dialog, cancellation/reselection, provider return destinations
 safe direct-link entry, recovery form states, simulated guest controls, and
 320/390/1280 px layouts. They do not verify hosted OAuth, email delivery, actual
 database concurrency, grants, wallet preservation, or end-to-end recovery.
+Private-entry verification additionally covers explicit start, denied access,
+retry and the shared Loader credential boundary. Its eleven isolated SQL tests
+pass on PGlite and PostgreSQL 17; the latter verifies an actual restricted
+password login. Hosted postflight confirms hidden Mahjong, enabled zero-credit policy, restricted
+LOGIN and an exchange/renew-only expiring key. Test entry accepts active enrolled
+guests and registered members without individual approval. The runtime
+TLS/readiness check passed without creating sessions or funding. Credentials
+expire on 2026-09-25 at 15:25 Asia/Taipei; renewal requires reviewed provisioning.
 `supabase/config.toml` enables anonymous Auth, manual linking, confirmation and a
 10-character minimum password for future local testing; it does not change the
 hosted project. Production provider and abuse settings remain a release gate.
@@ -422,6 +518,12 @@ It does not establish that the CLI now has configuration read/write access.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
 A push to `main` triggers production deployment. Do not push documentation or code changes unless the user explicitly requests it.
+
+Looty remains on Cloudflare Pages. Mahjong H5 is planned for separate static
+hosting on Cloudflare, but its upload is deferred until asset/readiness work is
+complete. Godot remains local during development; GCP/VPS selection and payment
+are deferred until external multiplayer testing requires an always-on server.
+SMTP belongs to Looty/Supabase Auth and does not depend on that server host.
 
 The Supabase Edge Function is deployed separately from Cloudflare Pages.
 

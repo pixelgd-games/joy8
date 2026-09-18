@@ -1,0 +1,17 @@
+:root{
+  --font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;
+  --bg:#101319;
+  --bg-deep:#090b10;
+  --line:color-mix(in srgb, var(--accent) 20%, transparent);
+  --line-strong:color-mix(in srgb, var(--accent) 42%, transparent);
+  --text:#f7f5ef;
+  --muted:rgba(218,223,232,.66);
+  --accent:#ebff3d;
+  --accent-strong:#d5ff18;
+  --glass-border:rgba(255,255,255,.12);
+  --glass-border-accent:color-mix(in srgb, var(--accent) 16%, transparent);
+  --glass-panel:rgba(16,20,28,.56);
+  --glass-panel-strong:rgba(12,16,24,.78);
+  --glass-shadow:0 24px 58px rgba(4,8,18,.34);
+  --glass-backdrop:blur(22px) saturate(1.18);
+}

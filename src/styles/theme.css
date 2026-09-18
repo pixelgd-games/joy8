@@ -1,19 +1,4 @@
-:root{
-  --bg:#101319;
-  --bg-deep:#090b10;
-  --line:rgba(235,255,61,.2);
-  --line-strong:rgba(235,255,61,.42);
-  --text:#f7f5ef;
-  --muted:rgba(218,223,232,.66);
-  --accent:#ebff3d;
-  --accent-strong:#d5ff18;
-  --glass-border:rgba(255,255,255,.12);
-  --glass-border-accent:rgba(235,255,61,.16);
-  --glass-panel:rgba(16,20,28,.56);
-  --glass-panel-strong:rgba(12,16,24,.78);
-  --glass-shadow:0 24px 58px rgba(4,8,18,.34);
-  --glass-backdrop:blur(22px) saturate(1.18);
-}
+@import "./tokens.css";
 
 *{box-sizing:border-box}
 
@@ -21,11 +6,11 @@ html{scroll-behavior:smooth}
 
 body{
   margin:0;
-  font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;
+  font-family:var(--font-family);
   background:
-    radial-gradient(circle at 18% 10%, rgba(235,255,61,.15) 0%, rgba(235,255,61,.03) 24%, transparent 48%),
+    radial-gradient(circle at 18% 10%, color-mix(in srgb, var(--accent) 15%, transparent) 0%, color-mix(in srgb, var(--accent) 3%, transparent) 24%, transparent 48%),
     radial-gradient(circle at 82% 18%, rgba(120,103,255,.14) 0%, rgba(120,103,255,.04) 22%, transparent 44%),
-    radial-gradient(circle at 50% 110%, rgba(235,255,61,.1) 0%, rgba(235,255,61,.02) 18%, transparent 42%),
+    radial-gradient(circle at 50% 110%, color-mix(in srgb, var(--accent) 10%, transparent) 0%, color-mix(in srgb, var(--accent) 2%, transparent) 18%, transparent 42%),
     linear-gradient(180deg, #1b2029 0%, #141821 14%, var(--bg) 44%, var(--bg-deep) 100%);
   color:var(--text);
   line-height:1.5;
@@ -47,11 +32,11 @@ body{
   transform:scale(1.05);
   filter:blur(128px);
   background:
-    radial-gradient(circle at 14% 12%, rgba(235,255,61,.24) 0%, rgba(235,255,61,0) 26%),
+    radial-gradient(circle at 14% 12%, color-mix(in srgb, var(--accent) 24%, transparent) 0%, transparent 26%),
     radial-gradient(circle at 76% 16%, rgba(120,103,255,.16) 0%, rgba(120,103,255,0) 24%),
     radial-gradient(circle at 28% 66%, rgba(156,255,52,.12) 0%, rgba(156,255,52,0) 22%),
-    radial-gradient(circle at 84% 74%, rgba(235,255,61,.12) 0%, rgba(235,255,61,0) 22%),
-    radial-gradient(circle at 22% 94%, rgba(235,255,61,.18) 0%, rgba(235,255,61,0) 18%);
+    radial-gradient(circle at 84% 74%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 22%),
+    radial-gradient(circle at 22% 94%, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 18%);
 }
 
 .brand-link{
@@ -66,6 +51,6 @@ body{
   letter-spacing:.03em;
   color:var(--accent);
   text-shadow:
-    0 0 18px rgba(235,255,61,.16),
+    0 0 18px color-mix(in srgb, var(--accent) 16%, transparent),
     0 0 10px rgba(120,103,255,.12);
 }

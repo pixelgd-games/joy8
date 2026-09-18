@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { PGlite } from "@electric-sql/pglite"
-import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto"
+import { createTestDatabase } from "./fixtures/test-database.mjs"
 import { loadMemberDatabase, memberSql } from "./fixtures/member-database.mjs"
 
 for (const [name, setup, expected] of [
@@ -9,7 +8,7 @@ for (const [name, setup, expected] of [
   ["outstanding reservation", "update public.wallet_accounts set locked_balance=10", "LOOTY_RESET_HAS_OUTSTANDING_RESERVATIONS"],
   ["external cascading dependency", "create table public.other_product_data(id uuid references public.wallet_accounts(id) on delete cascade); insert into public.other_product_data select id from public.wallet_accounts", "LOOTY_RESET_HAS_EXTERNAL_DEPENDENCIES"],
 ]) test(`cutover refuses ${name} and retains all data and old schema`, async () => {
-  const db = new PGlite({ extensions: { pgcrypto } })
+  const db = await createTestDatabase("pglite")
   try {
     await loadMemberDatabase(db)
     const auth = (await db.query("insert into auth.users(is_anonymous) values(true) returning id")).rows[0].id

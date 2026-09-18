@@ -1,13 +1,15 @@
-import { supabase, supabaseFunctionsUrl } from "/src/lib/supabaseClient.js"
-import { appendQueryParams, normalizeLaunchUrl } from "/src/lib/urls.js"
-import { ERROR_CODES, showErrorModal } from "/src/ui/error-modal.js"
+import { supabase, supabaseFunctionsUrl } from "../../lib/supabaseClient.js"
+import { appendQueryParams, normalizeLaunchUrl } from "../../lib/urls.js"
+import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { mountGameFrame } from "./iframe.js"
-import { memberSupabase } from "/src/lib/memberClient.js"
-import { lobbyGamePath, createMemberService } from "/src/member/service.js"
+import { memberSupabase } from "../../lib/memberClient.js"
+import { lobbyGamePath, createMemberService } from "../../member/service.js"
+import { openMemberModal } from "../../member/modal.js"
 
 const params = new URLSearchParams(location.search)
 const slug = params.get("slug")
 const GAME_LOAD_TIMEOUT_MS = 30000
+const privateEntry = location.pathname === "/play-test/"
 
 function primeParentScroll() {
   if (window.scrollY > 0) return
@@ -57,8 +59,31 @@ async function main() {
   }
 
   const memberService = createMemberService(memberSupabase, { origin: location.origin })
-  if (!(await memberService.membership())) {
+  const member = await memberService.membership()
+  if (!member) {
+    if (privateEntry) {
+      await openMemberModal(document.getElementById("private-start"), { next: `/play-test/?slug=${encodeURIComponent(slug)}` })
+      document.getElementById("private-status").textContent = "登入完成後，按「進入測試」繼續。"
+      return
+    }
     location.replace(lobbyGamePath(location.pathname + location.search, location.origin))
+    return
+  }
+
+  if (privateEntry) {
+    const { data, error } = await memberSupabase.functions.invoke("looty-gateway/private-session", { body: { slug } })
+    if (error) {
+      let denied = false
+      try { denied = (await error.context?.json())?.error === "LOOTY_PRIVATE_ENTRY_DENIED" } catch {}
+      document.getElementById("private-status").textContent = denied
+        ? "目前無法從這個網址進入測試，請確認測試入口已啟用。"
+        : "目前無法進入測試，請稍後再試。"
+      return
+    }
+    if (!data?.session_id || !data.launch_code || data.protocol !== "server-v1") throw new Error("Invalid private session")
+    const gameUrl = normalizeLaunchUrl(data.launch_url)
+    if (!gameUrl) throw new Error("Invalid private launch URL")
+    mountSession(gameUrl, data.game_name, data)
     return
   }
 
@@ -108,6 +133,10 @@ async function main() {
   }
 
   const launchSession = await createLaunchSession(data.slug)
+  mountSession(gameUrl, data.name, launchSession)
+}
+
+function mountSession(gameUrl, gameName, launchSession) {
   const gatewayUrl = supabaseFunctionsUrl ? `${supabaseFunctionsUrl}/looty-gateway` : ""
   const sessionGameUrl = appendQueryParams(gameUrl, {
     looty_session_id: launchSession.session_id,
@@ -127,7 +156,10 @@ async function main() {
     return
   }
 
-  mountGameIframe(sessionGameUrl, data.name)
+  document.getElementById("private-start")?.remove()
+  const copy = document.querySelector(".loader-copy")
+  if (copy) copy.textContent = "正在進入遊戲…"
+  mountGameIframe(sessionGameUrl, gameName)
   primeParentScroll()
 }
 
@@ -181,11 +213,33 @@ function hideLoading() {
   }, 320)
 }
 
-main().catch((error) => {
+function failed(error) {
   showError({
     code: ERROR_CODES.GAME_READ_FAILED,
     title: "遊戲載入失敗",
     message: "目前無法載入遊戲，請稍後再試。",
     error,
   })
-})
+}
+
+if (privateEntry) {
+  const card = document.querySelector(".loader-card")
+  card.querySelector(".loader-ring")?.remove()
+  card.querySelector(".loader-copy").textContent = "登入 Looty 或使用快速登入，即可進入測試。"
+  const button = document.createElement("button")
+  button.id = "private-start"
+  button.type = "button"
+  button.textContent = "進入測試"
+  const status = document.createElement("p")
+  status.id = "private-status"
+  status.setAttribute("role", "status")
+  button.addEventListener("click", async () => {
+    button.disabled = true
+    status.textContent = "正在進入測試…"
+    try { await main() } catch (error) { failed(error) }
+    finally { button.disabled = false }
+  })
+  card.append(button, status)
+} else {
+  main().catch(failed)
+}

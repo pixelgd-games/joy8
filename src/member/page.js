@@ -184,7 +184,6 @@ export function initMemberPanel(root, options = {}) {
 
   return {
     ready,
-    refresh: () => run(refresh),
     dispose() {
       disposed = true
       window.removeEventListener("focus", onFocus)

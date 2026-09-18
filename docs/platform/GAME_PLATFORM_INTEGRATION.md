@@ -4,9 +4,11 @@ This document is the authoritative runtime contract between Looty and a game. It
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-17. The single server-authorized protocol below
-is deployed in the hosted database and Gateway; see [README.md](../../README.md)
-for verification and product-activation limits. There is no
+Current source reviewed: 2026-09-18. The server-authorized base and continuous
+per-hand settlement extension are installed in the hosted database. The Gateway
+version 8 includes private entry and the settlement-error mappings.
+See [README.md](../../README.md) for verification and product-activation limits.
+There is no
 old/new compatibility path in the replacement. Existing game clients must adopt
 this protocol in their own repositories before activation.
 
@@ -85,6 +87,25 @@ The current Loader requests `POINT` with a one-hour session expiry.
 
 ## Loader Query Parameters
 
+### Private test entry
+
+Looty's `/play-test/?slug=...` uses the same member flow and iframe shell.
+`POST /private-session` accepts only `{ "slug": "..." }` with a verified member
+bearer and an allowed browser Origin. Its service-only RPC checks backend entry
+configuration, exact Origin and hidden catalog status. Every active enrolled
+member, including a persistent guest, can enter; there is no per-player allowlist.
+Only then does the shared internal session issuer resolve a wallet and issue a
+one-use launch code. The response additionally includes backend-owned `game_name`
+and `launch_url`; the browser cannot select the URL or identity. It uses no-store.
+The public `create-session` path remains restricted to published games.
+
+The current local Mahjong binding uses Looty `http://localhost:5173` and game
+`http://localhost:4391/`. Entry configuration remains backend-controlled. The
+private entry and Gateway are installed; real game acceptance remains pending.
+See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
+
+### Shared launch parameters
+
 | Parameter | Meaning | Handling |
 | --- | --- | --- |
 | `looty_session_id` | Public session reference | May be used for correlation; not authorization |
@@ -147,6 +168,8 @@ Rules:
 - `currency` defaults to `POINT`; no other currency is currently supported.
 - `expires_in_seconds` must be from 60 to 86,400.
 - `display_name` is optional and limited to 120 characters.
+- The current Loader omits `display_name`. It remains a supported optional launch
+  field, not an account-editing interface or an authorization input.
 - A valid Supabase bearer token and explicit player enrollment are required.
 - A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
   user's own verified session is supported and remains a guest. Missing enrollment
@@ -173,8 +196,9 @@ The launch code is valid for two minutes and can be used once.
 
 ## Operational Protocol v1
 
-Status: deployed through the platform migrations and Gateway version 7. This protocol is
-for both wallet models. There is no browser payout or legacy Demo path.
+Status: base deployed through the platform migrations and Gateway version 8;
+continuous settlement is installed. This protocol is for both
+wallet models. There is no browser payout or legacy Demo path.
 
 ### Configuration and Credentials
 
@@ -266,12 +290,16 @@ The opening locks funds without moving the balance. Its response is
 `{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
 current state; changing the opening under the same game/match reference conflicts.
 
-`server-settle-v1` takes the authoritative result from the game backend:
+`server-settle-v1` takes the authoritative result from the game backend. The
+following request uses the installed continuous-settlement fields `settlement_no`
+and `final`. A game still needs an authorized financial backend key and funded-play
+configuration; the current Mahjong identity-only key cannot settle:
 
 ```json
 {
   "version":1,"match_ref":"product-match-123","rule_version":"rules-v1",
   "operation_key":"settle:product-match-123",
+  "settlement_no":1,"final":true,
   "entries":[
     {"kind":"player","account_ref":"<player UUID>","amount":"80.00","source":"gameplay"},
     {"kind":"product","account_ref":"bot-1","amount":"-90.00","source":"gameplay"},
@@ -283,7 +311,7 @@ current state; changing the opening under the same game/match reference conflict
 
 Entries are signed changes, unique by kind/account, nonzero and limited to 65
 entries. Their exact sum must be zero. Omit participants whose change is zero;
-an empty list settles a draw and releases reservations. Players and product
+an empty list records a draw; `final` determines reservation release. Players and product
 accounts must belong to the opening. Loss cannot exceed the recorded reserve;
 every absolute entry must fit the opening's snapshotted limit. Fee entries are
 positive, game-bound and separate from player or AI funding.
@@ -291,15 +319,59 @@ positive, game-bound and separate from player or AI funding.
 Looty validates authority, rules reference, account binding and accounting;
 the game backend and its adapter validate the actual gameplay result. All human
 wallet changes, product-account changes, fee entries, immutable settlement rows,
-product commit marker and reservation releases commit in one transaction.
+product commit marker and reservation updates commit in one transaction.
 Wallets lock in UUID order. A frozen wallet or adapter failure rolls back all
 participants. Player suspension, browser logout or session expiry after opening
 does not erase the authorized match obligation; trusted settlement may complete.
 
-Response fields are `version`, `settlement_id`, `match_id`, `state:"settled"`,
-`request_hash` and `settled_at`. Exact retries return the saved response.
+Response fields are `version`, `settlement_id`, `match_id`, `state`,
+`settlement_no`, `final`, `request_hash` and `settled_at`.
+Exact retries return the saved response.
 The operation key is unique within a game; changed content conflicts. Another
 operation key cannot settle an already finalized match.
+
+### Continuous Settlement
+
+`supabase/migrations/20260918010100_continuous_settlement.sql` is deployed and extends the same settlement RPC,
+without a second wallet or legacy request fallback. `settlement_no` is a required
+JSON integer from 1 through 999,999,999; `final` is a required JSON boolean.
+A single-hand game uses number 1 and `final:true`. A multi-hand game opens one
+financial match for the entire table and posts each completed hand in order:
+
+- Number must equal the match's committed count plus one. A skipped number or
+  a repeated number under another operation key returns `LOOTY_SETTLEMENT_SEQUENCE`.
+- `final:false` posts human, product and fee movements immediately, keeps the
+  match open and retains every participant's occupancy. For each account the
+  remaining reserve becomes prior reserve plus that hand's signed net movement.
+  Winnings therefore remain usable in this same match. A zero reserve still
+  occupies the participant; it does not authorize a further loss or another table.
+- `final:true` posts the last hand and releases remaining reservations atomically.
+  An explicit empty final posting can close a table with no additional transfer;
+  products must validate the corresponding durable result/close marker.
+- Entry limits remain the opening's snapshotted per-entry limit. New losses are
+  checked against the current reserve. No new session or wallet is created
+  between hands. Session expiry, logout or suspension cannot erase an already
+  opened obligation; backend authorization and active-wallet checks still apply.
+- Exact historical retries return their original response, even after a later
+  hand or closure. Read `server-status-v1` for the current state, latest result
+  and `settlement_count`; never roll the product back to the retried response.
+- Cancel ends only the unfinished remainder, releases current holds and retains
+  all earlier payments, fees and immutable hand records. A cancelled table may
+  have a non-null last result. Disconnection alone still never authorizes cancel.
+
+Human and AI adapter mutations share the same transaction. The trusted settle
+payload additionally supplies `next_product_participants`, computed by Looty
+from the current product reserves and validated signed entries. An adapter must
+apply these rolling holds, retain its open state for `final:false`, validate the
+hand number and result, and release on final/cancel. An adapter implementing only
+the previous close-on-settle behavior is not suitable for activation.
+
+The installed extension follows the wallet-ledger cleanup and refuses application
+while a platform match is open. It retains finalized accounting and performs no
+balance reset or grant. Mahjong's private adapter/schema, Gateway error mapping
+and identity-only entry configuration are installed. Financial key scopes, funded
+limits, human/AI funding and real-service acceptance remain activation gates in
+[the Mahjong review](../../supabase/drafts/MAHJONG_REVIEW.md).
 
 ### Product Accounting Adapter
 
@@ -315,7 +387,7 @@ The platform validates the registered signature/owner boundary and requires
 
 Actions are `open`, `settle` and `cancel`; the second argument is the Looty match
 UUID. Payload always includes `version:1`, trusted `game_id` and `request`.
-Settlement also supplies `settlement_id` and `request_hash`. The adapter validates
+Settlement also supplies `settlement_id`, `request_hash` and, under continuous settlement, `next_product_participants`. The adapter validates
 its game binding and authoritative product state, reserves/reconciles product
 accounts in deterministic order, and writes its durable commit marker. It must
 throw on any mismatch. It cannot make external HTTP side effects or commit a
@@ -330,7 +402,9 @@ There is no distributed-transaction promise for products in another database.
 
 `server-status-v1` and `server-cancel-v1` take only
 `{"version":1,"match_ref":"product-match-123"}` and return
-`{version,match_id,state,result}`. Result is null until settled. After a timeout,
+`{version,match_id,state,result,settlement_count}` under continuous settlement.
+Result is null before the first posting, then contains the most recent committed
+settlement even while open or after cancellation. After a timeout,
 query status and retry the same operation/content; never invent a new operation
 key or assume failure. Cancellation releases reservations without changing
 balances, calls the adapter atomically, and is repeatable. It cannot reverse a
@@ -343,7 +417,7 @@ browser disconnection and token expiry do not authorize cancellation.
 | 401 | `LOOTY_BACKEND_UNAUTHORIZED` |
 | 403 | `LOOTY_GAME_NOT_READY`, `LOOTY_PLAYER_INACTIVE`, `LOOTY_WALLET_INACTIVE`, `LOOTY_SESSION_INVALID` |
 | 404 | `LOOTY_MATCH_NOT_FOUND` |
-| 409 | `LOOTY_IDEMPOTENCY_CONFLICT`, `LOOTY_MATCH_FINALIZED`, `LOOTY_RULE_MISMATCH`, `LOOTY_WALLET_OCCUPIED`, `LOOTY_INSUFFICIENT_BALANCE`, `LOOTY_ADAPTER_REJECTED` |
+| 409 | `LOOTY_IDEMPOTENCY_CONFLICT`, `LOOTY_MATCH_FINALIZED`, `LOOTY_SETTLEMENT_SEQUENCE`, `LOOTY_RULE_MISMATCH`, `LOOTY_WALLET_OCCUPIED`, `LOOTY_INSUFFICIENT_BALANCE`, `LOOTY_ADAPTER_REJECTED` |
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
 | 502/503 | Invalid/upstream-unavailable response; `LOOTY_UPSTREAM_UNAVAILABLE` or `LOOTY_ADAPTER_UNAVAILABLE` |
 
@@ -372,6 +446,7 @@ Current database-backed limits are keyed by route and client address:
 | Route | Requests | Window |
 | --- | ---: | ---: |
 | `create-session` | 30 | 5 minutes |
+| `private-session` | 30 | 5 minutes |
 | `member` | 120 | 1 minute |
 | `enroll-member` | 30 | 5 minutes |
 | `health` | 30 | 1 minute |
@@ -435,7 +510,7 @@ Before listing a game through the Looty Lobby:
 4. Verify the game runs with the documented iframe sandbox and permissions.
 5. Implement an explicit Looty Client; do not detect Looty from iframe presence.
 6. Use the designated single launch-code redeemer; keep client game tokens in memory and validate the server handoff.
-7. Use a stable `round_id` that correlates with the authoritative game-database record and an idempotency key strategy.
+7. Use a stable `match_ref` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
 9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance.
 10. Confirm no launch code, Gateway token, member JWT, or provider credential reaches storage, logs, analytics, or save data.

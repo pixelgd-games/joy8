@@ -1,15 +1,12 @@
 import assert from "node:assert/strict"
 import { after, afterEach, before, beforeEach, test } from "node:test"
 import { randomBytes } from "node:crypto"
-import { PGlite } from "@electric-sql/pglite"
-import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto"
-import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
+import { createTestDatabase } from "./fixtures/test-database.mjs"
 import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 import { memberSql } from "./fixtures/member-database.mjs"
 
-const db = process.env.LOOTY_PLATFORM_TEST_ENGINE === "postgres17"
-  ? await createLocalPostgres() : new PGlite({ extensions: { pgcrypto } })
+const db = await createTestDatabase()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 const secret = randomBytes(32).toString("hex")
 const otherSecret = randomBytes(32).toString("hex")

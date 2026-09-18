@@ -2,15 +2,15 @@ import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadMemberDatabase } from "./fixtures/member-database.mjs"
+import { loadMemberPlatformDatabase, reserveMemberWallet } from "./fixtures/member-platform.mjs"
 
 const db = await createLocalPostgres()
 const resolveSql = "select * from public.looty_resolve_member($1::uuid, true)"
-const launchSql = "select * from public.create_game_session('test-game', 'POINT', 3600, null, $1::uuid)"
 const lockSql = "select pg_advisory_xact_lock(hashtextextended($1::text, 0))"
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
+let games
 
-before(() => loadMemberDatabase(db))
+before(async () => { games = await loadMemberPlatformDatabase(db) })
 after(() => db.close())
 
 async function identity() {
@@ -50,7 +50,7 @@ async function blockedRace({ hold, holdValues, work, workValues, count = 8, rele
       const client = await db.connect()
       clients.push(client)
       await client.query("set role service_role")
-      pending.push(client.query(work, workValues).then((value) => ({ rows: value.rows }), (error) => ({ error })))
+      pending.push(client.query(work, typeof workValues === "function" ? workValues(i) : workValues).then((value) => ({ rows: value.rows }), (error) => ({ error })))
     }
     await waitBlocked(clients)
     await gate.query(release)
@@ -74,73 +74,109 @@ test("eight simultaneous enrollments create exactly one player", async () => {
   assert.equal(new Set(members.map((member) => member.player_account_id)).size, 1)
   assert.ok(members.every((member) => member.account_type === "guest"))
   assert.equal((await one("select count(*)::int as count from public.player_accounts where auth_user_id=$1", [id])).count, 1)
+  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [members[0].player_account_id])).n, 0)
 })
 
-test("eight simultaneous launches create one wallet and one initial credit", async () => {
-  const id = await identity()
-  const [member] = await serviceQuery(resolveSql, [id])
-  const sessions = successful(await blockedRace({ hold: lockSql, holdValues: [id], work: launchSql, workValues: [id] }))
-  assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
-  assert.equal(new Set(sessions.map((session) => session.session_id)).size, 8)
-  assert.equal(new Set(sessions.map((session) => session.launch_code)).size, 8)
-  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
-  const ledger = await one("select count(*)::int as count, sum(amount) as amount from public.wallet_transactions where wallet_account_id=$1", [sessions[0].wallet_account_id])
-  assert.equal(ledger.count, 1)
-  assert.equal(Number(ledger.amount), 10000)
-})
+for (const slug of ["test-game", "independent-game"]) {
+  const launchSql = `select * from public.create_game_session('${slug}', 'POINT', 3600, null, $1::uuid)`
 
-test("concurrent promotion waits for Auth commit and preserves player and wallet", async () => {
-  const id = await identity()
-  const [member] = await serviceQuery(resolveSql, [id])
-  const [session] = await serviceQuery(launchSql, [id])
-  await db.query("update public.wallet_accounts set balance=8123, locked_balance=123 where id=$1", [session.wallet_account_id])
-  const members = successful(await blockedRace({
-    hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
-    holdValues: [id], work: resolveSql, workValues: [id],
-  }))
-  assert.ok(members.every((current) => current.player_account_id === member.player_account_id && current.account_type === "registered"))
-  const [registered] = await serviceQuery(launchSql, [id])
-  assert.equal(registered.wallet_account_id, session.wallet_account_id)
-  const wallet = await one("select balance, locked_balance from public.wallet_accounts where id=$1", [session.wallet_account_id])
-  assert.equal(Number(wallet.balance), 8123)
-  assert.equal(Number(wallet.locked_balance), 123)
-  assert.equal((await one("select count(*)::int as count from public.wallet_transactions where wallet_account_id=$1", [session.wallet_account_id])).count, 1)
-})
+  test(`${slug}: eight simultaneous launches create one zero wallet without grants`, async () => {
+    const id = await identity()
+    const [member] = await serviceQuery(resolveSql, [id])
+    const sessions = successful(await blockedRace({ hold: lockSql, holdValues: [id], work: launchSql, workValues: [id] }))
+    assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
+    assert.equal(new Set(sessions.map((session) => session.session_id)).size, 8)
+    assert.equal(new Set(sessions.map((session) => session.launch_code)).size, 8)
+    assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
+    const ledger = await one("select count(*)::int as count, sum(amount) as amount from public.wallet_transactions where wallet_account_id=$1", [sessions[0].wallet_account_id])
+    assert.equal(ledger.count, 0)
+    assert.equal(Number((await one("select balance from public.wallet_accounts where id=$1", [sessions[0].wallet_account_id])).balance), 0)
+  })
 
-test("rolled-back Auth promotion leaves queued launches as the same guest", async () => {
+  test(`${slug}: concurrent promotion preserves the wallet, ledger and reservation`, async () => {
+    const id = await identity()
+    const [member] = await serviceQuery(resolveSql, [id])
+    const policy = slug === "test-game" ? games.platformPolicy : games.gamePolicy
+    await db.query("update public.looty_wallet_policies set initial_credit=1000 where id=$1", [policy])
+    let session
+    try { [session] = await serviceQuery(launchSql, [id]) }
+    finally { await db.query("update public.looty_wallet_policies set initial_credit=0 where id=$1", [policy]) }
+    await reserveMemberWallet(db, session, games.keys.get(session.game_id))
+    const snapshot = async () => ({
+      wallet: await one("select * from public.wallet_accounts where id=$1", [session.wallet_account_id]),
+      ledger: (await db.query("select * from public.wallet_transactions where wallet_account_id=$1 order by id", [session.wallet_account_id])).rows,
+      reservation: await one("select * from public.looty_match_participants where wallet_account_id=$1", [session.wallet_account_id]),
+    })
+    const before = await snapshot()
+    assert.equal(Number(before.wallet.balance), 1000)
+    assert.equal(Number(before.wallet.locked_balance), 100)
+    assert.equal(before.ledger.length, 1)
+    assert.ok(before.reservation)
+    const members = successful(await blockedRace({
+      hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
+      holdValues: [id], work: resolveSql, workValues: [id],
+    }))
+    assert.ok(members.every((current) => current.player_account_id === member.player_account_id && current.account_type === "registered"))
+    const [registered] = await serviceQuery(launchSql, [id])
+    assert.equal(registered.wallet_account_id, session.wallet_account_id)
+    assert.deepEqual(await snapshot(), before)
+  })
+
+  test(`${slug}: rolled-back Auth promotion leaves queued launches as the same guest`, async () => {
+    const id = await identity()
+    const [member] = await serviceQuery(resolveSql, [id])
+    const sessions = successful(await blockedRace({
+      hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
+      holdValues: [id], work: launchSql, workValues: [id], release: "rollback",
+    }))
+    assert.ok(sessions.every((session) => session.player_account_id === member.player_account_id && session.account_type === "guest"))
+    assert.equal((await one("select upgraded_at from public.player_accounts where id=$1", [member.player_account_id])).upgraded_at, null)
+    assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
+  })
+
+  test(`${slug}: a wallet freeze committed first rejects waiting launches without replacement`, async () => {
+    const id = await identity()
+    const [member] = await serviceQuery(resolveSql, [id])
+    const [session] = await serviceQuery(launchSql, [id])
+    const results = await blockedRace({ hold: "update public.wallet_accounts set status='frozen' where id=$1", holdValues: [session.wallet_account_id], work: launchSql, workValues: [id] })
+    assert.ok(results.every((result) => result.error?.code === "42501"))
+    assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
+    assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 1)
+    assert.equal((await one("select count(*)::int as count from public.wallet_transactions where wallet_account_id=$1", [session.wallet_account_id])).count, 0)
+  })
+
+  test(`${slug}: a launch committed first lets the waiting freeze finish and blocks later launches`, async () => {
+    const id = await identity()
+    const [member] = await serviceQuery(resolveSql, [id])
+    const policy = slug === "test-game" ? games.platformPolicy : games.gamePolicy
+    await db.query("insert into public.wallet_accounts (player_account_id,wallet_policy_id) values ($1,$2)", [member.player_account_id, policy])
+    successful(await blockedRace({
+      hold: launchSql, holdValues: [id], count: 1,
+      work: "update public.wallet_accounts set status='frozen' where player_account_id=$1 returning id",
+      workValues: [member.player_account_id],
+    }))
+    await assert.rejects(serviceQuery(launchSql, [id]), (error) => error.code === "42501")
+    assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 1)
+  })
+}
+
+test("concurrent launches across three titles create exactly two zero wallet scopes", async () => {
   const id = await identity()
   const [member] = await serviceQuery(resolveSql, [id])
+  const slugs = ["test-game", "shared-game", "independent-game"]
   const sessions = successful(await blockedRace({
-    hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
-    holdValues: [id], work: launchSql, workValues: [id], release: "rollback",
+    hold: lockSql, holdValues: [id], count: 9,
+    work: "select * from public.create_game_session($2, 'POINT', 3600, null, $1::uuid)",
+    workValues: index => [id, slugs[index % slugs.length]],
   }))
-  assert.ok(sessions.every((session) => session.player_account_id === member.player_account_id && session.account_type === "guest"))
-  assert.equal((await one("select upgraded_at from public.player_accounts where id=$1", [member.player_account_id])).upgraded_at, null)
-  assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
-})
-
-test("a wallet freeze committed first rejects every waiting launch without replacement", async () => {
-  const id = await identity()
-  const [member] = await serviceQuery(resolveSql, [id])
-  const [session] = await serviceQuery(launchSql, [id])
-  const results = await blockedRace({ hold: "update public.wallet_accounts set status='frozen' where id=$1", holdValues: [session.wallet_account_id], work: launchSql, workValues: [id] })
-  assert.ok(results.every((result) => result.error?.code === "42501"))
-  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
-  assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 1)
-  assert.equal((await one("select count(*)::int as count from public.wallet_transactions where wallet_account_id=$1", [session.wallet_account_id])).count, 1)
-})
-
-test("a launch committed first lets the waiting freeze finish and blocks later launches", async () => {
-  const id = await identity()
-  const [member] = await serviceQuery(resolveSql, [id])
-  await db.query("insert into public.wallet_accounts (player_account_id) values ($1)", [member.player_account_id])
-  successful(await blockedRace({
-    hold: launchSql, holdValues: [id], count: 1,
-    work: "update public.wallet_accounts set status='frozen' where player_account_id=$1 returning id",
-    workValues: [member.player_account_id],
-  }))
-  await assert.rejects(serviceQuery(launchSql, [id]), (error) => error.code === "42501")
-  assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 1)
+  const shared = sessions.filter(session => session.game_id !== games.independent)
+  const independent = sessions.filter(session => session.game_id === games.independent)
+  assert.equal(new Set(shared.map(session => session.wallet_account_id)).size, 1)
+  assert.equal(new Set(independent.map(session => session.wallet_account_id)).size, 1)
+  assert.notEqual(shared[0].wallet_account_id, independent[0].wallet_account_id)
+  const wallets = (await db.query("select balance,locked_balance from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).rows
+  assert.equal(wallets.length, 2)
+  assert.ok(wallets.every(wallet => Number(wallet.balance) === 0 && Number(wallet.locked_balance) === 0))
 })
 
 test("rolling back the first enrollment permits queued retries to create one player", async () => {

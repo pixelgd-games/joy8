@@ -29,8 +29,10 @@ Looty succeeds when:
 ## Current Implementation
 
 [README.md](../../README.md) owns the implemented feature list and operating
-instructions. The member, scoped-wallet, and trusted-settlement capabilities
-below are targets, not completed functionality.
+instructions. Member entry, scoped wallets and trusted settlement
+are deployed foundations; provider acceptance and product activation remain open.
+Continuous per-hand settlement and the private Mahjong schema are installed;
+product activation remains pending as recorded in README and the integration contract. Target policies below do not imply full acceptance.
 
 ## Ownership Boundaries
 

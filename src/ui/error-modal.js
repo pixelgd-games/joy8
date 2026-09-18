@@ -1,3 +1,5 @@
+import "../styles/error-modal.css"
+
 export const ERROR_CODES = Object.freeze({
   LOBBY_GAMES_READ_FAILED: "LOOTY-LOBBY-001",
 
@@ -21,7 +23,6 @@ export const ERROR_CODES = Object.freeze({
   ADMIN_GAME_ID_MISSING: "LOOTY-ADMIN-011",
 })
 
-const STYLE_ID = "looty-error-modal-style"
 const MODAL_ID = "looty-error-modal"
 
 let activeCleanup = null
@@ -36,7 +37,6 @@ export function showErrorModal(options = {}) {
   }
 
   closeErrorModal()
-  ensureStyles()
 
   const modal = document.createElement("section")
   modal.id = MODAL_ID
@@ -80,15 +80,7 @@ export function showErrorModal(options = {}) {
     }, "primary"))
   }
 
-  if (config.secondaryAction) {
-    actions.append(createActionButton(config.secondaryAction))
-  } else if (config.close !== false) {
-    actions.append(createActionButton({
-      label: "Close",
-      onClick: closeErrorModal,
-      closeBeforeAction: false,
-    }))
-  }
+  actions.append(createActionButton({ label: "Close" }))
 
   dialog.append(kicker, title, message, code, actions)
   modal.append(dialog)
@@ -96,13 +88,13 @@ export function showErrorModal(options = {}) {
   document.body.classList.add("looty-error-modal-open")
 
   const handleKeydown = (event) => {
-    if (event.key === "Escape" && config.close !== false) {
+    if (event.key === "Escape") {
       closeErrorModal()
     }
   }
 
   const handleOverlayClick = (event) => {
-    if (event.target === modal && config.close !== false) {
+    if (event.target === modal) {
       closeErrorModal()
     }
   }
@@ -134,9 +126,7 @@ function normalizeOptions(options) {
     message: options.message || "The system is having trouble right now. Please try again later.",
     error: options.error,
     reload: options.reload,
-    close: options.close,
     primaryAction: options.primaryAction,
-    secondaryAction: options.secondaryAction,
   }
 }
 
@@ -146,124 +136,8 @@ function createActionButton(action, modifier = "") {
   button.className = modifier ? `looty-error-action ${modifier}` : "looty-error-action"
   button.textContent = action.label || "OK"
   button.addEventListener("click", () => {
-    if (action.closeBeforeAction !== false) {
-      closeErrorModal()
-    }
-
+    closeErrorModal()
     action.onClick?.()
   })
   return button
-}
-
-function ensureStyles() {
-  if (document.getElementById(STYLE_ID)) return
-
-  const style = document.createElement("style")
-  style.id = STYLE_ID
-  style.textContent = `
-    body.looty-error-modal-open{
-      overflow:hidden;
-    }
-
-    .looty-error-modal{
-      position:fixed;
-      inset:0;
-      z-index:10000;
-      display:grid;
-      place-items:center;
-      padding:24px;
-      background:rgba(5,7,12,.68);
-      -webkit-backdrop-filter:blur(14px);
-      backdrop-filter:blur(14px);
-      color:#f7f8fc;
-      font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;
-    }
-
-    .looty-error-dialog{
-      width:min(420px,100%);
-      padding:24px;
-      border:1px solid rgba(235,255,61,.18);
-      border-radius:18px;
-      background:linear-gradient(180deg, rgba(24,29,38,.96) 0%, rgba(10,14,20,.98) 100%);
-      box-shadow:0 28px 70px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06);
-    }
-
-    .looty-error-kicker{
-      margin:0 0 8px;
-      color:#ebff3d;
-      font-size:12px;
-      font-weight:800;
-      letter-spacing:.12em;
-    }
-
-    .looty-error-title{
-      margin:0;
-      font-size:24px;
-      line-height:1.2;
-    }
-
-    .looty-error-message{
-      margin:12px 0 0;
-      color:rgba(247,248,252,.84);
-      font-size:15px;
-      line-height:1.6;
-    }
-
-    .looty-error-code{
-      margin:16px 0 0;
-      padding:10px 12px;
-      border:1px solid rgba(255,255,255,.08);
-      border-radius:12px;
-      background:rgba(255,255,255,.04);
-      color:rgba(247,248,252,.72);
-      font-size:13px;
-      font-weight:700;
-      word-break:break-word;
-    }
-
-    .looty-error-actions{
-      display:flex;
-      justify-content:flex-end;
-      gap:10px;
-      margin-top:20px;
-    }
-
-    .looty-error-action{
-      min-height:38px;
-      padding:0 16px;
-      border:1px solid rgba(235,255,61,.14);
-      border-radius:999px;
-      background:rgba(15,19,28,.92);
-      color:#f7f8fc;
-      font:inherit;
-      font-size:13px;
-      font-weight:800;
-      cursor:pointer;
-    }
-
-    .looty-error-action.primary{
-      border-color:rgba(255,255,255,.08);
-      background:linear-gradient(180deg, #ebff3d 0%, #d5ff18 100%);
-      color:#1d2128;
-    }
-
-    @media (max-width:480px){
-      .looty-error-modal{
-        padding:16px;
-      }
-
-      .looty-error-dialog{
-        padding:20px;
-      }
-
-      .looty-error-actions{
-        flex-direction:column;
-      }
-
-      .looty-error-action{
-        width:100%;
-      }
-    }
-  `
-  document.head.append(style)
 }

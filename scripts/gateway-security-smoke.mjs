@@ -19,6 +19,9 @@ async function post(route, body = {}, browserOrigin = null) {
 assert.equal((await post("create-session", {}, "https://not-looty.example")).status, 403)
 assert.equal((await post("create-session")).status, 403)
 assert.equal((await post("create-session", {}, origin)).status, 401)
+assert.equal((await post("private-session", { slug: "mahjong-clash" }, "https://not-looty.example")).status, 403)
+assert.equal((await post("private-session", { slug: "mahjong-clash" })).status, 403)
+assert.equal((await post("private-session", { slug: "mahjong-clash" }, "http://localhost:5173")).status, 401)
 for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
   assert.equal((await post(route)).status, 404, route + " must be removed")
 }

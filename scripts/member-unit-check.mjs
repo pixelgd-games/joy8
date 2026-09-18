@@ -59,6 +59,9 @@ test("return paths reject external destinations and remove unrelated parameters"
     assert.equal(safeReturnPath(value, origin), "/")
   }
   assert.equal(safeReturnPath("/game/?slug=mahjong-clash&access_token=secret", origin), "/game/?slug=mahjong-clash")
+  assert.equal(safeReturnPath("/play-test/?slug=mahjong-clash&launch_url=https://evil.example&token=secret", origin), "/play-test/?slug=mahjong-clash")
+  assert.equal(safeReturnPath("https://evil.example/play-test/?slug=mahjong-clash", origin), "/")
+  assert.equal(accountPath("/play-test/?slug=mahjong-clash", origin), "/account/?next=%2Fplay-test%2F%3Fslug%3Dmahjong-clash")
   assert.equal(accountPath("/game/?slug=test", origin), "/account/?next=%2Fgame%2F%3Fslug%3Dtest")
   assert.equal(lobbyGamePath("/game/?slug=test&token=discard", origin), "/?play=test")
   assert.equal(lobbyGamePath("https://evil.example/game/?slug=test", origin), "/")
@@ -101,6 +104,30 @@ test("repeated game clicks are serialized and invalid destinations do not check 
   resolveMember(null)
   await first
   assert.deepEqual(paths, ["/game/?slug=first"])
+})
+
+test("account and game entry share one guard, including lazy dialog loading and failure cleanup", async () => {
+  let rejectDialog
+  let busy = false
+  const trigger = { setAttribute: () => { busy = true }, removeAttribute: () => { busy = false } }
+  let reads = 0
+  const paths = []
+  const enter = createGameEntry({
+    origin,
+    membership: async () => { reads++; return { player_account_ref: "player-1" } },
+    openMember: () => new Promise((_, reject) => { rejectDialog = reject }),
+    navigate: (path) => paths.push(path),
+  })
+  const account = enter({ trigger })
+  assert.equal(busy, true)
+  await enter({ trigger, next: "/game/?slug=test" })
+  assert.equal(reads, 0)
+  rejectDialog(new Error("Dialog load failed"))
+  await assert.rejects(account, /Dialog load failed/)
+  assert.equal(busy, false)
+  await enter({ trigger, next: "/game/?slug=test" })
+  assert.deepEqual(paths, ["/game/?slug=test"])
+  assert.equal(busy, false)
 })
 
 test("reading membership never creates a guest or enrolls an existing Auth user", async () => {

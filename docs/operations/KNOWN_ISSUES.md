@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-17.
+Last reviewed: 2026-09-18.
 
 ## Status Summary
 
@@ -20,12 +20,14 @@ each product must still implement and verify authoritative gameplay before activ
 
 - The deployed foundation implements scope, backend authority, reservation,
   atomic settlement, product adapters and renewal. Browser amount RPCs are removed.
-  Per-product configuration and real backend integration remain unverified;
-  passing local fixture tests does not activate products.
+  Mahjong has verified identity-only configuration and a restricted hosted
+  connection; full gameplay/settlement acceptance remains unverified. Passing
+  local fixture tests does not authorize funded operation.
 - Operational opening credit is decided: 0 POINT pending a later grant decision.
   The approved reset removed test accounting; no old balance was transferred.
 - Each product still needs reviewed scope/limits, keys, its authoritative backend
-  and any accounting adapter. No product policy or key is installed by the platform migrations.
+  and any accounting adapter. Mahjong's installed policy and exchange/renew key
+  support identity checks only; financial scopes and funding remain pending.
 - No general compensation/funding API exists. Define the reviewed linked
   compensation procedure before funded operation; immutable records cannot be
   edited to repair an accounting discrepancy.
@@ -35,14 +37,21 @@ The requirements and acceptance cases belong in
 POINT purchase policy and release timing belong in
 [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
-### Product SQL Drafts
+### Mahjong Activation
 
-The three `2026091609...` Mahjong SQL files are review-only, not applied and not
-an approved deployable set. They have incomplete account coverage and mismatches
-with product identifiers and occupancy. The product owns the detailed corrections
-in [its data plan](../../../../Project-Gaming/production/table/products/mahjong-clash/docs/DATA_AND_LOOTY_INTEGRATION_PLAN.md#sql-draft-corrections).
-They are preserved under `supabase/drafts/mahjong-clash/`, outside active migration
-discovery. See [draft review instructions](../../supabase/drafts/README.md).
+The continuous-settlement extension, ledger cleanup and 22-table Mahjong private
+schema are installed. Private entry and Gateway version 8 are active with an
+identity-only game policy and zero opening credit. The restricted TLS database
+connection passed; the game has only an expiring exchange/renew key. Test entry
+uses ordinary member/guest authentication without per-player approval.
+Real sign-in/game acceptance and funded-play policy/key
+scopes remain incomplete. The test page ships with Looty, but Mahjong entry is
+configured only for localhost and its public release is not activated.
+See [the activation review](../../supabase/drafts/MAHJONG_REVIEW.md).
+
+The three original `2026091609...` Mahjong drafts remain superseded, unapplied
+reference material under `supabase/drafts/mahjong-clash/`; never bulk-apply them
+alongside the installed product schema. The product owns future gameplay SQL.
 
 ### Member and Persistent Guest Direction
 
@@ -60,8 +69,8 @@ Current behavior:
   implemented. The member migrations and Gateway are active; the matching front
   end is released from main. Real provider acceptance remains outstanding.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
-- Wallet scope is resolved by trusted platform/game policy. No product policy is
-  enabled until its integration is reviewed.
+- Wallet scope is resolved by trusted platform/game policy. Mahjong's enabled
+  zero-credit identity policy does not establish funded-play readiness.
 
 Risk:
 
@@ -125,6 +134,25 @@ Direction:
 
 If production evidence shows abuse, evaluate edge protection, CAPTCHA, device attestation, or a stronger issuance design. Do not add these preemptively without an observed need and a privacy review.
 
+### Forwarded Client Address Trust Is Unverified
+
+The Gateway selects `cf-connecting-ip`, then `x-real-ip`, then the first
+`x-forwarded-for` value, falling back to `unknown`. Local tests cannot establish
+which headers the hosted ingress overwrites or whether a caller can influence
+the selected rate-limit key. This is an unverified boundary, not a confirmed bypass.
+
+[Cloudflare documents](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
+that it can append to an existing forwarded chain and that Worker subrequests
+have distinct client-IP behavior. The [Supabase example](https://supabase.com/docs/guides/functions/examples/cloudflare-turnstile)
+uses the first forwarded address, but does not establish Looty's complete ingress
+trust contract. Neither source proves the hosted fallback branches safe.
+
+Before changing this selection, verify the managed ingress contract or run a
+separately approved, bounded hosted diagnostic using conflicting synthetic values
+in all three headers, including multi-hop and IPv6 cases. Confirm the selected
+key comes from the trusted ingress; do not log credentials or add a public header
+echo endpoint. Local mocked headers and IP-format validation cannot prove this.
+
 ## Test Gaps
 
 ### Automation Coverage
@@ -132,10 +160,11 @@ If production evidence shows abuse, evaluate edge protection, CAPTCHA, device at
 Current local checks cover the static build, key pages, iframe restrictions,
 load timeout, cover fallback, error presentation, member service logic, Gateway
 membership authorization, safe return paths, and responsive member UI. The
-isolated member SQL suite also executes both migrations and checks roles, rollback,
-player/wallet preservation and initial credit. Its engine and fixture limits are
-documented in [README.md](../../README.md#verification). Native PostgreSQL 17.6
-also passes eight competing-connection cases. Hosted guest acceptance is limited
+isolated member SQL suite loads the current platform migrations and checks roles,
+rollback, zero-POINT provisioning and promotion preserving both wallet scopes,
+ledger and reservations. Its engine and fixture limits are documented in
+[README.md](../../README.md#verification). Native PostgreSQL 17.6 also passes
+14 competing-connection cases against that schema. Hosted guest acceptance is limited
 to the checks in README; Google/email, linking, recovery and production load
 remain unverified.
 

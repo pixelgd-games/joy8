@@ -285,7 +285,7 @@ failure may return 429/503 before the probe. The dependency RPC reads the catalo
 and verifies critical member/session/settlement function presence. It does not
 exercise financial writes or prove Google, SMTP, product backend or iframe health.
 The rate limiter may update runtime counters; no business records are created.
-The hosted health/rejection check passed against Gateway version 7.
+The hosted health/rejection check passed against Gateway version 8.
 
 It should distinguish:
 

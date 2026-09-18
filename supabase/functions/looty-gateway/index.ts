@@ -66,6 +66,7 @@ const ROUTES = new Set([
   "member",
   "enroll-member",
   "create-session",
+  "private-session",
   "balance",
 ])
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
@@ -79,13 +80,14 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   member: { limit: 120, windowSeconds: 60 },
   "enroll-member": { limit: 30, windowSeconds: 300 },
   "create-session": { limit: 30, windowSeconds: 300 },
+  "private-session": { limit: 30, windowSeconds: 300 },
   balance: { limit: 120, windowSeconds: 60 },
 }
 const PUBLIC_RPC_MESSAGES = new Set([
-  "expires_in_seconds must be between 60 and 86400", "game is not available",
-  "game session is not active", "game slug is required", "player account is not active",
-  "player membership is required", "verified member identity is required", "wallet account is not active",
+  "game is not available", "game session is not active", "player account is not active",
+  "player membership is required", "verified member identity is required",
   "LOOTY_GAME_NOT_READY", "LOOTY_PLAYER_INACTIVE", "LOOTY_WALLET_INACTIVE", "LOOTY_INVALID_REQUEST",
+  "LOOTY_PRIVATE_ENTRY_DENIED",
 ])
 
 const allowedOrigins = (Deno.env.get("LOOTY_ALLOWED_ORIGINS") ?? "")
@@ -168,6 +170,10 @@ async function dispatchRoute(
     return createSession(request, headers)
   }
 
+  if (route === "private-session") {
+    return createPrivateSession(request, headers)
+  }
+
   if (route === "balance") {
     return getBalance(request, headers)
   }
@@ -203,6 +209,7 @@ async function serverOperation(route: string, request: Request, headers: Headers
       LOOTY_INVALID_ENTRY: 400, LOOTY_LIMIT_EXCEEDED: 400, LOOTY_RULE_MISMATCH: 409,
       LOOTY_IDEMPOTENCY_CONFLICT: 409, LOOTY_MATCH_FINALIZED: 409, LOOTY_MATCH_NOT_FOUND: 404,
       LOOTY_UNBALANCED_SETTLEMENT: 400, LOOTY_WALLET_OCCUPIED: 409, LOOTY_INSUFFICIENT_BALANCE: 409,
+      LOOTY_SETTLEMENT_SEQUENCE: 409,
     }
     if (statuses[code]) return jsonResponse({ error: code }, statuses[code], headers)
     if (error?.code === "22P02") return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
@@ -232,6 +239,27 @@ async function resolveMember(request: Request, headers: HeadersInit, enroll: boo
     return jsonResponse({ error: "Gateway returned an invalid member" }, 502, headers)
   }
   return jsonResponse({ member: { player_account_ref: row.player_account_id, account_type: row.account_type } }, 200, headers)
+}
+
+async function createPrivateSession(request: Request, headers: HeadersInit): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  const slug = body.value.slug
+  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
+    return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
+  }
+  const result = await callRpc("looty_create_private_session", {
+    p_game_slug: slug, p_auth_user_id: auth.userId, p_origin: request.headers.get("origin"),
+  })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  const row = result.body as Record<string, JsonValue> | null
+  if (!row || Array.isArray(row) || !row.session_id || !row.launch_code || !row.game_id || !row.launch_url || row.protocol !== "server-v1") {
+    return jsonResponse({ error: "Gateway returned an empty session" }, 502, headers)
+  }
+  return jsonResponse(row, 200, { ...headers, "Cache-Control": "no-store" })
 }
 
 async function createSession(request: Request, headers: HeadersInit): Promise<Response> {
@@ -510,6 +538,7 @@ function buildCorsHeaders(
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
   if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
+  if (route === "private-session") return Boolean(origin && allowedOrigins.includes(origin))
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
   if (!origin) {
     return !memberRoute

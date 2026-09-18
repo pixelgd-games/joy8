@@ -1,6 +1,6 @@
-import { supabase } from "/src/lib/supabaseClient.js"
+import { supabase } from "../../lib/supabaseClient.js"
 
-const PUBLIC_GAME_FIELDS = "id, slug, name, type, supports_live, thumbnail, created_at, sort_order"
+const PUBLIC_GAME_FIELDS = "slug, name, type, thumbnail"
 
 export async function fetchPublicGames() {
   const { data, error } = await supabase

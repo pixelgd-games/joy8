@@ -93,6 +93,7 @@ try {
 
   let memberRows = [{ player_account_id: "player-1", account_type: "guest" }]
   let memberError = null
+  let sessionError = null
   const rpcCalls = []
   globalThis.fetch = async (url, options) => {
     if (url.endsWith("/auth/v1/user")) return Response.json({ id: "verified-user" })
@@ -103,11 +104,15 @@ try {
     if (name === "looty_resolve_member") {
       return memberError ? Response.json(memberError, { status: 403 }) : Response.json(memberRows)
     }
-    if (name === "create_game_session") return Response.json([{
+    if (name === "create_game_session") return sessionError ? Response.json(sessionError, { status: 400 }) : Response.json([{
       session_id: "session-1", player_account_id: "player-1", game_id: "game-1",
       launch_code: "one-use-code", account_type: "guest", currency: "POINT", protocol: "server-v1",
     }])
     if (name === "looty_cleanup_gateway_runtime") return Response.json([])
+    if (name === "looty_create_private_session") return sessionError ? Response.json(sessionError, { status: 403 }) : Response.json({
+      session_id: "private-session", game_id: "game-1", launch_code: "private-code", protocol: "server-v1",
+      launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", currency: "POINT",
+    })
     throw new Error(`Unexpected RPC ${name}`)
   }
   const request = (route, body = {}, token = "member-token", origin = "https://looty-git.pages.dev") => handleRequest(new Request(`https://gateway.example/${route}`, {
@@ -115,7 +120,7 @@ try {
     headers: { "Content-Type": "application/json", apikey: "anon-key", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
   }))
-  for (const route of ["member", "enroll-member", "create-session"]) {
+  for (const route of ["member", "enroll-member", "create-session", "private-session"]) {
     assert.equal((await request(route, {}, "", "https://evil.example")).status, 403)
     assert.equal((await request(route, {}, "", null)).status, 403)
     for (const token of ["", "anon-key"]) assert.equal((await request(route, {}, token)).status, 401)
@@ -145,6 +150,42 @@ try {
   assert.equal(launched.status, 200)
   assert.equal((await launched.json()).account_type, "guest")
   assert.equal(rpcCalls.find(({ name }) => name === "create_game_session").args.p_auth_user_id, "verified-user")
+
+  for (const [code, message, status] of [
+    ["P0002", "game is not available", 404],
+    ["22023", "LOOTY_INVALID_REQUEST", 400],
+    ["42501", "LOOTY_WALLET_INACTIVE", 403],
+  ]) {
+    sessionError = { code, message }
+    const response = await request("create-session", { slug: "test" })
+    assert.equal(response.status, status)
+    assert.deepEqual(await response.json(), { error: message })
+  }
+  for (const message of [
+    "game slug is required",
+    "expires_in_seconds must be between 60 and 86400",
+    "wallet account is not active",
+    "private database diagnostic",
+  ]) {
+    sessionError = { code: "22023", message }
+    const response = await request("create-session", { slug: "test" })
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { error: "Gateway RPC failed" })
+  }
+  sessionError = null
+
+  assert.equal((await request("private-session", { slug: "mahjong-clash", auth_user_id: "victim" })).status, 400)
+  assert.equal((await request("private-session", { slug: "mahjong-clash", origin: "http://localhost:5173" })).status, 400)
+  assert.equal((await request("private-session", { slug: "mahjong-clash" }, "member-token", "http://localhost:9000")).status, 403)
+  const privateResponse = await request("private-session", { slug: "mahjong-clash" }, "member-token", "http://localhost:5173")
+  assert.equal(privateResponse.status, 200)
+  assert.equal(privateResponse.headers.get("cache-control"), "no-store")
+  assert.deepEqual(rpcCalls.at(-1), { name: "looty_create_private_session", args: { p_game_slug: "mahjong-clash", p_auth_user_id: "verified-user", p_origin: "http://localhost:5173" } })
+  sessionError = { code: "42501", message: "LOOTY_PRIVATE_ENTRY_DENIED" }
+  const privateDenied = await request("private-session", { slug: "mahjong-clash" })
+  assert.equal(privateDenied.status, 403)
+  assert.deepEqual(await privateDenied.json(), { error: "LOOTY_PRIVATE_ENTRY_DENIED" })
+  sessionError = null
 
   for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
     assert.equal((await request(route, {}, "", null)).status, 404)
@@ -181,7 +222,7 @@ try {
   assert.equal((await request("server-open-v1", [], key, null)).status, 400)
   assert.equal((await request("server-open-v1", { data: "x".repeat(17000) }, key, null)).status, 400)
   assert.equal(serverCalls.length, count)
-  for (const [code, status] of [["LOOTY_BACKEND_UNAUTHORIZED", 401], ["LOOTY_IDEMPOTENCY_CONFLICT", 409], ["LOOTY_WALLET_INACTIVE", 403], ["LOOTY_MATCH_NOT_FOUND", 404]]) {
+  for (const [code, status] of [["LOOTY_BACKEND_UNAUTHORIZED", 401], ["LOOTY_IDEMPOTENCY_CONFLICT", 409], ["LOOTY_SETTLEMENT_SEQUENCE", 409], ["LOOTY_WALLET_INACTIVE", 403], ["LOOTY_MATCH_NOT_FOUND", 404]]) {
     serverError = { message: code }
     const response = await request("server-settle-v1", {}, key, null)
     assert.equal(response.status, status)
