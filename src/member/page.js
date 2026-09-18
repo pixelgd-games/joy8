@@ -14,6 +14,7 @@ export function initMemberPanel(root, options = {}) {
     guestLock: navigator.locks ? (fn) => navigator.locks.request("looty-guest-entry", fn) : null,
   })
   const pendingKey = "looty-member-link-user"
+  const entryDescription = $("account-description").textContent
   let user = null
   let formMode = "signin"
   let busy = false
@@ -44,6 +45,7 @@ export function initMemberPanel(root, options = {}) {
       root.querySelector(".account-card").setAttribute("aria-busy", "false")
       for (const button of root.querySelectorAll("button")) button.disabled = false
       $("password").value = ""
+      $("register-confirm-password").value = ""
       $("new-password").value = ""
       $("confirm-password").value = ""
       $("account-actions").hidden = false
@@ -52,13 +54,28 @@ export function initMemberPanel(root, options = {}) {
 
   function mode(value) {
     formMode = value
-    const emailOnly = value === "reset" || (value === "register" && user?.is_anonymous)
+    const guest = user?.is_anonymous === true
+    const creating = value === "register"
+    const emailOnly = value === "reset" || (creating && guest)
+    $("account-title").textContent = guest ? "訪客帳號" : user ? ["recovery", "upgrade"].includes(flow) ? "設定密碼" : "我的帳號" : value === "register" ? "建立帳號" : value === "reset" ? "找回密碼" : "登入"
+    $("account-description").textContent = guest ? "綁定帳號後，可在其他裝置找回進度。" : user || value !== "signin" ? "" : entryDescription
+    $("account-description").hidden = !$("account-description").textContent
+    $("provider-options").hidden = !guest && value !== "signin"
     $("password-field").hidden = emailOnly
     $("password").required = !emailOnly
-    $("password").minLength = value === "register" ? 10 : 1
-    $("password").autocomplete = value === "register" ? "new-password" : "current-password"
-    $("email-submit").textContent = value === "reset" ? "寄送重設密碼信" : value === "register" ? "寄送帳號驗證信" : "登入"
+    $("password").minLength = creating ? 10 : 1
+    $("password").autocomplete = creating ? "new-password" : "current-password"
+    $("password-label").textContent = creating ? "設定密碼" : "密碼"
+    $("confirm-password-field").hidden = !creating || guest
+    $("register-confirm-password").required = creating && !guest
+    $("password-hint").hidden = !creating || guest
+    $("reset-button").hidden = value !== "signin" || Boolean(user)
+    $("email-submit").textContent = value === "reset" ? "寄送重設密碼信" : guest ? "寄送綁定驗證信" : creating ? "寄送帳號驗證信" : "登入"
+    $("account-switch").hidden = Boolean(user)
+    $("account-switch-prompt").textContent = creating ? "已經有帳號？" : value === "reset" ? "想起密碼了？" : "還沒有帳號？"
     $("register-button").textContent = value === "signin" ? "建立帳號" : "返回登入"
+    $("guest-button").hidden = Boolean(user) || value !== "signin"
+    $("guest-notice").hidden = Boolean(user) || value !== "signin"
   }
 
   async function refresh() {
@@ -66,13 +83,9 @@ export function initMemberPanel(root, options = {}) {
     if (disposed) return
     $("identity-summary").hidden = !user
     $("signin-options").hidden = Boolean(user && !user.is_anonymous)
-    $("guest-button").hidden = Boolean(user)
-    $("reset-button").hidden = Boolean(user)
-    $("register-button").hidden = Boolean(user?.is_anonymous)
     $("continue-link").hidden = true
     $("enroll-button").hidden = true
     $("new-password-form").hidden = !(user && !user.is_anonymous && ["recovery", "upgrade"].includes(flow))
-    $("account-title").textContent = user ? user.is_anonymous ? "保留你的訪客進度。" : "你的 Looty 帳號" : "登入，接著玩。"
     $("google-button").textContent = user ? "綁定 Google，保留進度" : "使用 Google 登入"
     $("identity-label").textContent = user?.is_anonymous ? "目前以訪客身分登入" : user?.email || ""
     mode(user?.is_anonymous ? "register" : "signin")
@@ -99,6 +112,11 @@ export function initMemberPanel(root, options = {}) {
 
   $("email-form").addEventListener("submit", (event) => {
     event.preventDefault()
+    if (formMode === "register" && !user?.is_anonymous && $("password").value !== $("register-confirm-password").value) {
+      status("兩次密碼不相同，請重新輸入。", true)
+      $("register-confirm-password").focus()
+      return
+    }
     run(async () => {
       const email = $("email").value
       if (formMode === "reset") {
@@ -117,8 +135,14 @@ export function initMemberPanel(root, options = {}) {
     })
   })
 
-  $("register-button").addEventListener("click", () => mode(formMode === "signin" ? "register" : "signin"))
-  $("reset-button").addEventListener("click", () => mode("reset"))
+  $("register-button").addEventListener("click", () => {
+    status()
+    mode(formMode === "signin" ? "register" : "signin")
+  })
+  $("reset-button").addEventListener("click", () => {
+    status()
+    mode("reset")
+  })
   $("enroll-button").addEventListener("click", () => run(async () => {
     await service.membership(true)
     if (service.returnPath !== "/") {
@@ -163,7 +187,7 @@ export function initMemberPanel(root, options = {}) {
       }
     }
     await refresh()
-    status(user?.is_anonymous ? "綁定帳號後，就能在其他裝置找回進度。" : user ? "登入狀態已確認。" : "")
+    status()
   })
 
   const onFocus = () => {

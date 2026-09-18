@@ -27,7 +27,7 @@ export async function openMemberModal(trigger, { next = "/", gameName = "" } = {
   returnFocus = trigger
   const content = dialog.querySelector(".member-dialog-content")
   content.innerHTML = memberCardMarkup
-  if (gameName) content.querySelector("#account-description").textContent = `登入或以訪客身分開始玩「${gameName}」。`
+  if (gameName) content.querySelector("#account-description").textContent = `遊玩「${gameName}」`
   document.body.classList.add("member-dialog-open")
   dialog.showModal()
   panel = initMemberPanel(content, {

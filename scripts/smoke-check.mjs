@@ -376,11 +376,26 @@ async function expectMemberEntry(client, appPort) {
       document.getElementById("register-button").click()
       const registration = document.getElementById("password").minLength === 10
         && document.getElementById("password").autocomplete === "new-password"
+        && document.getElementById("account-title").textContent === "建立帳號"
+        && !document.getElementById("confirm-password-field").hidden
+        && document.getElementById("register-confirm-password").required
+        && document.getElementById("provider-options").hidden
+        && document.getElementById("guest-button").hidden
+        && document.getElementById("reset-button").hidden
+      document.getElementById("email").value = "player@example.com"
+      document.getElementById("password").value = "first-password"
+      document.getElementById("register-confirm-password").value = "other-password"
+      document.getElementById("email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+      const mismatch = document.getElementById("account-status").textContent.includes("兩次密碼不相同")
+      document.getElementById("register-button").click()
       document.getElementById("reset-button").click()
       const recovery = document.getElementById("password-field").hidden
         && !document.getElementById("password").required
+        && document.getElementById("account-title").textContent === "找回密碼"
+        && document.getElementById("provider-options").hidden
       document.getElementById("register-button").click()
-      return registration && recovery && !document.getElementById("password-field").hidden
+      return registration && mismatch && recovery && !document.getElementById("password-field").hidden
+        && document.getElementById("account-title").textContent === "登入"
     })()`,
   })
   if (!controls.result.value) throw new Error("Member form modes failed")
@@ -388,7 +403,7 @@ async function expectMemberEntry(client, appPort) {
     await client.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 })
     const layout = await client.send("Runtime.evaluate", {
       returnByValue: true,
-      expression: `document.documentElement.scrollWidth <= innerWidth && getComputedStyle(document.getElementById("new-password-form")).display === "none"`,
+      expression: `document.documentElement.scrollWidth <= innerWidth && getComputedStyle(document.getElementById("new-password-form")).display === "none" && document.getElementById("google-button").getBoundingClientRect().top > document.getElementById("email-submit").getBoundingClientRect().bottom && document.getElementById("guest-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 17`,
     })
     if (!layout.result.value) throw new Error(`Member layout failed at ${width}px`)
     if (process.env.SMOKE_MEMBER_SCREENSHOT && width === 390) {
@@ -429,11 +444,26 @@ async function expectMemberModal(client) {
       const backdrop = getComputedStyle(dialog, "::backdrop")
       return location.pathname === "/" && dialog.open
         && document.querySelector(".hero-image").isConnected
+        && !dialog.querySelector(".account-kicker")
+        && dialog.querySelector("#account-description").hidden
         && backdrop.backgroundColor === "rgba(0, 0, 0, 0.18)"
         && backdrop.backdropFilter === "none"
     })()`,
   })
   if (!opened.result.value) throw new Error("Member dialog replaces or obscures the Lobby")
+  const switched = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: `(() => {
+      const dialog = document.querySelector("#member-dialog")
+      dialog.querySelector("#register-button").click()
+      const registration = dialog.open && location.pathname === "/"
+        && dialog.querySelector("#account-title").textContent === "建立帳號"
+        && !dialog.querySelector("#confirm-password-field").hidden
+      dialog.querySelector("#register-button").click()
+      return registration && dialog.open && dialog.querySelector("#account-title").textContent === "登入"
+    })()`,
+  })
+  if (!switched.result.value) throw new Error("Member dialog form switch changed the Lobby")
   await client.send("Runtime.evaluate", { awaitPromise: true, expression: 'new Promise(resolve => { document.querySelector("#member-dialog").addEventListener("close", resolve, { once: true }); document.querySelector(".member-dialog-close").click() })' })
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
   await waitForText(client, (text) => text.includes("使用 Google 登入"), "Member dialog reopens")
@@ -473,7 +503,7 @@ async function expectGameSelection(client, appPort) {
   })
   for (let index = 0; index < games.length; index++) {
     await client.send("Runtime.evaluate", { expression: `document.querySelectorAll("#gameGrid .game-tile-poster")[${index}].click()` })
-    await waitForText(client, (text) => text.includes(`開始玩「${games[index].name}」`) && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
+    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
     const path = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
     if (path.result.value !== "/") throw new Error("Selecting a game removed the Lobby")
     await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
@@ -483,12 +513,12 @@ async function expectGameSelection(client, appPort) {
     await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
   }
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && !text.includes("開始玩「"), "Top-bar entry clears previous game choice")
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && !text.includes("遊玩「"), "Top-bar entry clears previous game choice")
   await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
-  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`開始玩「${games[0].name}」`) && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`遊玩「${games[0].name}」`) && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })

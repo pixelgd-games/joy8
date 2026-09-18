@@ -1,12 +1,13 @@
 .account-shell { width: min(100% - 32px, 460px); margin: 40px auto; }
 .account-shell > .brand-link { margin-bottom: 24px; }
 .account-card { padding: 32px; background: rgba(18, 22, 30, .94); border: 1px solid var(--glass-border); border-radius: 24px; box-shadow: var(--glass-shadow); }
-.account-kicker { font-size: 11px; letter-spacing: .16em; color: var(--accent); font-weight: 700; }
-.account-card h1 { font-size: 30px; margin: 10px 0; letter-spacing: -.03em; }
+.account-card h1 { font-size: 30px; margin: 0 0 12px; letter-spacing: -.03em; }
 .muted, .account-note, .account-footer { color: var(--muted); }
+.account-card #account-description { margin: 0 0 16px; }
 .account-note, .account-footer { font-size: 12px; line-height: 1.7; }
 .account-footer { text-align: center; padding: 0 12px; }
-#account-status { font-size: 14px; min-height: 22px; overflow-wrap: anywhere; }
+#account-status { font-size: 14px; margin: 0 0 16px; overflow-wrap: anywhere; }
+#account-status:empty { display: none; }
 #account-status[data-error="true"] { color: #ffb7b7; }
 .account-card form { display: grid; gap: 10px; }
 .account-card label { font-size: 13px; }
@@ -14,8 +15,11 @@
 .account-card button, .account-primary { min-height: 46px; border-radius: 10px; font: inherit; font-weight: 650; cursor: pointer; padding: 10px 14px; }
 .account-primary { display: block; text-align: center; background: var(--accent); color: #171c08; border: 0; text-decoration: none; }
 .account-secondary, #enroll-button { width: 100%; background: transparent; color: var(--text); border: 1px solid #555e6c; }
+#guest-button { margin-top: 18px; }
 .account-text { border: 0; background: transparent; color: var(--muted); font-size: 13px !important; }
-.account-links { display: flex; flex-wrap: wrap; justify-content: space-between; margin: 8px 0 18px; }
+.account-reset { justify-self: end; min-height: 30px !important; padding: 0 2px !important; }
+.account-switch { margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--glass-border); text-align: center; color: var(--muted); font-size: 13px; }
+.account-switch button { min-height: 30px; padding: 2px 4px; color: var(--accent); }
 .account-divider { display: flex; align-items: center; gap: 14px; margin: 22px 0; font-size: 12px; color: var(--muted); }
 .account-divider::before, .account-divider::after { content: ""; height: 1px; flex: 1; background: var(--glass-border); }
 .account-card :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

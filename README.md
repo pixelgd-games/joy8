@@ -161,6 +161,7 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    It follows Auth session changes; the label does not grant player eligibility.
    The control opens the shared member UI
    in a dismissible dialog; the Lobby remains visible and its URL is unchanged.
+   Sign-in, account creation, and password recovery switch within that dialog.
    `/account/` remains available for Auth callbacks and recovery.
 2. Cards are rendered from database metadata.
 3. Selecting a game checks membership. Enrolled registered players and persistent
