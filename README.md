@@ -10,8 +10,8 @@ The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
 server-authorized wallet/settlement flow.
 The member migrations, four platform foundation migrations, session-scope
-correction, Joy8 object rebrand, read-only member lookup and cross-product adapter
-isolation are applied; the hosted `joy8-gateway` is active with the `server-v1`
+correction, Joy8 object rebrand, read-only member lookup, public-ID allocation
+and product-schema registration are applied; the hosted `joy8-gateway` is active with the `server-v1`
 product protocol.
 The matching front end is released through main. Cloudflare Turnstile protects
 anonymous Auth entry; real Google sign-in and guest entry passed hosted
@@ -226,6 +226,17 @@ does not create a replacement guest. Clearing storage can lose guest access.
 Guest-to-Google linking must preserve the original player and every wallet scope;
 hosted linking acceptance is still pending.
 
+The local member client bounds Turnstile script loading to 15 seconds and the
+complete token attempt to 45 seconds. Failure removes the failed script/widget,
+unlocks the controls and permits an explicit retry. Closing the dialog cancels
+its attempt; late callbacks cannot complete a newer attempt. This local change
+still requires front-end release and hosted acceptance.
+
+The Auth trampoline currently forwards the one-use OAuth code from `/account/`
+to the Lobby callback query. The Lobby removes that query before loading the
+member dialog. This does not remove the initial request from infrastructure
+logs; do not collect callback queries in analytics or access-log exports.
+
 `POST /member` resolves existing enrollment; `POST /enroll-member` explicitly
 enrolls the authenticated identity. Both take an empty JSON object, require an
 allowed Origin and server-verified bearer token, and return
@@ -304,11 +315,14 @@ and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
 Do not promote them alongside the installed schema; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 40 local and hosted migration records match, including the Joy8 rebrand,
+All 45 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
-cross-product adapter isolation and public player IDs. Installation checks verified unchanged Auth/player IDs,
+cross-product adapter isolation, public player IDs, candidate-scoped ID allocation,
+first-enrollment profile visibility, product-schema registration, automatic DDL
+validation, rejected-candidate lock cleanup and optimized adapter validation.
+Installation checks verified unchanged Auth/player IDs,
 existing catalog records and administrator count, with no wallets, sessions,
 transactions or matches created. The hidden Mahjong catalog entry is the only
 catalog addition. Its private schema and effective permissions passed hosted
@@ -352,14 +366,23 @@ npm run preview
 
 Use the checks that match the change:
 
+`npm run verify` is the combined local acceptance command: it checks literal SQL
+dependency paths, runs member/captcha/iframe and deployed-schema suites, checks the
+Gateway, builds production assets and runs browser smoke. It fails on the first
+unsuccessful stage. Chrome or Edge is required for smoke. It does not apply SQL or
+publish code; the browser checks read the catalog and mock member/session writes.
+
 ```powershell
 npm audit
 npm run build
 npm run smoke
 npm run test:gateway
 npm run test:member
+npm run test:captcha
+npm run test:iframe
 npm run test:member-db
 npm run test:public-id
+npm run test:member-product-db
 npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:platform-db
@@ -368,7 +391,8 @@ node --test scripts/private-entry-check.mjs
 ```
 
 `test:member-db` loads the member migrations, four platform foundation migrations
-and deployed session-scope correction in an in-memory PGlite database with pgcrypto
+and deployed session-scope correction, member-read hardening, adapter isolation
+and current public-ID allocation and schema-registration migrations in an in-memory PGlite database with pgcrypto
 and a minimal Auth/catalog fixture. It never reads environment credentials or connects to Supabase.
 Its 18 checks cover enrollment without wallet creation, read-only membership
 lookup, zero-POINT launch without automatic grants, shared and independent wallets, guest promotion preserving both
@@ -383,6 +407,43 @@ The fixture is test-only, not a baseline migration or hosted deployment script.
 players plus service-role-only member-profile resolution. It does not prove
 allocator behavior at the six-digit namespace limit or replace hosted migration
 verification.
+
+The shared member/platform fixtures include the deployed public-ID allocator and
+product-schema registry, including in their PostgreSQL concurrency suites. `test:captcha`
+covers silent callbacks, bounded script loading, retry, cancellation, expired
+challenges and stale callbacks. Browser smoke additionally verifies that a
+timed-out challenge unlocks member controls and the same panel can retry.
+
+`npm run test:member-product-db` verifies candidate-scoped allocation,
+first-enrollment profile visibility and product-schema registration on PGlite.
+With `JOY8_TEST_PG_BIN` configured, `npm run test:member-product-pg` runs the same
+cases plus competing allocations on native PostgreSQL 17. These commands never
+apply hosted SQL. The installed corrections preserve existing public IDs and
+use no browser retry workaround or alternate runtime.
+
+`test:iframe` verifies load/handshake ordering, visible timeout, rejected sources,
+late messages, failed delivery and the opaque-origin sandbox contract. Browser
+smoke verifies the actual timeout error screen and removal of the failed iframe.
+The Loader hides its waiting display only after both load and credential delivery.
+
+Automatic DDL validation at commit, collision-lock cleanup and the faster runtime
+permission query are installed as incremental migrations. Default member fixtures
+load the current allocator; platform fixtures also load DDL and adapter validation
+through `scripts/fixtures/platform-hardening.mjs` in migration order.
+With PostgreSQL 17 configured, `npm run test:hardening-pg` runs member/platform/
+continuous/private acceptance, DDL rollback and competing allocation checks.
+`npm run benchmark:adapter` compares the historical baseline and current queries
+and committed settlement latency with 1, 5 and 10 synthetic product schemas.
+It reports median/P95 over 100 samples after warmup; it is not a hosted Mahjong
+capacity test and excludes Gateway and gameplay execution. Historical definitions
+are used only by this isolated comparison; there is no runtime fallback.
+
+Hosted postflight verified the installed function bodies, fixed search
+paths, protected grants, both registration triggers, the DDL event/deferred
+triggers, empty validation queue and Mahjong registry entry.
+Identity/catalog/player/public-ID/accounting snapshots matched and all
+reconciliation anomalies were zero. No business records were created by these
+checks. Real provider entry after this correction remains separate acceptance.
 
 `test:platform-db` uses the same deployed platform schema with its accounting fixtures.
 Its 21 SQL cases cover both wallet models, zero credit, one-time provisioning,

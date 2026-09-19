@@ -6,7 +6,9 @@ import { loadMemberPlatformDatabase, reserveMemberWallet } from "./fixtures/memb
 
 const db = await createLocalPostgres()
 const resolveSql = "select * from public.joy8_resolve_member($1::uuid, true)"
+const lookupSql = "select * from public.joy8_resolve_member($1::uuid, false)"
 const lockSql = "select pg_advisory_xact_lock(hashtextextended($1::text, 0))"
+const playerLockSql = "update public.player_accounts set display_name=display_name where auth_user_id=$1"
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 let games
 
@@ -77,13 +79,32 @@ test("eight simultaneous enrollments create exactly one player", async () => {
   assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [members[0].player_account_id])).n, 0)
 })
 
+test("membership lookup does not wait for an unrelated update on the player row", async () => {
+  const id = await identity()
+  const [member] = await serviceQuery(resolveSql, [id])
+  const gate = await db.connect()
+  const reader = await db.connect()
+  try {
+    await gate.query("begin")
+    await gate.query("update public.player_accounts set display_name='pending' where id=$1", [member.player_account_id])
+    await reader.query("set role service_role; set statement_timeout=1000")
+    const result = await reader.query(lookupSql, [id])
+    assert.equal(result.rows[0].player_account_id, member.player_account_id)
+    assert.equal(result.rows[0].account_type, "guest")
+  } finally {
+    await gate.query("rollback")
+    await gate.end()
+    await reader.end()
+  }
+})
+
 for (const slug of ["test-game", "independent-game"]) {
   const launchSql = `select * from public.create_game_session('${slug}', 'POINT', 3600, null, $1::uuid)`
 
   test(`${slug}: eight simultaneous launches create one zero wallet without grants`, async () => {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
-    const sessions = successful(await blockedRace({ hold: lockSql, holdValues: [id], work: launchSql, workValues: [id] }))
+    const sessions = successful(await blockedRace({ hold: playerLockSql, holdValues: [id], work: launchSql, workValues: [id] }))
     assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
     assert.equal(new Set(sessions.map((session) => session.session_id)).size, 8)
     assert.equal(new Set(sessions.map((session) => session.launch_code)).size, 8)
@@ -126,7 +147,7 @@ for (const slug of ["test-game", "independent-game"]) {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
     const sessions = successful(await blockedRace({
-      hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
+      hold: "with promoted as (update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1 returning id) update public.player_accounts set display_name=display_name where auth_user_id=$1",
       holdValues: [id], work: launchSql, workValues: [id], release: "rollback",
     }))
     assert.ok(sessions.every((session) => session.player_account_id === member.player_account_id && session.account_type === "guest"))
@@ -165,7 +186,7 @@ test("concurrent launches across three titles create exactly two zero wallet sco
   const [member] = await serviceQuery(resolveSql, [id])
   const slugs = ["test-game", "shared-game", "independent-game"]
   const sessions = successful(await blockedRace({
-    hold: lockSql, holdValues: [id], count: 9,
+    hold: playerLockSql, holdValues: [id], count: 9,
     work: "select * from public.create_game_session($2, 'POINT', 3600, null, $1::uuid)",
     workValues: index => [id, slugs[index % slugs.length]],
   }))

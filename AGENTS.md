@@ -12,7 +12,7 @@ Before substantive work in this repository:
 4. Read `README.md` for the current implementation and repository map.
 5. Load only the task-specific documents listed below.
 
-Do not claim a document was read unless it was read in the current task. Use read-only discovery before editing files or changing external state.
+Do not claim a document was read unless it was actually read in the current conversation. Content already read in this conversation stays valid; do not reread it. Use read-only discovery before editing files or changing external state.
 
 The repository root is `D:\Studio\Project_Code\joy8`.
 

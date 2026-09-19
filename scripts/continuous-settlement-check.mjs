@@ -7,6 +7,7 @@ import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 import { memberSql } from "./fixtures/member-database.mjs"
 import { applyJoy8Rebrand } from "./fixtures/joy8-rebrand.mjs"
+import { loadPlatformHardening } from "./fixtures/platform-hardening.mjs"
 
 const native = process.env.JOY8_TEST_ENGINE === "postgres17"
 const db = await createTestDatabase()
@@ -21,6 +22,12 @@ before(async () => {
   await db.exec(await memberSql("../../supabase/migrations/20260918010000_wallet_ledger_cleanup.sql"))
   await db.exec(await memberSql("../../supabase/migrations/20260918010100_continuous_settlement.sql"))
   await applyJoy8Rebrand(db)
+  await db.exec(await memberSql("../../supabase/migrations/20260919130000_read_only_member_lookup.sql"))
+  await db.exec(await memberSql("../../supabase/migrations/20260919131000_cross_product_adapter_isolation.sql"))
+  for (const name of ["20260920100000_public_player_ids.sql", "20260920110000_public_id_allocation.sql", "20260920111000_product_schema_registration.sql"]) {
+    await db.exec(await memberSql(`../../supabase/migrations/${name}`))
+  }
+  await loadPlatformHardening(db)
   await loadProductAccounting(db)
   await db.exec(`
     set role fixture_product_owner;

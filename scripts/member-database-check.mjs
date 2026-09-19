@@ -67,6 +67,35 @@ test("repeated guest enrollment preserves one player without provisioning a wall
   assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 0)
 })
 
+test("membership reads do not update the player and promotion writes only during enrollment", async () => {
+  const { id, member } = await enrolled()
+  await db.exec(`
+    create table public.member_write_probe(calls integer not null default 0);
+    insert into public.member_write_probe default values;
+    create function public.count_member_write() returns trigger language plpgsql as $$
+    begin
+      update public.member_write_probe set calls=calls+1;
+      return new;
+    end;
+    $$;
+    create trigger count_member_write after update on public.player_accounts
+      for each row execute function public.count_member_write();
+  `)
+  for (let i = 0; i < 5; i++) assert.deepEqual(await resolve(id), [member])
+  assert.equal((await one("select calls from public.member_write_probe")).calls, 0)
+  await db.query("update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1", [id])
+  const [readOnlyPromotion] = await resolve(id)
+  assert.equal(readOnlyPromotion.account_type, "registered")
+  assert.deepEqual(await one("select account_type,upgraded_at from public.player_accounts where id=$1", [member.player_account_id]), { account_type: "guest", upgraded_at: null })
+  assert.equal((await one("select calls from public.member_write_probe")).calls, 0)
+  const [promoted] = await resolve(id, true)
+  assert.equal(promoted.account_type, "registered")
+  assert.equal((await one("select account_type from public.player_accounts where id=$1", [member.player_account_id])).account_type, "registered")
+  assert.equal((await one("select calls from public.member_write_probe")).calls, 1)
+  await resolve(id, true)
+  assert.equal((await one("select calls from public.member_write_probe")).calls, 1)
+})
+
 test("an existing unenrolled player keeps the scoped wallet after explicit enrollment", async () => {
   assert.equal((await one("select member_enrolled_at from public.player_accounts where id=$1", [existingPlayer])).member_enrolled_at, null)
   assert.deepEqual(await resolve(existingAuth), [])
@@ -120,7 +149,7 @@ test("guest promotion preserves both wallet scopes, real reservations and ledger
   assert.equal(before.ledger.length, 2)
   assert.equal(before.reservations.length, 2)
   await db.query("update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1", [id])
-  const [promoted] = await resolve(id)
+  const [promoted] = await resolve(id, true)
   assert.equal(promoted.player_account_id, member.player_account_id)
   assert.equal(promoted.account_type, "registered")
   const upgraded = await one("select upgraded_at from public.player_accounts where id=$1", [member.player_account_id])

@@ -22,7 +22,6 @@ export function initMemberPanel(root, options = {}) {
   let busy = false
   let disposed = false
 
-  if (options.standalone) history.replaceState(null, "", `/account/?next=${encodeURIComponent(service.returnPath)}`)
   if (authCode || callbackError) {
     $("account-title").textContent = callbackError ? "登入沒有完成" : "正在完成登入"
     $("account-description").textContent = callbackError ? "你可以重新選擇登入方式。" : "請稍候，馬上帶你回到 Joy8。"
@@ -115,7 +114,6 @@ export function initMemberPanel(root, options = {}) {
   }))
 
   const ready = run(async () => {
-    await captcha.ready
     if (callbackError) throw Object.assign(new Error("Authentication callback failed"), { code: callbackErrorCode })
     if (authCode) {
       await service.completeCallback(authCode, sessionStorage.getItem(pendingKey), flow)

@@ -129,6 +129,17 @@ game paths, never arbitrary URLs. A future branded Mahjong H5/App entry should l
 home screen before requesting identity at game start; native implementation
 remains deferred.
 
+The callback passes OAuth parameters through `/account/` to
+`/?member=callback&code=...`. The Lobby captures those parameters and clears the
+visible query using `history.replaceState` before opening the dialog. Never log
+the callback URL or send it to analytics.
+
+After successful enrollment, the member service dispatches the window event
+`joy8:membership`. Its `detail` is the Gateway member object containing
+`player_account_ref`, `account_type` and `public_id`. The Lobby uses it to refresh
+the account label without a second enrollment. This is an in-page UI notification,
+not an authorization signal; session issuance still verifies identity server-side.
+
 ```text
 Public Lobby or branded home -> select a game / start playing
   -> Joy8 sign-in or persistent guest restoration

@@ -187,7 +187,6 @@ test("anonymous entry forwards captcha tokens", async () => {
   const f = fixture()
   await f.service.guest("captcha-guest")
   assert.deepEqual(f.calls[0], ["anonymous", { options: { captchaToken: "captcha-guest" } }])
-  assert.equal(memberErrorMessage({ code: "captcha_required" }), "請先完成安全驗證。")
 })
 
 test("sign-out does not auto-create guests", async () => {
@@ -201,6 +200,12 @@ test("inactive membership and upstream failures fail closed without exposing raw
   const f = fixture(registeredUser)
   f.client.functions.invoke = async () => ({ error: { context: { json: async () => ({ error: "player account is not active" }) } } })
   await assert.rejects(f.service.membership(), { code: "member_inactive" })
+  f.client.functions.invoke = async () => ({ error: { context: { json: async () => ({ error: "verified member identity is required" }) } } })
+  await assert.rejects(f.service.membership(), (error) => {
+    assert.equal(error.code, "verification_required")
+    assert.equal(memberErrorMessage(error), "目前的登入身分無法通過驗證，請重新登入。")
+    return true
+  })
   f.client.functions.invoke = async () => ({ error: new Error("secret diagnostic") })
   await assert.rejects(f.service.membership(), { code: "member_unavailable" })
   assert.equal(memberErrorMessage(new Error("secret diagnostic")).includes("secret"), false)

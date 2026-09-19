@@ -119,6 +119,22 @@ public namespace. Public IDs must not be recycled, accepted as credentials, or
 used in place of the internal player UUID for authorization, wallets, settlement,
 or game-owned identity mapping.
 
+The allocator uses indexed collision checks and nonblocking candidate-specific
+transaction locks. A crowded namespace or extreme candidate contention can
+still reject allocation within the 128-attempt limit. It does not promise
+unlimited throughput or increase the six-digit capacity.
+
+### Product DDL and Adapter Availability
+
+Product schema and policy registration validate isolation before commit.
+Supported subsequent DDL and object grants are automatically validated at commit.
+PostgreSQL event triggers exclude shared objects such as roles; role membership
+and attribute changes still require explicit all-adapter preflight in their
+transaction. Disabling the guard or skipping role preflight can stop adapters at
+runtime. Every product schema must be registered before runtime access, including
+products without an adapter. The registration and DDL contract belongs to
+[GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
+
 ### Synchronous Gateway Runtime Cleanup
 
 After a successful `create-session`, the Gateway calls `joy8_cleanup_gateway_runtime` synchronously.
@@ -229,14 +245,7 @@ Direction:
 
 ## User Experience and Maintainability
 
-### Launch Handoff Failure Can Be Silent
-
-The Loader uses the iframe `load` event for its loading display and a separate
-ready/launch message to deliver the credential. If the game does not send ready
-within 10 seconds after the document has loaded, the Loader clears the launch
-credential without showing an error. A player can therefore see a game document
-that cannot authenticate. Treat visible delivery failure and retry as
-cross-repository contract work.
+### Same-Origin Sandbox Handoff
 
 Cross-origin games use an exact message target. A same-origin game is sandboxed
 without `allow-same-origin`, so it has a `null` origin and the Loader sends the

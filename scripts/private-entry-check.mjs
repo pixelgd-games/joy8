@@ -7,6 +7,7 @@ import { credentialBundle } from './mahjong-credentials.mjs'
 import { randomBytes } from 'node:crypto'
 import pg from 'pg'
 import { applyJoy8Rebrand } from './fixtures/joy8-rebrand.mjs'
+import { loadPlatformHardening } from './fixtures/platform-hardening.mjs'
 
 let db, game, member, user
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
@@ -31,6 +32,12 @@ before(async () => {
   await db.exec(await readFile('supabase/migrations/20260918010900_mahjong_identity_activation.sql','utf8'))
   await db.exec(await readFile('supabase/migrations/20260918011000_remove_test_player_allowlist.sql','utf8'))
   await applyJoy8Rebrand(db)
+  await db.exec(await readFile('supabase/migrations/20260919130000_read_only_member_lookup.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260919131000_cross_product_adapter_isolation.sql','utf8'))
+  for (const name of ['20260920100000_public_player_ids.sql','20260920110000_public_id_allocation.sql','20260920111000_product_schema_registration.sql']) {
+    await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'))
+  }
+  await loadPlatformHardening(db)
   game = (await one("select id from public.games where slug='mahjong-clash'")).id
   user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
   member = (await one('select * from public.joy8_resolve_member($1,true)',[user])).player_account_id

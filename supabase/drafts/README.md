@@ -4,6 +4,29 @@ SQL under this directory is excluded from active migration discovery. The three
 original files in `mahjong-clash/` are superseded, incomplete and unapplied; do
 not combine them with the installed product schema.
 
+The approved public-ID allocation/profile correction and product-schema
+registration are installed as `../migrations/20260920110000_public_id_allocation.sql`
+and `../migrations/20260920111000_product_schema_registration.sql`.
+[README](../../README.md#verification) owns their verification and current state;
+[the integration contract](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration)
+owns ongoing schema registration and DDL permission checks.
+
+## Platform Hardening
+
+The three approved corrections are installed under `../migrations/`:
+
+- `20260920120000_product_ddl_guard.sql`: validate supported DDL at commit.
+- `20260920121000_public_id_collision_locks.sql`: release rejected candidate locks.
+- `20260920122000_product_adapter_validation.sql`: optimize runtime isolation scans.
+
+There are no pending platform-hardening drafts. Tests resolve these paths through
+`scripts/fixtures/platform-hardening.mjs`; default fixtures load the installed SQL.
+[README](../../README.md#verification) owns the acceptance commands and deployment
+state; the [integration contract](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration)
+owns the DDL and role-preflight requirements.
+
+## Installed Mahjong Work
+
 The approved wallet-ledger cleanup, continuous settlement and Mahjong registration
 have been promoted to `../migrations/20260918010*.sql`. The five intervening product
 migrations snapshot the game-owned SQL in its repository. These eight migrations

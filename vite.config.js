@@ -6,7 +6,7 @@ const canonicalHostRedirect = {
   transformIndexHtml() {
     return [{
       tag: "script",
-      children: 'if (location.hostname === "joy8.pages.dev") location.replace("https://joy8.cc" + location.pathname + location.search + location.hash)',
+      attrs: { src: "/canonical-host.js" },
       injectTo: "head-prepend",
     }]
   },

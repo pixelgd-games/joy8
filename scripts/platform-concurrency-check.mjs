@@ -71,7 +71,7 @@ function success(results) {
 
 test("simultaneous operational launches provision one wallet and one grant", async () => {
   const p = await identity()
-  const results = success(await race("select pg_advisory_xact_lock(hashtextextended($1,0))", [p.auth], Array.from({ length: 6 }, () => [launchSql, [p.auth]])))
+  const results = success(await race("update public.player_accounts set display_name=display_name where id=$1", [p.id], Array.from({ length: 6 }, () => [launchSql, [p.auth]])))
   assert.equal(new Set(results.map(r => r.wallet_account_id)).size, 1)
   assert.equal((await one("select count(*)::int n from public.wallet_transactions where wallet_account_id=$1", [results[0].wallet_account_id])).n, 1)
 })

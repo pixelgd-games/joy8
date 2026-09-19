@@ -115,7 +115,7 @@ export function showErrorModal(options = {}) {
   return { close: closeErrorModal }
 }
 
-export function closeErrorModal() {
+function closeErrorModal() {
   activeCleanup?.()
 }
 

@@ -235,6 +235,37 @@ test("adapter owner cannot inherit platform authority and runtime cannot execute
   assert.equal((await one("select has_table_privilege('fixture_product_runtime','public.wallet_accounts','UPDATE') allowed")).allowed, false)
 })
 
+test("adapter owner cannot access another registered product schema", async () => {
+  await db.exec(`
+    create role fixture_other_owner nologin;
+    create schema fixture_other authorization fixture_other_owner;
+    set role fixture_other_owner;
+    create table fixture_other.accounts(ref text primary key);
+    create function fixture_other.accounting(action text, match_id uuid, payload jsonb)
+    returns jsonb language sql security definer set search_path='' as $$
+      select jsonb_build_object('committed',true)
+    $$;
+    revoke all on function fixture_other.accounting(text,uuid,jsonb) from public;
+    reset role;
+    insert into public.joy8_product_schemas values('fixture_other');
+  `)
+  await db.query("update public.joy8_game_policies set product_adapter='fixture_product.accounting(text,uuid,jsonb)'::regprocedure where game_id=$1", [game])
+  await db.query("update public.joy8_game_policies set product_adapter='fixture_other.accounting(text,uuid,jsonb)'::regprocedure where game_id=$1", [other])
+  await db.exec("grant select on fixture_other.accounts to fixture_product_owner")
+  const a = await ready()
+  const request = { ...opening([a]), product_participants: [{ account_ref: "bot-1", reserve: "100.00" }] }
+  await denied(call("joy8_open_match_v1", request), "JOY8_ADAPTER_UNAVAILABLE")
+  assert.equal((await one("select count(*)::int n from public.joy8_matches")).n, 0)
+  await db.exec("revoke select on fixture_other.accounts from fixture_product_owner")
+  await db.exec("grant execute on function fixture_other.accounting(text,uuid,jsonb) to fixture_product_owner")
+  await denied(call("joy8_open_match_v1", request), "JOY8_ADAPTER_UNAVAILABLE")
+  await db.exec("revoke execute on function fixture_other.accounting(text,uuid,jsonb) from fixture_product_owner")
+  await db.exec("grant create on schema fixture_other to fixture_product_owner")
+  await denied(call("joy8_open_match_v1", request), "JOY8_ADAPTER_UNAVAILABLE")
+  await db.exec("revoke create on schema fixture_other from fixture_product_owner")
+  assert.equal((await call("joy8_open_match_v1", request)).state, "open")
+})
+
 test("draw releases holds without manufacturing ledger entries", async () => {
   const a = await ready(), b = await ready()
   await call("joy8_open_match_v1", opening([a, b]))

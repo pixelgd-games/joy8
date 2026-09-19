@@ -38,5 +38,6 @@ export async function loadProductAccounting(db) {
     $$;
     revoke all on function fixture_product.accounting(text,uuid,jsonb) from public;
     reset role;
+    insert into public.joy8_product_schemas values('fixture_product');
   `)
 }

@@ -9,7 +9,7 @@ import { openMemberModal } from "../../member/modal.js"
 const params = new URLSearchParams(location.search)
 const slug = params.get("slug")
 const GAME_LOAD_TIMEOUT_MS = 30000
-const privateEntry = location.pathname === "/play-test/"
+const privateEntry = document.body.dataset.entry === "private"
 
 function primeParentScroll() {
   if (window.scrollY > 0) return
@@ -194,11 +194,13 @@ function mountGameIframe(gameUrl, gameName, launch) {
     launch,
     timeoutMs: GAME_LOAD_TIMEOUT_MS,
     onLoad: hideLoading,
-    onTimeout: () => {
+    onTimeout: (reason) => {
       showError({
         code: ERROR_CODES.GAME_LOAD_TIMEOUT,
-        title: "遊戲載入逾時",
-        message: "遊戲在預定時間內沒有完成載入，請稍後再試。",
+        title: reason === "handshake" ? "遊戲連線未完成" : "遊戲載入逾時",
+        message: reason === "handshake"
+          ? "遊戲未能完成安全連線，請重新整理後再試。"
+          : "遊戲在預定時間內沒有完成載入，請稍後再試。",
       })
     },
   })

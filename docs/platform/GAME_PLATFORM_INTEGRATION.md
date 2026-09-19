@@ -125,10 +125,12 @@ iframe and expected game origin, then sends exactly one
 `{type:"joy8-launch-v1",launch:{...}}` response. The game accepts it only from
 `window.parent` at an approved Joy8 origin, validates the exact field set and
 trusted Gateway/game configuration, removes the listener and exposes the launch
-code to its runtime once. There is no Local Client fallback. The current Loader
-clears an undelivered launch after 10 seconds; if the iframe document has already
-loaded, that credential-delivery timeout is not yet shown to the player. This is
-a known limitation, not a successful launch.
+code to its runtime once. There is no Local Client fallback. The Loader waits for
+both document load and credential delivery before hiding its loading display.
+An undelivered launch expires 10 seconds after mounting, even when the document
+has loaded. Failed delivery removes the iframe, clears credentials/listeners and
+shows `JOY8-GAME-006` with a reload action. Reload requests a fresh session; it
+does not reuse the expired credential. Late readiness cannot restart that frame.
 
 For a cross-origin game, both sides require the exact approved origin. A
 same-origin game runs in a sandbox without `allow-same-origin`, so its message
@@ -412,9 +414,10 @@ The platform validates the registered signature/owner boundary and requires
 `{"committed":true}`; the caller cannot select a function or table.
 
 The automated privilege check rejects adapter-owner access to `public`, `auth`,
-or another registered product schema. Cross-product checks cover schema creation,
-tables, views, materialized views, sequences and function execution. Review these
-grants before registration and retain product-specific permission tests; automated
+or another schema in `joy8_product_schemas`. Cross-product checks cover schema
+creation, tables, views, materialized views, sequences and function execution.
+The registry includes products without configured adapters. Review these grants
+before registration and retain product-specific permission tests; automated
 catalog checks do not replace review of application behavior or external services.
 
 Actions are `open`, `settle` and `cancel`; the second argument is the Joy8 match
@@ -429,6 +432,46 @@ other product path may hold those locks and then call back into Joy8.
 The fixture adapter demonstrates rollback and permission isolation only. Each
 product still implements/reviews its own gameplay and AI accounting invariants.
 There is no distributed-transaction promise for products in another database.
+
+### Product Schema Registration
+
+`joy8_product_schemas` is an operator-owned registry with no browser, service-role
+or product-runtime grants. The operator registers each product schema before
+runtime access or adapter configuration. Registry and game-policy changes run
+`joy8_validate_product_adapters()` before commit, so an unsafe new registration
+is rolled back without changing existing registrations. Registry entries are
+independent of adapters; a product without an adapter must still be registered.
+
+Every product DDL, function ownership or grant transaction must also call
+`select public.joy8_validate_product_adapters();` before commit, as the authorized
+operator. The validator reads metadata and does not execute gameplay or settle
+a match. Runtime checks remain active; never remove them to make unsafe grants pass.
+
+The installed `supabase/migrations/20260920120000_product_ddl_guard.sql`
+adds a deferred DDL validation queue: supported DDL changes validate automatically
+at transaction commit, allowing function creation and PUBLIC revocation in the
+same transaction. Unsafe changes roll back with `JOY8_PRODUCT_DDL_REJECTED` before
+another product uses the changed privileges. The queue grants no runtime access.
+PostgreSQL event triggers do not cover shared objects such as roles;
+role membership/attribute changes still need explicit
+preflight. Runtime isolation checks remain necessary. See the
+[PostgreSQL event-trigger limits](https://www.postgresql.org/docs/17/event-trigger-definition.html)
+and [Supabase event-trigger support](https://supabase.com/docs/guides/database/postgres/event-triggers).
+
+Revoke PUBLIC EXECUTE on each product function in its creation transaction.
+Schema-scoped default revocation cannot remove globally granted default PUBLIC
+EXECUTE, and defaults belong to the creating role. See
+[PostgreSQL default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html).
+Even without schema USAGE, a PUBLIC function grant fails this strict boundary.
+
+Use [member-product preflight](../../scripts/sql/member-product-preflight.sql)
+for aggregate identity/accounting snapshots and schema inventory, and
+[postflight](../../scripts/sql/member-product-postflight.sql) for registry and
+permission checks through the Joy8 wrapper. Management API reads run as
+`supabase_read_only_user`, which cannot execute the internal validator; do not
+grant it execution to bypass this boundary. Migration/operator transactions run
+the validator directly. Account/catalog/player snapshots must remain unchanged
+when installing platform-only permission changes.
 
 ### Recovery and Errors
 

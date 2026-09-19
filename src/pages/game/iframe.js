@@ -5,8 +5,8 @@ const BASE_SANDBOX_TOKENS = [
   "allow-scripts",
 ]
 const IFRAME_PERMISSIONS = "autoplay; fullscreen; gamepad"
-export const JOY8_LAUNCH_READY_TYPE = "joy8-launch-ready-v1"
-export const JOY8_LAUNCH_MESSAGE_TYPE = "joy8-launch-v1"
+const JOY8_LAUNCH_READY_TYPE = "joy8-launch-ready-v1"
+const JOY8_LAUNCH_MESSAGE_TYPE = "joy8-launch-v1"
 
 export function createGameIframe({ gameUrl, gameName, onLoad }) {
   const iframe = document.createElement("iframe")
@@ -34,7 +34,8 @@ export function mountGameFrame({
   onLoad,
   onTimeout,
 }) {
-  let settled = false
+  let loaded = false
+  let finished = false
   let timeoutId = 0
   let deliveryTimeoutId = 0
   let launchPayload = launch ? { ...launch } : null
@@ -42,11 +43,10 @@ export function mountGameFrame({
     gameUrl,
     gameName,
     onLoad: () => {
-      if (settled) return
-
-      settled = true
+      if (finished) return
+      loaded = true
       window.clearTimeout(timeoutId)
-      onLoad?.()
+      complete()
     },
   })
   const gameOrigin = new URL(gameUrl, location.origin).origin
@@ -57,6 +57,20 @@ export function mountGameFrame({
     window.clearTimeout(deliveryTimeoutId)
     window.removeEventListener("message", deliverLaunch)
   }
+  const complete = () => {
+    if (finished || !loaded || launchPayload) return
+    finished = true
+    window.clearTimeout(timeoutId)
+    onLoad?.()
+  }
+  const fail = (reason) => {
+    if (finished) return
+    finished = true
+    window.clearTimeout(timeoutId)
+    clearLaunch()
+    iframe.remove()
+    onTimeout?.(reason)
+  }
   const deliverLaunch = (event) => {
     if (!launchPayload
       || event.source !== iframe.contentWindow
@@ -64,25 +78,25 @@ export function mountGameFrame({
       || event.data?.type !== JOY8_LAUNCH_READY_TYPE
       || event.data?.protocol !== "server-v1") return
 
-    iframe.contentWindow?.postMessage({
-      type: JOY8_LAUNCH_MESSAGE_TYPE,
-      launch: launchPayload,
-    }, targetOrigin)
+    try {
+      if (!iframe.contentWindow) throw new Error("Game frame is unavailable")
+      iframe.contentWindow.postMessage({
+        type: JOY8_LAUNCH_MESSAGE_TYPE,
+        launch: launchPayload,
+      }, targetOrigin)
+    } catch {
+      fail("handshake")
+      return
+    }
     clearLaunch()
+    complete()
   }
 
   if (launchPayload) {
     window.addEventListener("message", deliverLaunch)
-    deliveryTimeoutId = window.setTimeout(clearLaunch, Math.min(timeoutMs, 10000))
+    deliveryTimeoutId = window.setTimeout(() => fail("handshake"), Math.min(timeoutMs, 10000))
   }
-  timeoutId = window.setTimeout(() => {
-    if (settled) return
-
-    settled = true
-    clearLaunch()
-    iframe.remove()
-    onTimeout?.()
-  }, timeoutMs)
+  timeoutId = window.setTimeout(() => fail("load"), timeoutMs)
 
   gameRoot.append(iframe)
   return iframe

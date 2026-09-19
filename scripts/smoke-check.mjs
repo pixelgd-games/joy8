@@ -106,6 +106,10 @@ function verifySecurityHeaders() {
 }
 
 function verifyCanonicalHostRedirect() {
+  const script = readFileSync(path.join(cwd, "dist", "canonical-host.js"), "utf8")
+  if (!script.includes('location.hostname === "joy8.pages.dev"') || !script.includes('"https://joy8.cc"')) {
+    throw new Error("Missing canonical-host redirect script")
+  }
   const entryFiles = [
     "index.html",
     "account/index.html",
@@ -118,7 +122,7 @@ function verifyCanonicalHostRedirect() {
   ]
   for (const entryFile of entryFiles) {
     const html = readFileSync(path.join(cwd, "dist", entryFile), "utf8")
-    if (!html.includes('location.hostname === "joy8.pages.dev"') || !html.includes('"https://joy8.cc"')) {
+    if (!html.includes('src="/canonical-host.js"')) {
       throw new Error(`Missing canonical-host redirect: ${entryFile}`)
     }
   }
@@ -352,7 +356,9 @@ async function expectPrivateEntry(client, appPort) {
   await waitForText(client, text => text.includes("目前無法進入測試，請稍後再試。"), "Test entry failure remains recoverable")
   const denied = await client.send("Runtime.evaluate", { returnByValue:true, expression:'document.querySelectorAll("iframe").length===0 && !document.getElementById("private-start").disabled' })
   if (!denied.result.value) throw new Error("Private denial mounted a game or blocked retry")
-  await client.send("Runtime.evaluate", { expression:'window.privateAllowed=true;document.getElementById("private-start").click()' })
+  await client.send("Runtime.evaluate", { expression:`window.privateTimer=window.setTimeout;
+    window.setTimeout=(fn,ms,...args)=>window.privateTimer(fn,ms===10000?500:ms,...args);
+    window.privateAllowed=true;document.getElementById("private-start").click()` })
   await waitForText(client, () => true, "Private retry dispatched")
   const launched = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`new Promise(resolve=>setTimeout(()=>{
     const iframe=document.querySelector("iframe")
@@ -363,6 +369,9 @@ async function expectPrivateEntry(client, appPort) {
       && !JSON.stringify({...localStorage,...sessionStorage}).includes("fixture-only-code")))
   },100))` })
   if (!launched.result.value) throw new Error("Private entry did not preserve the Loader credential boundary")
+  await waitForText(client, text => text.includes("遊戲連線未完成") && text.includes("JOY8-GAME-006"), "Missing game handshake shows a recoverable platform error")
+  const timedOut = await client.send("Runtime.evaluate", { returnByValue:true, expression:'window.setTimeout=window.privateTimer;document.querySelectorAll("iframe").length===0' })
+  if (!timedOut.result.value) throw new Error("Handshake timeout left the unauthenticated game mounted")
   console.log("OK Private entry, denied access, retry, shared iframe and in-memory launch credential")
 }
 
@@ -564,11 +573,13 @@ async function expectMemberContinuation(client) {
       const paths = []
       const roots = []
       const panels = []
+      const originalTurnstile = window.turnstile
+      const originalSetTimeout = window.setTimeout
       auth.getSession = async () => ({ data: { session: user ? { user } : null }, error: null })
       auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
       auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
       Object.defineProperty(memberSupabase, "functions", { configurable: true, value: { invoke: async () => ({ data: { member: { player_account_ref: "fixture-player", account_type: user?.is_anonymous ? "guest" : "registered" } }, error: null }) } })
-      const mount = (next, extra = {}) => {
+      const mount = (next, extra = {}, captcha = { token: async () => "fixture-captcha", reset() {}, dispose() {} }) => {
         const root = document.createElement("div")
         root.hidden = true
         root.innerHTML = memberCardMarkup
@@ -579,7 +590,7 @@ async function expectMemberContinuation(client) {
         const panel = initMemberPanel(root, {
           params: new URLSearchParams({ next, ...extra }),
           onContinue: path => { paths.push(path); complete(path) },
-          captcha: { ready: Promise.resolve(), token: async () => "fixture-captcha", reset() {}, dispose() {} },
+          captcha,
         })
         panels.push(panel)
         return { root, panel, continued }
@@ -590,6 +601,24 @@ async function expectMemberContinuation(client) {
         guest.root.querySelector("#guest-button").click()
         await guest.continued
         guest.panel.dispose()
+        user = null
+        let challenge
+        window.turnstile = { render: (_, options) => { challenge = options; return 0 }, execute() {}, remove() {} }
+        window.setTimeout = (fn, delay, ...args) => originalSetTimeout(fn, delay === 45000 ? 20 : delay, ...args)
+        const recovering = mount("/game/?slug=recovered-game", {}, null)
+        await recovering.panel.ready
+        recovering.root.querySelector("#guest-button").click()
+        await new Promise(resolve => originalSetTimeout(resolve, 60))
+        const captchaRecovered = recovering.root.querySelector("#account-status").textContent.includes("安全驗證逾時")
+          && recovering.root.querySelector(".account-card").getAttribute("aria-busy") === "false"
+          && [...recovering.root.querySelectorAll("button")].every(button => !button.disabled)
+          && user === null
+        window.turnstile.execute = () => challenge.callback("fixture-retry")
+        recovering.root.querySelector("#guest-button").click()
+        await recovering.continued
+        recovering.panel.dispose()
+        window.turnstile = originalTurnstile
+        window.setTimeout = originalSetTimeout
         user = null
         let release
         let didStart
@@ -613,22 +642,24 @@ async function expectMemberContinuation(client) {
         const retiredFlowRejected = retired.root.querySelector("#account-status").dataset.error === "true"
           && retired.root.querySelector("#account-status").textContent.includes("目前無法完成操作")
         retired.panel.dispose()
-        return { paths, retiredFlowRejected }
+        return { paths, retiredFlowRejected, captchaRecovered }
       } finally {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
         Object.assign(auth, saved)
+        window.turnstile = originalTurnstile
+        window.setTimeout = originalSetTimeout
         if (descriptor) Object.defineProperty(memberSupabase, "functions", descriptor)
         else delete memberSupabase.functions
       }
     })`,
   })
-  const expectedPaths = ["/game/?slug=guest-game", "/game/?slug=callback-game"]
+  const expectedPaths = ["/game/?slug=guest-game", "/game/?slug=recovered-game", "/game/?slug=callback-game"]
   const value = result.result.value
-  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected) {
+  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.captchaRecovered) {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
-  console.log("OK Guest and Google callback continuation; retired email callbacks fail closed and late completion cannot launch a cancelled game")
+  console.log("OK Guest and Google continuation, captcha timeout unlocks controls and permits retry, invalid callbacks and cancelled entry fail closed")
 }
 
 async function expectGameIframeSecurity(client) {
