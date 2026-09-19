@@ -44,8 +44,17 @@ export function memberErrorMessage(error) {
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
     verification_required: "請先完成信箱驗證。",
+    pkce_code_verifier_not_found: "找不到這次驗證的瀏覽器資料，請重新操作並在同一個瀏覽器開啟信件連結。",
+    flow_state_not_found: "這個驗證連結已使用或已失效，請重新操作。",
+    flow_state_expired: "這個驗證連結已失效，請重新操作。",
+    otp_expired: "這個驗證連結已失效，請重新操作。",
+    auth_callback_failed: "驗證連結無法完成，請重新操作。",
   }
   return messages[code] || "目前無法完成操作，請稍後再試。"
+}
+
+export function signupWasVerifiedWithoutSession(error, flow) {
+  return flow === "signup" && error?.code === "pkce_code_verifier_not_found"
 }
 
 export function createMemberService(client, { origin, next = "/", guestLock } = {}) {

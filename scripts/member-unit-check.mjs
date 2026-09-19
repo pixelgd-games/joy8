@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
+import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath, signupWasVerifiedWithoutSession } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 
 const origin = "https://joy8.example"
@@ -195,6 +195,14 @@ test("invalid or replayed callbacks cannot enroll or fall back to a new guest", 
   f.client.auth.exchangeCodeForSession = async () => ({ error: { code: "flow_state_not_found" } })
   await assert.rejects(f.service.completeCallback("used-code", null, "signin"), { code: "flow_state_not_found" })
   assert.deepEqual(f.calls, [])
+})
+
+test("a verified signup with missing browser state falls back to password login", () => {
+  const error = { code: "pkce_code_verifier_not_found" }
+  assert.equal(signupWasVerifiedWithoutSession(error, "signup"), true)
+  assert.equal(signupWasVerifiedWithoutSession(error, "recovery"), false)
+  assert.equal(memberErrorMessage(error), "找不到這次驗證的瀏覽器資料，請重新操作並在同一個瀏覽器開啟信件連結。")
+  assert.equal(memberErrorMessage({ code: "flow_state_not_found" }), "這個驗證連結已使用或已失效，請重新操作。")
 })
 
 test("email password sign-in enrolls only after successful authentication", async () => {

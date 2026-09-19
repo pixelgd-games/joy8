@@ -1,7 +1,7 @@
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
 import { createMemberCaptcha } from "./captcha.js"
-import { createMemberService, memberErrorMessage } from "./service.js"
+import { createMemberService, memberErrorMessage, signupWasVerifiedWithoutSession } from "./service.js"
 
 export function initMemberPanel(root, options = {}) {
   const $ = (id) => root.querySelector(`#${id}`)
@@ -9,6 +9,7 @@ export function initMemberPanel(root, options = {}) {
   let flow = params.get("flow")
   const authCode = params.get("code")
   const callbackError = params.has("error") || params.has("error_code")
+  const callbackErrorCode = params.get("error_code") || "auth_callback_failed"
   const service = createMemberService(memberSupabase, {
     origin: location.origin,
     next: params.get("next"),
@@ -135,7 +136,7 @@ export function initMemberPanel(root, options = {}) {
           const result = await service.register(email, $("password").value, captchaToken)
           if (result.expectedUserId) sessionStorage.setItem(pendingKey, result.expectedUserId)
           else sessionStorage.removeItem(pendingKey)
-          status("請到信箱查看驗證信，並在這個瀏覽器開啟連結。若已有帳號，請使用登入或忘記密碼。")
+          status("如果這個 Email 可以建立帳號，你會收到驗證信，請在這個瀏覽器開啟連結。若已有帳號，系統不會再寄註冊信，請使用登入或忘記密碼。")
         } else {
           await service.signIn(email, $("password").value, captchaToken)
           continuePlaying()
@@ -188,9 +189,19 @@ export function initMemberPanel(root, options = {}) {
 
   const ready = run(async () => {
     await captcha.ready
-    if (callbackError) throw new Error("Authentication callback failed")
+    if (callbackError) throw Object.assign(new Error("Authentication callback failed"), { code: callbackErrorCode })
     if (authCode) {
-      await service.completeCallback(authCode, sessionStorage.getItem(pendingKey), flow)
+      try {
+        await service.completeCallback(authCode, sessionStorage.getItem(pendingKey), flow)
+      } catch (error) {
+        sessionStorage.removeItem(pendingKey)
+        if (!signupWasVerifiedWithoutSession(error, flow)) throw error
+        flow = null
+        await refresh()
+        mode("signin")
+        status("信箱驗證成功，請使用剛設定的 Email 與密碼登入。")
+        return
+      }
       sessionStorage.removeItem(pendingKey)
       if (!["recovery", "upgrade"].includes(flow)) {
         await service.membership(true)
