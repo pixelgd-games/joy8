@@ -357,7 +357,7 @@ async function expectPrivateEntry(client, appPort) {
   const denied = await client.send("Runtime.evaluate", { returnByValue:true, expression:'document.querySelectorAll("iframe").length===0 && !document.getElementById("private-start").disabled' })
   if (!denied.result.value) throw new Error("Private denial mounted a game or blocked retry")
   await client.send("Runtime.evaluate", { expression:`window.privateTimer=window.setTimeout;
-    window.setTimeout=(fn,ms,...args)=>window.privateTimer(fn,ms===10000?500:ms,...args);
+    window.setTimeout=(fn,ms,...args)=>window.privateTimer(fn,ms===30000?500:ms,...args);
     window.privateAllowed=true;document.getElementById("private-start").click()` })
   await waitForText(client, () => true, "Private retry dispatched")
   const launched = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`new Promise(resolve=>setTimeout(()=>{

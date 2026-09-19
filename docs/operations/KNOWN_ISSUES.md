@@ -61,6 +61,13 @@ operations also lock one singleton `economy_state` row, serializing those
 operations across matches. Correct the balance contract and measure this capacity
 before funded or public activation.
 
+The Mahjong repository's `server/fixtures/joy8-platform.json` pins fourteen
+matching Joy8 sources but omits active-session scope, read-only membership,
+adapter isolation, public-ID allocation and the product registry/DDL hardening.
+Its installation tests therefore do not reproduce the installed platform schema.
+The game repository must refresh the fixture and enforce completeness as well as
+individual hashes before those tests can establish current integration acceptance.
+
 ### Member and Persistent Guest Direction
 
 Hosted member settings have been inspected and the authorized entry changes are
@@ -134,6 +141,16 @@ transaction. Disabling the guard or skipping role preflight can stop adapters at
 runtime. Every product schema must be registered before runtime access, including
 products without an adapter. The registration and DDL contract belongs to
 [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
+
+The current event trigger has no command-tag filter. Every supported database DDL
+queues validation and takes the same advisory lock, including unrelated index or
+comment changes and supported provider maintenance DDL. Concurrent DDL transactions
+therefore serialize; a rejected validation can also roll back maintenance.
+Narrowing this scope requires coverage for ownership, grants, schema moves and
+cascading drops, including changes to protected `public` and `auth` objects.
+Skipping all Auth or extension DDL would leave isolation changes unchecked. The
+[PostgreSQL firing matrix](https://www.postgresql.org/docs/17/event-trigger-matrix.html)
+defines the commands covered by this guard; shared role changes remain excluded.
 
 ### Synchronous Gateway Runtime Cleanup
 

@@ -40,8 +40,8 @@ for (const loaded of [false, true]) test(`missing handshake fails visibly with d
   const f = fixture(t)
   if (loaded) f.load()
   assert.equal(f.loads(), 0)
-  t.mock.timers.tick(10000)
-  assert.deepEqual(f.failures, ["handshake"])
+  t.mock.timers.tick(30000)
+  assert.deepEqual(f.failures, [loaded ? "handshake" : "load"])
   assert.equal(f.frame.removed, true)
   assert.equal(f.listeners.has("message"), false)
   f.ready()
@@ -75,7 +75,7 @@ test("wrong window, origin and protocol cannot receive a credential or cancel ti
   f.ready({ origin: "https://attacker.example" })
   f.ready({ origin: "null" })
   f.ready({ data: { type: "joy8-launch-ready-v1", protocol: "old" } })
-  t.mock.timers.tick(10000)
+  t.mock.timers.tick(30000)
   assert.equal(f.messages.length, 0)
   assert.deepEqual(f.failures, ["handshake"])
 })
@@ -88,6 +88,28 @@ test("credential delivery does not cancel the document load deadline", t => {
   t.mock.timers.tick(20000)
   assert.deepEqual(f.failures, ["load"])
   assert.equal(f.loads(), 0)
+})
+
+test("slow document and client readiness share the full launch deadline", t => {
+  const f = fixture(t)
+  t.mock.timers.tick(20000)
+  f.load()
+  t.mock.timers.tick(9000)
+  assert.deepEqual(f.failures, [])
+  f.ready()
+  assert.equal(f.loads(), 1)
+  assert.equal(f.messages.length, 1)
+  t.mock.timers.tick(30000)
+  assert.deepEqual(f.failures, [])
+})
+
+test("late document load does not restart the handshake deadline", t => {
+  const f = fixture(t)
+  t.mock.timers.tick(29000)
+  f.load()
+  t.mock.timers.tick(1000)
+  assert.deepEqual(f.failures, ["handshake"])
+  assert.equal(f.frame.removed, true)
 })
 
 test("failed postMessage produces a terminal error without retaining the listener", t => {

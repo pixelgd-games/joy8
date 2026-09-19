@@ -9,7 +9,7 @@ if (gateway.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includ
   throw new Error("Gateway must use HTTPS outside loopback")
 }
 const base = gateway.href.replace(/\/+$/, "")
-const origin = process.env.GATEWAY_JOY8_ORIGIN || "https://joy8.pages.dev"
+const origin = process.env.GATEWAY_JOY8_ORIGIN || "https://joy8.cc"
 async function post(route, body = {}, browserOrigin = null) {
   return fetch(base + "/" + route, {
     method: "POST", headers: { "Content-Type": "application/json", ...(browserOrigin ? { Origin: browserOrigin } : {}) },

@@ -37,7 +37,6 @@ export function mountGameFrame({
   let loaded = false
   let finished = false
   let timeoutId = 0
-  let deliveryTimeoutId = 0
   let launchPayload = launch ? { ...launch } : null
   const iframe = createGameIframe({
     gameUrl,
@@ -45,7 +44,6 @@ export function mountGameFrame({
     onLoad: () => {
       if (finished) return
       loaded = true
-      window.clearTimeout(timeoutId)
       complete()
     },
   })
@@ -54,7 +52,6 @@ export function mountGameFrame({
   const targetOrigin = gameOrigin === location.origin ? "*" : gameOrigin
   const clearLaunch = () => {
     launchPayload = null
-    window.clearTimeout(deliveryTimeoutId)
     window.removeEventListener("message", deliverLaunch)
   }
   const complete = () => {
@@ -94,9 +91,8 @@ export function mountGameFrame({
 
   if (launchPayload) {
     window.addEventListener("message", deliverLaunch)
-    deliveryTimeoutId = window.setTimeout(() => fail("handshake"), Math.min(timeoutMs, 10000))
   }
-  timeoutId = window.setTimeout(() => fail("load"), timeoutMs)
+  timeoutId = window.setTimeout(() => fail(loaded ? "handshake" : "load"), timeoutMs)
 
   gameRoot.append(iframe)
   return iframe

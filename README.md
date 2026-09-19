@@ -388,6 +388,7 @@ npm run test:iframe
 npm run test:member-db
 npm run test:public-id
 npm run test:member-product-db
+npm run test:product-ddl
 npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:platform-db
@@ -427,7 +428,8 @@ cases plus competing allocations on native PostgreSQL 17. These commands never
 apply hosted SQL. The installed corrections preserve existing public IDs and
 use no browser retry workaround or alternate runtime.
 
-`test:iframe` verifies load/handshake ordering, visible timeout, rejected sources,
+`test:iframe` verifies load/handshake ordering, the shared 30-second deadline,
+slow readiness without a premature 10-second cutoff, visible timeout, rejected sources,
 late messages, failed delivery and the opaque-origin sandbox contract. Browser
 smoke verifies the actual timeout error screen and removal of the failed iframe.
 The Loader hides its waiting display only after both load and credential delivery.

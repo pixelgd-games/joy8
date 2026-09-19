@@ -1,38 +1,38 @@
-import { supabase } from "../lib/supabaseClient.js";
-import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js";
-import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js";
-import { requireAdmin } from "./auth.js";
+import { supabase } from "../lib/supabaseClient.js"
+import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
+import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
+import { requireAdmin } from "./auth.js"
 
-const form = document.getElementById("gameForm");
-const params = new URLSearchParams(window.location.search);
-const isEditPage = window.location.pathname.startsWith("/admin/games/edit/");
-const gameId = isEditPage ? params.get("id") : null;
+const form = document.getElementById("gameForm")
+const params = new URLSearchParams(window.location.search)
+const isEditPage = window.location.pathname.startsWith("/admin/games/edit/")
+const gameId = isEditPage ? params.get("id") : null
 
 function slugSanity(slug) {
-  const s = String(slug || "").trim();
-  if (!s) return { ok: false, msg: "slug 不能為空" };
-  if (/\s/.test(s)) return { ok: false, msg: "slug 不能包含空格" };
+  const s = String(slug || "").trim()
+  if (!s) return { ok: false, msg: "slug 不能為空" }
+  if (/\s/.test(s)) return { ok: false, msg: "slug 不能包含空格" }
   if (!/^[a-z0-9-]+$/.test(s))
-    return { ok: false, msg: "slug 只能用小寫英數與 -" };
-  return { ok: true, slug: s };
+    return { ok: false, msg: "slug 只能用小寫英數與 -" }
+  return { ok: true, slug: s }
 }
 
 function val(id) {
-  return document.getElementById(id)?.value ?? "";
+  return document.getElementById(id)?.value ?? ""
 }
 function checked(id) {
-  return !!document.getElementById(id)?.checked;
+  return !!document.getElementById(id)?.checked
 }
 
 function parseSortOrder(rawValue) {
-  const value = String(rawValue || "").trim();
+  const value = String(rawValue || "").trim()
 
-  if (!value) return { ok: true, value: 0 };
+  if (!value) return { ok: true, value: 0 }
   if (!/^-?\d+$/.test(value)) {
-    return { ok: false, msg: "sort order 只能填整數" };
+    return { ok: false, msg: "sort order 只能填整數" }
   }
 
-  return { ok: true, value: Number(value) };
+  return { ok: true, value: Number(value) }
 }
 
 async function loadGame() {
@@ -40,7 +40,7 @@ async function loadGame() {
     .from("games")
     .select("id,name,slug,thumbnail,type,supports_live,published,launch_url,sort_order")
     .eq("id", gameId)
-    .maybeSingle();
+    .maybeSingle()
 
   if (error) {
     showFormError({
@@ -48,8 +48,8 @@ async function loadGame() {
       title: "遊戲資料讀取失敗",
       message: "目前無法取得這筆遊戲資料，請稍後再試。",
       error,
-    });
-    return;
+    })
+    return
   }
   if (!data) {
     showFormError({
@@ -59,44 +59,44 @@ async function loadGame() {
       primaryAction: {
         label: "回遊戲列表",
         onClick: () => {
-          window.location.href = "/admin/games/";
+          window.location.href = "/admin/games/"
         },
       },
-    });
-    return;
+    })
+    return
   }
 
-  document.getElementById("name").value = data.name ?? "";
-  document.getElementById("slug").value = data.slug ?? "";
-  document.getElementById("thumbnail").value = data.thumbnail ?? "";
-  document.getElementById("type").value = data.type ?? "slot";
-  document.getElementById("supports_live").checked = !!data.supports_live;
-  document.getElementById("published").checked = !!data.published;
-  document.getElementById("launch_url").value = data.launch_url ?? "";
-  document.getElementById("sort_order").value = data.sort_order ?? "";
+  document.getElementById("name").value = data.name ?? ""
+  document.getElementById("slug").value = data.slug ?? ""
+  document.getElementById("thumbnail").value = data.thumbnail ?? ""
+  document.getElementById("type").value = data.type ?? "slot"
+  document.getElementById("supports_live").checked = !!data.supports_live
+  document.getElementById("published").checked = !!data.published
+  document.getElementById("launch_url").value = data.launch_url ?? ""
+  document.getElementById("sort_order").value = data.sort_order ?? ""
 
-  const loading = document.getElementById("loading");
-  if (loading) loading.style.display = "none";
+  const loading = document.getElementById("loading")
+  if (loading) loading.style.display = "none"
 }
 
 async function submitForm(e) {
-  e.preventDefault();
+  e.preventDefault()
 
-  const name = val("name").trim();
-  const slugCheck = slugSanity(val("slug"));
-  if (!slugCheck.ok) return showValidationError(slugCheck.msg);
-  const sortOrderCheck = parseSortOrder(val("sort_order"));
-  if (!sortOrderCheck.ok) return showValidationError(sortOrderCheck.msg);
-  const launchUrlInput = val("launch_url").trim();
-  const launchUrl = normalizeLaunchUrl(launchUrlInput);
-  const thumbnailInput = val("thumbnail").trim();
-  const thumbnail = normalizeCoverPath(thumbnailInput, slugCheck.slug);
+  const name = val("name").trim()
+  const slugCheck = slugSanity(val("slug"))
+  if (!slugCheck.ok) return showValidationError(slugCheck.msg)
+  const sortOrderCheck = parseSortOrder(val("sort_order"))
+  if (!sortOrderCheck.ok) return showValidationError(sortOrderCheck.msg)
+  const launchUrlInput = val("launch_url").trim()
+  const launchUrl = normalizeLaunchUrl(launchUrlInput)
+  const thumbnailInput = val("thumbnail").trim()
+  const thumbnail = normalizeCoverPath(thumbnailInput, slugCheck.slug)
 
   if (launchUrlInput && !launchUrl) {
-    return showValidationError("launch url 只能使用 https://、/ 開頭的站內路徑或本機開發網址");
+    return showValidationError("launch url 只能使用 https://、/ 開頭的站內路徑或本機開發網址")
   }
   if (thumbnailInput && !thumbnail) {
-    return showValidationError(`封面必須使用 /games/${slugCheck.slug}/cover.webp`);
+    return showValidationError(`封面必須使用 /games/${slugCheck.slug}/cover.webp`)
   }
 
   const payload = {
@@ -108,43 +108,43 @@ async function submitForm(e) {
     published: checked("published"),
     launch_url: launchUrl || null,
     sort_order: sortOrderCheck.value,
-  };
+  }
 
-  if (!payload.name) return showValidationError("名稱不能為空");
+  if (!payload.name) return showValidationError("名稱不能為空")
   if (payload.published && !launchUrl) {
-    return showValidationError("已上架遊戲需要 launch url");
+    return showValidationError("已上架遊戲需要 launch url")
   }
   if (payload.published && !thumbnail) {
-    return showValidationError("已上架遊戲需要符合規格的 Joy8 封面");
+    return showValidationError("已上架遊戲需要符合規格的 Joy8 封面")
   }
 
-  const submitBtn = form.querySelector('button[type="submit"]');
-  if (submitBtn) submitBtn.disabled = true;
+  const submitBtn = form.querySelector('button[type="submit"]')
+  if (submitBtn) submitBtn.disabled = true
 
   try {
     if (gameId) {
-      const { error } = await supabase.from("games").update(payload).eq("id", gameId);
+      const { error } = await supabase.from("games").update(payload).eq("id", gameId)
       if (error) {
-        showSaveError("更新遊戲失敗", error);
-        return;
+        showSaveError("更新遊戲失敗", error)
+        return
       }
     } else {
-      const { error } = await supabase.from("games").insert([payload]);
+      const { error } = await supabase.from("games").insert([payload])
       if (error) {
-        showSaveError("新增遊戲失敗", error);
-        return;
+        showSaveError("新增遊戲失敗", error)
+        return
       }
     }
 
-    window.location.href = "/admin/games/";
+    window.location.href = "/admin/games/"
   } finally {
-    if (submitBtn) submitBtn.disabled = false;
+    if (submitBtn) submitBtn.disabled = false
   }
 }
 
 async function initFormPage() {
-  const ok = await requireAdmin();
-  if (!ok) return;
+  const ok = await requireAdmin()
+  if (!ok) return
 
   if (isEditPage && !gameId) {
     showFormError({
@@ -154,24 +154,24 @@ async function initFormPage() {
       primaryAction: {
         label: "回遊戲列表",
         onClick: () => {
-          window.location.href = "/admin/games/";
+          window.location.href = "/admin/games/"
         },
       },
-    });
-    return;
+    })
+    return
   }
 
   if (gameId) {
-    await loadGame();
+    await loadGame()
   } else {
-    const loading = document.getElementById("loading");
-    if (loading) loading.style.display = "none";
+    const loading = document.getElementById("loading")
+    if (loading) loading.style.display = "none"
   }
 
-  form.addEventListener("submit", submitForm);
+  form.addEventListener("submit", submitForm)
 }
 
-initFormPage();
+initFormPage()
 
 function showValidationError(message) {
   showFormError({
@@ -179,7 +179,7 @@ function showValidationError(message) {
     title: "資料格式錯誤",
     message,
     reload: false,
-  });
+  })
 }
 
 function showSaveError(title, error) {
@@ -189,12 +189,12 @@ function showSaveError(title, error) {
     message: "目前無法儲存遊戲資料，請稍後再試。",
     error,
     reload: false,
-  });
+  })
 }
 
 function showFormError(options) {
   showErrorModal({
     reload: false,
     ...options,
-  });
+  })
 }

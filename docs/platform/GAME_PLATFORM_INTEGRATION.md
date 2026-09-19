@@ -56,7 +56,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | Wallet balance and transactions | Owns | Reads through authorized sessions; operational mutations require a trusted backend |
 | Loader iframe shell | Owns | Does not own |
 | Sandbox and `allow` permissions | Owns | Must remain compatible |
-| Platform load timeout and error screen | Owns | Reports game-ready state only if a future handshake is added |
+| Platform load timeout and error screen | Owns | Installs the credential receiver before loading its runtime; gameplay readiness remains separate |
 | CSP and `X-Frame-Options` | Reports failures | Owns |
 | Rendering and resources | Does not own | Owns |
 | Gameplay rules | Does not own | Owns |
@@ -127,8 +127,11 @@ iframe and expected game origin, then sends exactly one
 trusted Gateway/game configuration, removes the listener and exposes the launch
 code to its runtime once. There is no Local Client fallback. The Loader waits for
 both document load and credential delivery before hiding its loading display.
-An undelivered launch expires 10 seconds after mounting, even when the document
-has loaded. Failed delivery removes the iframe, clears credentials/listeners and
+Document load and credential delivery share one 30-second deadline from mounting.
+Neither event restarts that deadline; readiness after 10 seconds is still accepted.
+At the deadline, a missing document load reports a load timeout; a loaded document
+without credential delivery reports a handshake timeout. Failed delivery removes
+the iframe, clears credentials/listeners and
 shows `JOY8-GAME-006` with a reload action. Reload requests a fresh session; it
 does not reuse the expired credential. Late readiness cannot restart that frame.
 
@@ -153,7 +156,8 @@ allow="autoplay; fullscreen; gamepad"
 referrerpolicy="no-referrer"
 ```
 
-For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader uses eager loading and a 30-second load-event timeout.
+For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader uses
+eager loading and the shared 30-second launch deadline described above.
 
 The credential-ready message only proves that the game installed its Joy8 Client;
 it is not gameplay readiness. The current 30-second timeout still observes the
