@@ -385,6 +385,10 @@ alone does not prove these services are restored. Never test by overwriting the
 live Joy8 project. Local synthetic SQL tests are not a hosted backup restore.
 The storage destination, credentials and actual restore test remain pending;
 do not mark recovery complete based on a preflight query.
+The prescribed wrapper's linked schema dump currently fails on this workstation
+because neither Docker nor Podman is installed. Restore validation requires that
+prerequisite or an explicitly reviewed alternative export path; the local game
+fixture's copy/reopen test does not satisfy hosted recovery acceptance.
 
 Official procedures: [Supabase CLI backup/restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
 and [restoring a downloaded backup locally](https://supabase.com/docs/guides/local-development/restoring-downloaded-backup).

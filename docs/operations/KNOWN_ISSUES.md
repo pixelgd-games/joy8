@@ -61,12 +61,13 @@ operations also lock one singleton `economy_state` row, serializing those
 operations across matches. Correct the balance contract and measure this capacity
 before funded or public activation.
 
-The Mahjong repository's `server/fixtures/joy8-platform.json` pins fourteen
-matching Joy8 sources but omits active-session scope, read-only membership,
-adapter isolation, public-ID allocation and the product registry/DDL hardening.
-Its installation tests therefore do not reproduce the installed platform schema.
-The game repository must refresh the fixture and enforce completeness as well as
-individual hashes before those tests can establish current integration acceptance.
+The Mahjong fixture now consumes the complete 27-source platform export, with
+ordered inventory, migration classification and hash checks. Its native PostgreSQL
+tests cover the current hardening. The revised available/reserved balance contract
+and restricted checkpoint lock pass local upgrade tests; their hosted SQL remains
+in `supabase/drafts/20260920150000_mahjong_runtime_balance.sql` pending approval.
+Local accounting measurements and their limits belong in Mahjong's deployment
+document; they do not establish hosted capacity or authorize funded operation.
 
 ### Member and Persistent Guest Direction
 
@@ -205,11 +206,19 @@ have distinct client-IP behavior. The [Supabase example](https://supabase.com/do
 uses the first forwarded address, but does not establish Joy8's complete ingress
 trust contract. Neither source proves the hosted fallback branches safe.
 
-Before changing this selection, verify the managed ingress contract or run a
-separately approved, bounded hosted diagnostic using conflicting synthetic values
-in all three headers, including multi-hop and IPv6 cases. Confirm the selected
-key comes from the trusted ingress; do not log credentials or add a public header
-echo endpoint. Local mocked headers and IP-format validation cannot prove this.
+A bounded hosted diagnostic found that requests carrying only forged
+`x-forwarded-for` or `x-real-ip` values returned healthy responses, while conflicting
+headers containing a forged `cf-connecting-ip` returned upstream HTML 403 responses
+(IPv4, multi-hop and synthetic IPv6 cases). Counter comparison found one changed
+non-synthetic bucket and no bucket matching the injected addresses or `unknown`.
+This is limited evidence for the observed ingress path: concurrent traffic and
+upstream rejection prevent attributing every request, and synthetic IPv6 headers
+do not test native IPv6 transport or Worker subrequests. One normal request also
+returned unexpected HTML before subsequent normal requests succeeded.
+
+Before changing this selection, establish the managed ingress contract and cover
+those remaining paths. Do not log credentials or add a public header echo endpoint.
+Local mocked headers and IP-format validation cannot prove ingress trust.
 
 ## Test Gaps
 

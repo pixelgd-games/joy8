@@ -14,4 +14,5 @@ runPostgresChecks([
   "scripts/public-id-lock-check.mjs",
   "scripts/player-cleanup-check.mjs",
   "scripts/platform-bundle-check.mjs",
+  "scripts/mahjong-balance-migration-check.mjs",
 ])

@@ -391,6 +391,7 @@ npm run test:public-id
 npm run test:member-product-db
 npm run test:product-ddl
 npm run test:platform-bundle
+npm run test:mahjong-balance
 npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:platform-db
@@ -398,6 +399,11 @@ npm run test:continuous-db
 node --test scripts/private-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
 ```
+
+`test:mahjong-balance` installs the historical Mahjong runtime and current platform
+hardening, then checks the proposed runtime balance upgrade, restricted checkpoint
+lock and unchanged wallet/configuration data. It runs in isolation; the SQL stays
+in `supabase/drafts/` until hosted application is approved.
 
 `test:member-db` loads the member migrations, four platform foundation migrations
 and deployed session-scope correction, member-read hardening, adapter isolation
