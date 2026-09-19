@@ -17,7 +17,7 @@ const checks = [
     "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
     "public-player-id-check", "public-id-allocation-check", "product-registration-check",
     "platform-database-check", "platform-cutover-check", "continuous-settlement-check",
-    "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check",
+    "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check",
   ].map(name => `scripts/${name}.mjs`)],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/gateway-unit-check.mjs"],
   ["scripts/smoke-check.mjs"],

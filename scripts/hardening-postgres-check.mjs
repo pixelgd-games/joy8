@@ -11,4 +11,5 @@ runPostgresChecks([
   "scripts/public-id-concurrency-check.mjs",
   "scripts/product-ddl-check.mjs",
   "scripts/public-id-lock-check.mjs",
+  "scripts/player-cleanup-check.mjs",
 ])

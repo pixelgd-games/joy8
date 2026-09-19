@@ -307,26 +307,31 @@ unique even if frozen or closed. POINT starts at 0 pending a later grant decisio
 There is no conversion, purchase or withdrawal API. Product gameplay data and any
 AI accounting adapter remain in a permission-separated product schema.
 
-The reset left wallet/session/transaction/match/settlement tables empty. Mahjong has an identity-only policy and expiring exchange/renew key. Before funded product activation, review its
-scope, limits, key and adapter against the integration contract.
+The hosted prelaunch dataset has two retained Auth accounts and no player,
+wallet, game-session, transaction, match or settlement rows. Retained Auth
+identities and login sessions, the administrator allowlist, eight catalog entries
+and system configuration are unchanged. A retained account receives a new player
+profile and public ID on its next explicit enrollment. Mahjong has an identity-only
+policy and expiring exchange/renew key. Before funded product activation, review
+its scope, limits, key and adapter against the integration contract.
 
 The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
 Do not promote them alongside the installed schema; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 45 local and hosted migration records match, including the Joy8 rebrand,
+All 46 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
 cross-product adapter isolation, public player IDs, candidate-scoped ID allocation,
 first-enrollment profile visibility, product-schema registration, automatic DDL
-validation, rejected-candidate lock cleanup and optimized adapter validation.
-Installation checks verified unchanged Auth/player IDs,
-existing catalog records and administrator count, with no wallets, sessions,
-transactions or matches created. The hidden Mahjong catalog entry is the only
-catalog addition. Its private schema and effective permissions passed hosted
-postflight; live game/provider acceptance is still pending.
+validation, rejected-candidate lock cleanup, optimized adapter validation and
+the authorized prelaunch player/account cleanup. The cleanup checks verified
+both retained Auth accounts and their login records against the local backup,
+with all eleven catalog/admin/configuration tables unchanged. Its backup remains
+local and is excluded from Git. Mahjong's private schema and effective permissions
+passed hosted postflight; live game/provider acceptance is still pending.
 Review blockers are tracked in [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Local Development
@@ -388,6 +393,7 @@ npm run test:ledger-cleanup
 npm run test:platform-db
 npm run test:continuous-db
 node --test scripts/private-entry-check.mjs
+node --test scripts/player-cleanup-check.mjs
 ```
 
 `test:member-db` loads the member migrations, four platform foundation migrations
@@ -431,7 +437,11 @@ permission query are installed as incremental migrations. Default member fixture
 load the current allocator; platform fixtures also load DDL and adapter validation
 through `scripts/fixtures/platform-hardening.mjs` in migration order.
 With PostgreSQL 17 configured, `npm run test:hardening-pg` runs member/platform/
-continuous/private acceptance, DDL rollback and competing allocation checks.
+continuous/private acceptance, DDL rollback, competing allocation and prelaunch
+cleanup checks. `player-cleanup-check.mjs` verifies rejection of changed cleanup
+targets or unexpected gameplay and preservation of retained Auth records,
+administrator access, catalog and configuration. It uses isolated fixture data;
+it never connects to the hosted database.
 `npm run benchmark:adapter` compares the historical baseline and current queries
 and committed settlement latency with 1, 5 and 10 synthetic product schemas.
 It reports median/P95 over 100 samples after warmup; it is not a hosted Mahjong
