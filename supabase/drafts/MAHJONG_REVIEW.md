@@ -51,7 +51,8 @@ The user approved and installed these additions:
 - Restricted `mahjong_clash_runtime` login and a game-scoped exchange/renew-only
   key. Both expire on 2026-09-25 at 15:25 Asia/Taipei. The key cannot open or settle
   matches. Secret values exist only in the game's ignored `.env.joy8.local`.
-- Gateway version 8 with private sessions and continuous-settlement error mapping.
+- The hosted `joy8-gateway` with product protocol `server-v1`, private sessions
+  and continuous-settlement error mapping.
   Health/rejection checks and actual identity-key scope checks passed. The local
   test entry is included in Joy8's standard front-end build, with backend access
   bound to localhost. Mahjong has no cloud game build, GCP host or public release.
@@ -100,6 +101,16 @@ including a real restricted login. Member/Gateway tests and browser smoke cover
 safe callbacks, explicit start, rejection/retry and shared iframe handling.
 These synthetic identities do not establish real provider or funded-play acceptance.
 
+Two installed runtime limits remain relevant before funded or public play:
+
+- `mahjong_clash.runtime_balance()` returns the wallet's stored balance, while
+  the Gateway browser balance reports available balance after subtracting locks.
+  Do not use the runtime value as an available-to-spend check while a match holds
+  POINT.
+- Economy operations lock the singleton `economy_state` row. This preserves the
+  global counters but serializes those operations across matches; measure the
+  resulting capacity before public activation.
+
 ## Remaining activation
 
 1. Sign in through Joy8 or restore the existing guest. Verify the same player
@@ -107,8 +118,10 @@ These synthetic identities do not establish real provider or funded-play accepta
 2. Define funded-play limits and the human POINT source before changing the
    identity-only reservation ceiling or authorizing financial backend scopes.
 3. Review AI funding and full gameplay acceptance before starting funded play.
-4. Public branded origin, Cloudflare game upload, GCP/VPS, SMTP, production launch
-   and Google linking remain separate from this connection approval.
+4. Public branded origin, Cloudflare game upload, GCP/VPS, production launch,
+   guest-to-Google linking and provider acceptance remain separate from this
+   connection approval. Turnstile is active; public Email/password entry and
+   Cloudflare Email Sending are disabled.
 
 ## Verification and recovery
 

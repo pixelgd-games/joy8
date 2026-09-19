@@ -4,9 +4,10 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-19. The server-authorized base and continuous
+Current source reviewed: 2026-09-20. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
-version 8 includes private entry and the settlement-error mappings.
+function `joy8-gateway` includes private entry and the settlement-error mappings;
+the current product protocol is `server-v1`.
 See [README.md](../../README.md) for verification and product-activation limits.
 There is no
 old/new compatibility path in the replacement. Existing game clients must adopt
@@ -21,7 +22,7 @@ A game must never:
 - Log a player into Joy8.
 - Receive identity-provider credentials.
 - Receive a Supabase anonymous key, member JWT, or service-role key from the Loader.
-- Write Joy8 player, wallet, session, round, or transaction tables.
+- Write Joy8 player, wallet, session, match, settlement, or transaction tables.
 - Change a player balance directly.
 - Store a Joy8 launch code or Gateway token in local storage, session storage, IndexedDB, logs, Analytics, or save data.
 
@@ -59,7 +60,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | CSP and `X-Frame-Options` | Reports failures | Owns |
 | Rendering and resources | Does not own | Owns |
 | Gameplay rules | Does not own | Owns |
-| Financial round summary for wallet settlement | Owns | Supplies stable round references through authorized calls |
+| Financial match and settlement summary | Owns | Supplies stable match references through authorized calls |
 | Authoritative rooms, matches, hands, actions, results, and history | Does not own | Owns in its game database |
 | Game-specific save data | Provides a platform adapter when applicable | Owns the payload |
 
@@ -124,8 +125,16 @@ iframe and expected game origin, then sends exactly one
 `{type:"joy8-launch-v1",launch:{...}}` response. The game accepts it only from
 `window.parent` at an approved Joy8 origin, validates the exact field set and
 trusted Gateway/game configuration, removes the listener and exposes the launch
-code to its runtime once. A missing or invalid message fails visibly without a
-Local Client fallback.
+code to its runtime once. There is no Local Client fallback. The current Loader
+clears an undelivered launch after 10 seconds; if the iframe document has already
+loaded, that credential-delivery timeout is not yet shown to the player. This is
+a known limitation, not a successful launch.
+
+For a cross-origin game, both sides require the exact approved origin. A
+same-origin game runs in a sandbox without `allow-same-origin`, so its message
+origin is `null`; the Loader therefore validates the exact iframe window and the
+`null` origin, but must use `*` as the response target. Do not describe this
+same-origin exception as exact-origin delivery.
 
 No launch field is appended to the iframe URL. The launch code therefore never
 enters the initial HTTP request, CDN/access log, browser storage or Analytics.
@@ -212,7 +221,8 @@ The launch code is valid for two minutes and can be used once.
 
 ## Operational Protocol v1
 
-Status: base deployed through the platform migrations and Gateway version 8;
+Status: base deployed through the platform migrations and the hosted
+`joy8-gateway` using product protocol `server-v1`;
 continuous settlement is installed. This protocol is for both
 wallet models. There is no browser payout or legacy Demo path.
 
@@ -401,6 +411,12 @@ registration. Do not grant the runtime membership in its deployment owner role.
 The platform validates the registered signature/owner boundary and requires
 `{"committed":true}`; the caller cannot select a function or table.
 
+The automated privilege check rejects adapter-owner access to `public`, `auth`,
+or another registered product schema. Cross-product checks cover schema creation,
+tables, views, materialized views, sequences and function execution. Review these
+grants before registration and retain product-specific permission tests; automated
+catalog checks do not replace review of application behavior or external services.
+
 Actions are `open`, `settle` and `cancel`; the second argument is the Joy8 match
 UUID. Payload always includes `version:1`, trusted `game_id` and `request`.
 Settlement also supplies `settlement_id`, `request_hash` and, under continuous settlement, `next_product_participants`. The adapter validates
@@ -488,6 +504,12 @@ registered or a persistent guest. Authentication, provider login, guest identity
 linking and branded entry are platform responsibilities.
 
 Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Joy8 session contract without copying identity-provider logic into the game.
+
+The Lobby may display the platform's six-digit `public_id` as `Player 123456`.
+That value is presentation-only and is not part of the launch payload or product
+authorization contract. Games and trusted backends correlate players with the
+internal `player_account_ref` returned by the Gateway; they must not authenticate,
+authorize, settle, or create product mappings from a public player ID.
 
 This member contract applies only when the Joy8 Client is active. CrazyGames and other external platform clients must use their own identity services and must not initialize Joy8 Auth, sessions, or wallets.
 

@@ -1,7 +1,11 @@
 # Joy8 Member and Authentication Plan
 
-Status: member migrations and Gateway are active; Cloudflare SMTP and Turnstile are configured for Supabase Auth. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
-Last reviewed: 2026-09-19.
+Status: member migrations and Gateway are active. Google sign-in and persistent
+guest entry passed hosted acceptance; Cloudflare Turnstile protects guest Auth.
+The public Email/password flow and Cloudflare Email Sending are disabled. Stable
+six-digit public player IDs are deployed. Guest-to-Google linking, guest
+continuity and branded handoff remain acceptance or target-design work.
+Last reviewed: 2026-09-20.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -13,11 +17,9 @@ owns the current implementation and operations.
 
 ## First-Release Identity Scope
 
-The first release is H5 with Google, basic account/password, and persistent
-guest entry. Use Email + password as the implementation baseline for basic
-accounts, with email verification and password recovery; a separate username
-credential system is not required. LINE, Apple, Email OTP, Android, and iOS are
-deferred and do not block this release.
+The first release is H5 with Google and persistent guest entry. Email/password,
+a separate username credential system, LINE, Apple, Email OTP, Android and iOS
+are deferred and do not block this release.
 
 A player can enter through the public Joy8 Lobby or a Joy8-controlled branded
 game entry. Both resolve the same Joy8 player. A branded entry can open before
@@ -34,7 +36,7 @@ initialize Joy8 identity merely because the game also has a Joy8 build.
 | --- | --- |
 | Credentials, provider identity and verification | Supabase Auth through Joy8-controlled flows |
 | Stable player, membership eligibility, guest upgrade and account lifecycle | Joy8 backend |
-| H5 sign-in, callback, recovery and account-status UI | Joy8-controlled entry surface |
+| H5 sign-in, callback and account-status UI | Joy8-controlled entry surface |
 | Product classification and wallet resolution | Joy8 trusted configuration and backend |
 | Game session and launch handoff | Joy8 integration contract |
 | Game-side player mapping, progress and gameplay data | Product backend and schema |
@@ -46,14 +48,19 @@ in the owning repository, not a first-release platform dependency.
 
 ## Current Gaps
 
-- Public member UI and Gateway source now implement the entry/upgrade/recovery
-  foundation. The two member migrations are applied and the Gateway is deployed.
-  Hosted entry settings, Cloudflare custom SMTP and Turnstile are enabled.
-  Real provider and email-delivery acceptance remain pending.
+- Public member UI and Gateway source implement Google/guest entry, guest
+  promotion and enrollment. The member migrations are applied and the Gateway
+  is deployed. Google sign-in, guest entry and Turnstile passed hosted
+  acceptance. Guest-to-Google linking remains pending hosted acceptance.
   [README.md](../../README.md) owns the implementation details and test limits.
-- Deletion requests, cleanup/retention, and branded cross-origin entry are not
-  implemented. Same-origin `/account/` belongs to Joy8 and returns only to the
-  Lobby, a validated `/game/?slug=...`, or `/play-test/?slug=...` route.
+- Email/password entry is not part of the current public product. Cloudflare
+  Email Sending is disabled, both SMTP credentials were deleted, and Workers
+  Paid was canceled. Re-enabling email authentication requires a new product
+  decision and provider configuration review.
+- Deletion requests, cleanup/retention and branded cross-origin entry are not
+  implemented. Same-origin `/account/` is a narrow callback trampoline that
+  returns only to the Lobby, a validated `/game/?slug=...`, or
+  `/play-test/?slug=...` route.
 - The local private-test entry is owned by Joy8 at
   `http://localhost:5173/play-test/?slug=mahjong-clash`; its game frame is owned by
   Mahjong at `http://localhost:4391/`. The implemented shared member callback also
@@ -70,6 +77,9 @@ in the owning repository, not a first-release platform dependency.
 
 - `player_accounts.id` remains stable through login, guest restoration, upgrade,
   entry-point changes, and session refresh.
+- `player_accounts.public_id` is a unique six-digit presentation identifier.
+  It may be shown as `Player 123456`, but must never replace the internal UUID
+  for authentication, authorization, launch, wallet, settlement, or game mapping.
 - Credentials and provider identities belong to Auth. Auth identity, player
   membership, and administrator authorization are separate concepts.
 - Resolve exactly one player and the correct existing wallet scope through
@@ -78,8 +88,8 @@ in the owning repository, not a first-release platform dependency.
 - A provider identity must not silently merge two existing Joy8 players or
   their wallets based on email, display name, or client-supplied similarity.
 - Supabase provider linking within one Auth user is different from merging
-  existing Joy8 players. Review its automatic verified-email linking behavior
-  and test Google/password conflicts explicitly before enabling the combined flow.
+  existing Joy8 players. Test guest-to-Google conflicts explicitly before
+  accepting the promotion flow as production-ready.
 - Browser storage separation alone does not authorize membership. An
   administrator-only session must not silently enroll a player.
 
@@ -87,11 +97,11 @@ in the owning repository, not a first-release platform dependency.
 
 A guest restores the same player while its approved local session remains valid.
 Clearing browser data or changing devices cannot guarantee guest recovery.
-Explain this limitation and provide an upgrade path to Google or Email/password.
+Explain this limitation and provide an upgrade path to Google.
 Signing out must return to an explicit entry choice, not silently create a guest.
 
 Supabase anonymous sign-in is the selected mechanism and is enabled in hosted
-Auth; public member deployment still requires acceptance testing. Anonymous Auth users
+Auth; hosted guest entry has passed acceptance testing. Anonymous Auth users
 have user IDs and use the `authenticated` role. Classify them using verified
 anonymous status rather than interpreting every Auth ID as a registered member.
 Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
@@ -107,15 +117,15 @@ outside this release.
 The Lobby is public and never requires a login just to browse. Selecting a game
 checks existing player enrollment: an active registered player or persistent
 guest proceeds directly; an unenrolled visitor gets the shared member dialog
-over the unchanged Lobby. The dialog offers Google, Email/password, and explicit
-guest play. Successful entry continues to the selected game. Dismissal cancels
+over the unchanged Lobby. The dialog offers Google and explicit guest play.
+Successful entry continues to the selected game. Dismissal cancels
 that selection; opening another game or the top-bar account entry must not reuse
 the previous destination. A service failure must not silently create a guest.
 
 Direct game URLs follow the same membership policy and return missing members
-to the Lobby dialog. `/account/` remains the callback/recovery surface, not the
-default platform entrance. Callback destinations are validated game paths, never
-arbitrary URLs. A future branded Mahjong H5/App entry should likewise allow its
+to the Lobby dialog. `/account/` is the callback trampoline, not the default
+platform entrance or a second account page. Callback destinations are validated
+game paths, never arbitrary URLs. A future branded Mahjong H5/App entry should likewise allow its
 home screen before requesting identity at game start; native implementation
 remains deferred.
 
@@ -134,8 +144,8 @@ The current `create-session` route expects an allowed browser Origin; arbitrary
 game URLs or originless native calls are not an alternate authentication path.
 
 The entry may retain Auth session material only in approved platform-controlled
-storage. Passwords, provider tokens, member access/refresh tokens, recovery secrets,
-and service-role keys never enter the game, URL logs, Analytics, or game saves.
+storage. Provider tokens, member access/refresh tokens and service-role keys
+never enter the game, URL logs, Analytics, or game saves.
 Launch-code redemption and short-lived game-token rules are owned exclusively by
 [GAME_PLATFORM_INTEGRATION.md](GAME_PLATFORM_INTEGRATION.md).
 
@@ -143,14 +153,11 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
 
 - **Sign-out:** end the current device's Auth session without deleting the
   player, wallet, history, or an already active match's accounting obligation.
-- **Recovery:** provide email verification and password reset. Provider accounts
-  use provider recovery; guests recover only while their approved session survives.
-- **Email delivery:** Cloudflare Email Sending custom SMTP is configured for
-  `Joy8 <no-reply@joy8.cc>`. Test real delivery before public password
-  registration. Supabase Auth continues to issue and validate
-  verification/recovery tokens.
-  Custom delivery does not mean rebuilding password authentication or storing
-  passwords in Joy8 tables.
+- **Recovery:** Google accounts use Google's provider recovery. Guests are
+  recoverable only while their approved browser session survives; linking to
+  Google is the intended continuity path, but hosted linking remains unverified.
+- **Email delivery:** the current public identity scope sends no authentication
+  email. Cloudflare Email Sending is disabled and no SMTP credential remains.
 - **Closure/deletion:** expose a request flow, and separately define Auth/profile
   deletion or anonymization, transaction retention, game-data coordination, and
   waiting/recovery periods. Do not directly delete Auth users: current player
@@ -164,8 +171,8 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
    migrations under [AGENTS.md](../../AGENTS.md) before database changes.
 3. Implement backend player resolution, guest restoration/promotion, and lifecycle
    operations, then the reusable H5 UI and session handoff.
-4. Verify Google/password/guest entry, verification, reset, sign-out, refresh,
-   callback replay, simultaneous requests, guest loss, and provider conflicts.
+4. Verify Google/guest entry, sign-out, refresh, callback replay, simultaneous
+   requests, guest loss, guest-to-Google linking and provider conflicts.
    Verify game selection, cancellation/reselection, late responses after closing
    a dialog, callback destination preservation, and direct-link entry.
 5. Verify direct and Lobby entries preserve the same player and product progress;
@@ -178,9 +185,10 @@ third stage; no product needs a separate temporary membership system.
 ## Remaining Decisions
 
 - Exact guest-session retention/cleanup and account-closure retention periods.
-- Real SMTP delivery acceptance and the final password/abuse policy.
 - Validate implemented linking/conflict handling and member/admin isolation with
   real providers before release; separate-player merging remains unsupported.
+- Player nickname rules, moderation and whether or when the six-digit public-ID
+  namespace must be extended beyond its 900,000 available values.
 - Branded H5 entry origins, paths, repository ownership, copy, and localization.
 - Whether future POINT purchases require guest promotion before checkout.
 
@@ -188,41 +196,24 @@ First-release platforms and sign-in methods are already decided; do not reopen
 them as a provider-selection task. Native callbacks and extra providers are
 deferred. Purchase launch timing belongs in the product plan.
 
-## Email Delivery Setup and Acceptance
+## Provider and Abuse Protection
 
-Cloudflare Email Sending is the selected provider. The verified sender is
-`Joy8 <no-reply@joy8.cc>` and Supabase custom SMTP is configured with
-`smtp.mx.cloudflare.net` on port 465. The credential is stored only in provider
-settings; never copy it into chat, source, logs, or documentation. Supabase Auth
-email sending is limited to 100 messages per hour with a 60-second minimum
-interval per user. Cloudflare Turnstile Managed protection is also enabled for
-Auth; its secret is stored only in Cloudflare and Supabase.
+Google sign-in and guest entry are the current public identity methods.
+Cloudflare Turnstile Managed protection is enabled for guest Auth; its public
+site key may be used by the client, while its secret remains provider-side.
+Guest-to-Google linking and provider-conflict preservation remain pending and
+must not be inferred from standalone Google entry.
 
-1. Cloudflare sending-domain/DNS verification and Supabase SMTP configuration
-   are complete. Keep credentials in provider settings only.
-2. Retain Joy8's approved Site URL and account callback allowlist. Keep the
-   verification link semantics supplied by Auth; no custom token issuer is needed.
-   The public Turnstile site key may be used by the client; its secret must
-   remain provider-side.
-3. Test a new email/password signup, unverified-login rejection, verification,
-   password reset, guest email promotion, expired/replayed links and an already
-   registered address. Confirm the same player and all wallet scopes survive
-   promotion. Do not infer email delivery from a successful API response.
-4. Test delivery to a non-project-team mailbox, because the default Supabase
-   sender is restricted to team recipients. Record failures without mail content,
-   passwords, codes or token-bearing links.
-
-Google real-account binding acceptance is deferred by the user. Keep it marked
-pending; fixture and guest tests do not replace provider acceptance. SMTP setup
-is complete, but a successful API response does not prove real delivery. Hosted
-password policy, guest retention, closure policy and branded-entry ownership
-remain separate release gates above.
+Cloudflare Email Sending is disabled, both SMTP credentials were deleted, and
+the Workers Paid subscription was canceled. No Email/password action is exposed
+by the public UI. Reintroducing email authentication would be a new product and
+operations decision requiring provider setup, abuse limits, delivery monitoring,
+callback acceptance and updated lifecycle policy; do not silently revive the
+retired flow from historical code or documentation.
 
 ## Technical References
 
 - [Supabase anonymous sign-in](https://supabase.com/docs/guides/auth/auth-anonymous)
 - [Supabase identity linking](https://supabase.com/docs/guides/auth/auth-identity-linking)
-- [Supabase password authentication](https://supabase.com/docs/guides/auth/passwords)
-- [Supabase SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 
 These explain vendor behavior; they do not approve configuration changes.

@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-18.
+Last reviewed: 2026-09-20.
 
 ## Status Summary
 
@@ -40,7 +40,8 @@ POINT purchase policy and release timing belong in
 ### Mahjong Activation
 
 The continuous-settlement extension, ledger cleanup and 22-table Mahjong private
-schema are installed. Private entry and Gateway version 8 are active with an
+schema are installed. Private entry and the hosted `joy8-gateway` using product
+protocol `server-v1` are active with an
 identity-only game policy and zero opening credit. The restricted TLS database
 connection passed; the game has only an expiring exchange/renew key. Test entry
 uses ordinary member/guest authentication without per-player approval.
@@ -53,32 +54,38 @@ The three original `2026091609...` Mahjong drafts remain superseded, unapplied
 reference material under `supabase/drafts/mahjong-clash/`; never bulk-apply them
 alongside the installed product schema. The product owns future gameplay SQL.
 
+Mahjong's installed `runtime_balance()` reports the stored wallet balance, while
+the Gateway reports available balance after subtracting locked POINT. The runtime
+value must not be treated as spendable balance during an active hold. Its economy
+operations also lock one singleton `economy_state` row, serializing those
+operations across matches. Correct the balance contract and measure this capacity
+before funded or public activation.
+
 ### Member and Persistent Guest Direction
 
-Hosted member settings have been inspected and the authorized entry changes
-saved through the dashboard. The exact current settings and remaining CLI
-configuration-access limitation are recorded in
-[README.md](../../README.md#hosted-auth-configuration). Do not treat that CLI
-limitation as inability to inspect the project or replace the working token
-without evidence. Cloudflare custom SMTP and Turnstile are now configured;
-real email/provider acceptance and the final hosted password policy remain
-release gates.
+Hosted member settings have been inspected and the authorized entry changes are
+recorded in [README.md](../../README.md#hosted-auth-configuration). Google sign-in,
+guest entry and production Turnstile verification passed hosted acceptance.
+The public Email/password flow is disabled. Cloudflare Email Sending is disabled,
+both SMTP credentials were deleted, and Workers Paid was canceled.
 
 Current behavior:
 
-- Member entry, persistent guest, promotion, recovery and enrollment checks are
-  implemented. The member migrations and Gateway are active. Cloudflare custom
-  SMTP and Turnstile are configured; real delivery/provider acceptance remains
-  outstanding.
+- Google/guest entry, persistent guest restoration, guest promotion and
+  enrollment checks are implemented. The member migrations and Gateway are
+  active. Guest-to-Google linking still needs real hosted conflict and
+  preservation acceptance.
+- `/account/` is a callback trampoline back to the Lobby dialog. It is not a
+  standalone account, password or recovery page.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
 - Wallet scope is resolved by trusted platform/game policy. Mahjong's enabled
   zero-credit identity policy does not establish funded-play readiness.
 
 Risk:
 
-- Hosted guest entry and the earlier launch flow passed the limited acceptance in
-  [README.md](../../README.md#verification). Cross-browser continuity and real
-  provider promotion remain unverified. Isolated SQL tests, including native
+- Hosted guest entry, Google sign-in and the earlier launch flow passed the
+  acceptance recorded in [README.md](../../README.md#verification). Cross-browser
+  continuity and real provider promotion remain unverified. Isolated SQL tests, including native
   PostgreSQL 17.6 races, do not prove real provider linking.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
@@ -89,16 +96,28 @@ The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH
 
 Guest entry creates a persistent Auth identity and enrolled player; game launch
 reuses that player's wallet and creates a session. Auth entry is protected by
-Cloudflare Turnstile, a 100-message/hour project email limit and a 60-second
-per-user email interval. Retention, cleanup and broader public-signup abuse
-controls are not finalized.
+Cloudflare Turnstile. Retention, cleanup and broader public-signup abuse controls
+are not finalized.
 
 Before volume grows materially:
 
 - Verify guest continuity across the supported browsers and devices.
-- Define retention for guest players, wallets, sessions, rounds, and transactions.
+- Define retention for guest players, wallets, sessions, matches, settlements,
+  and transactions.
 - Define which records may be deleted and which must remain auditable.
 - Verify member conversion and account linking preserve the correct guest data.
+
+### Public Player ID Capacity
+
+`player_accounts.public_id` is a unique six-digit number from `100000` through
+`999999`, so the current namespace contains 900,000 values. The allocator tries
+at most 128 random candidates and cannot create an ID after the namespace is
+exhausted; collision pressure can cause failures before absolute exhaustion.
+
+Before the platform approaches that capacity, approve and migrate to a larger
+public namespace. Public IDs must not be recycled, accepted as credentials, or
+used in place of the internal player UUID for authorization, wallets, settlement,
+or game-owned identity mapping.
 
 ### Synchronous Gateway Runtime Cleanup
 
@@ -136,7 +155,7 @@ Direction:
 
 `create-session` requires an allowed Origin and all routes use database-backed IP rate limits. This blocks common cross-origin misuse but does not make Origin an unforgeable client identity.
 
-Cloudflare Turnstile now protects Supabase Auth entry but does not prove identity
+Cloudflare Turnstile now protects anonymous guest Auth entry but does not prove identity
 for Gateway session issuance. If production evidence shows Gateway abuse,
 evaluate edge protection, device attestation, or a stronger issuance design with
 a privacy review.
@@ -172,9 +191,11 @@ isolated member SQL suite loads the current platform migrations and checks roles
 rollback, zero-POINT provisioning and promotion preserving both wallet scopes,
 ledger and reservations. Its engine and fixture limits are documented in
 [README.md](../../README.md#verification). Native PostgreSQL 17.6 also passes
-14 competing-connection cases against that schema. Hosted guest acceptance is limited
-to the checks in README; Turnstile token forwarding has local coverage, while
-Google/email delivery, linking, recovery and production load remain unverified.
+15 competing-connection cases against that schema. Hosted guest and Google
+sign-in acceptance and production Turnstile verification are recorded in README.
+Public-ID checks cover stable allocation and service-role-only profile
+resolution. Hosted guest-to-Google linking, cross-browser guest continuity and
+production load remain unverified.
 
 Not fully automated:
 
@@ -208,11 +229,20 @@ Direction:
 
 ## User Experience and Maintainability
 
-### Iframe Load Is Not Game Readiness
+### Launch Handoff Failure Can Be Silent
 
-The Loader's 30-second timeout observes the iframe `load` event. A game can load its document and then stall internally.
+The Loader uses the iframe `load` event for its loading display and a separate
+ready/launch message to deliver the credential. If the game does not send ready
+within 10 seconds after the document has loaded, the Loader clears the launch
+credential without showing an error. A player can therefore see a game document
+that cannot authenticate. Treat visible delivery failure and retry as
+cross-repository contract work.
 
-A more accurate signal requires an explicit game-ready handshake in the game integration contract. This is cross-repository work and must not be simulated only in the Joy8 shell.
+Cross-origin games use an exact message target. A same-origin game is sandboxed
+without `allow-same-origin`, so it has a `null` origin and the Loader sends the
+response with target `*` after checking the exact iframe window and `null` origin.
+This is a deliberate current exception but remains weaker and more difficult to
+reason about than exact-origin delivery.
 
 ### Error Modal Accessibility
 

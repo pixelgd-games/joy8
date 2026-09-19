@@ -6,7 +6,7 @@ Joy8 runtime integration is defined in `GAME_PLATFORM_INTEGRATION.md`. A shared 
 
 Version: 1.1.
 
-Last external requirements review: 2026-09-15. Recheck the official CrazyGames documentation before every submission because platform requirements may change.
+Last external requirements review: 2026-09-20. Recheck the official CrazyGames documentation before every submission because platform requirements may change.
 
 ## Eligibility
 

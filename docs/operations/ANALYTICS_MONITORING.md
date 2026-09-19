@@ -7,7 +7,7 @@ This document owns operational analytics, KPI definitions, dashboards, request t
 
 Current repository behavior is defined in `../../README.md`.
 
-Last reviewed: 2026-09-17.
+Last reviewed: 2026-09-20.
 
 ## Goals
 
@@ -46,9 +46,9 @@ This is a plan, not an installed dependency. Recheck current pricing, quotas, re
 
 - Successfully created launch sessions.
 - Sessions grouped by game and `games.type`.
-- Guest, wallet, transaction, and round record counts.
+- Guest, wallet, transaction, financial-match, and settlement record counts.
 - Net POINT movements and fee totals after the scoped settlement release is active.
-- Open or expired sessions and rounds.
+- Open or expired sessions and financial matches.
 - Database size and growth, when reported from the database service.
 - Static Lobby availability through an external synthetic check.
 
@@ -60,9 +60,10 @@ This is a plan, not an installed dependency. Recheck current pricing, quotas, re
 - Game-load success rate.
 - Complete Gateway error rate.
 - Gateway p50 and p95 latency.
-- Production round volume or RTP.
+- Production settlement volume or RTP.
 
-These remain unavailable until the required identity or event source exists.
+These remain unavailable until the required activity event source and reporting
+rules exist.
 
 ## Dashboard Model
 
@@ -73,9 +74,9 @@ Initial panels:
 - Launch sessions for today, 7 days, and 30 days.
 - Session trend and ranking by game.
 - Session distribution by game type.
-- Counts of platform players, wallets, transactions, and rounds.
+- Counts of platform players, wallets, transactions, financial matches, and settlements.
 - Net POINT settlements and fee totals after activation.
-- Open and overdue sessions or rounds.
+- Open and overdue sessions or financial matches.
 - Database size and growth.
 - Lobby and Gateway health after non-mutating health checks exist.
 - Recent Critical and Warning alerts.
@@ -85,7 +86,7 @@ Later panels:
 - DAU, WAU, and MAU.
 - Concurrent users.
 - Average play time.
-- Trusted round metrics.
+- Trusted settlement metrics.
 - RTP.
 - Gateway error rate and p95 duration.
 
@@ -96,7 +97,7 @@ Later panels:
 - Gateway 4xx, 5xx, and 429 counts after request telemetry exists.
 - Gateway p50 and p95 duration.
 - Database capacity.
-- Long-running open sessions and rounds.
+- Long-running open sessions and financial matches.
 - Negative balances or wallet-to-transaction inconsistencies.
 - Recent operational alerts.
 
@@ -104,7 +105,7 @@ Later panels:
 
 Create this only after there are enough games and reliable activity:
 
-- Active accounts, sessions, and trusted rounds by `games.type`.
+- Active accounts, sessions, and trusted settlements by `games.type`.
 - Game ranking within each type.
 - Average play time when heartbeat exists.
 - Net POINT movements; RTP remains unavailable without authoritative gross stake/win data.
@@ -119,9 +120,9 @@ Use one dashboard template with a game variable:
 - Game name, type, and published status.
 - Launch sessions and trend.
 - Trusted match settlements and scoped wallet transactions after activation.
-- Open sessions and rounds.
+- Open sessions and financial matches.
 - Gateway errors when request telemetry exists.
-- Later: active accounts, concurrent users, play time, game-load success, trusted rounds, RTP, and latency.
+- Later: active accounts, concurrent users, play time, game-load success, trusted settlements, RTP, and latency.
 
 Do not build a separate custom dashboard for every game.
 
@@ -137,13 +138,16 @@ This proves that Joy8 issued launch authorization. It does not prove that the if
 
 Count distinct `player_account_id` values with trusted activity during the period.
 
-Until guest reuse or stable anonymous identity is implemented, label this metric `Active Accounts`, not DAU, WAU, or MAU. One person may currently create several guest accounts.
+Persistent anonymous identity and enrolled player accounts are implemented.
+Continue to label this metric `Active Accounts`, not DAU, WAU, or MAU, until a
+trusted activity event and cross-browser/device reporting rules exist. One
+person can still have more than one account.
 
 Member and persistent guest design is owned by `../platform/MEMBER_AUTH_PLAN.md`.
 
 ### DAU, WAU, and MAU
 
-After stable identity exists:
+After a trusted activity event and reporting identity rules exist:
 
 - DAU: distinct active platform players per calendar day.
 - WAU: distinct active platform players in the trailing 7 days.
@@ -157,11 +161,13 @@ Count distinct non-expired sessions with a heartbeat in the most recent five min
 
 Do not use `game_sessions.status = active` alone; it overstates concurrency when a player closes the page without a session-close event.
 
-### Round
+### Financial Match and Settlement
 
 A financial match is uniquely identified by `game_id + match_ref`; a session may expire before that match settles.
 
-Only include a round after the game reports it through the authorized platform contract. For a game that does not use Gateway rounds, show `unavailable`, not zero.
+Only include a financial match or settlement after the game reports it through
+the authorized platform contract. For a game that does not use Gateway
+settlement, show `unavailable`, not zero.
 
 ### Average Play Time
 
@@ -183,7 +189,7 @@ Record `duration_ms` for each Gateway request and report p50 and p95. An average
 
 ### RTP
 
-For settled, non-refunded, trusted rounds:
+For settled, non-refunded, trusted financial matches:
 
 ```text
 RTP = total payout / total bet x 100%
@@ -192,7 +198,7 @@ RTP = total payout / total bet x 100%
 Rules:
 
 - Do not display RTP when valid bet total is zero.
-- Exclude refunded rounds according to an explicitly reviewed calculation.
+- Exclude fully refunded matches according to an explicitly reviewed calculation.
 - Net wallet settlements do not expose gross wager/win turnover and cannot establish RTP.
 - A browser-generated result is not valid production or redeemable-value RTP.
 - Production RTP requires an authoritative game server or adjudication source.
@@ -218,7 +224,7 @@ The first retained request-event record should contain only:
 
 It must not contain:
 
-- Email, phone number, or provider profile.
+- Email, phone number, provider profile, public player ID, or internal player UUID.
 - Launch code.
 - Gateway token.
 - Supabase access token.
@@ -248,7 +254,7 @@ Create reporting objects through small user-reviewed migrations:
 - Platform daily aggregate.
 - Game daily aggregate.
 - Game-type daily aggregate.
-- Wallet and round aggregate.
+- Wallet, match, and settlement aggregate.
 - System anomaly view.
 - Gateway request-event table and required indexes.
 - A dedicated read-only reporting role or database user.
@@ -283,9 +289,11 @@ The deployed implementation provides `POST /health` with `{}` and no credential.
 It returns only `{"status":"ok"}` (200) or unavailable (503). Gateway rate-limit
 failure may return 429/503 before the probe. The dependency RPC reads the catalog
 and verifies critical member/session/settlement function presence. It does not
-exercise financial writes or prove Google, SMTP, product backend or iframe health.
+exercise financial writes or prove Google, guest Auth, Turnstile, product backend
+or iframe health.
 The rate limiter may update runtime counters; no business records are created.
-The hosted health/rejection check passed against Gateway version 8.
+The hosted health/rejection check passed against `joy8-gateway` using the
+`server-v1` product protocol.
 
 It should distinguish:
 
@@ -294,7 +302,7 @@ It should distinguish:
 
 It must not:
 
-- Create a guest, player, wallet, session, round, or transaction.
+- Create a guest, player, wallet, session, financial match, settlement, or transaction.
 - Return credentials or internal database details.
 - Bypass rate limiting.
 - Become a high-cost database query.
@@ -344,7 +352,7 @@ Thresholds are initial proposals and must be tuned from real traffic.
 - Three or more Gateway 5xx responses occur within ten minutes.
 - 429 responses increase sharply above the recent baseline.
 - Database capacity crosses an internal early-warning threshold.
-- A session or round remains open beyond its reviewed maximum age.
+- A session or financial match remains open beyond its reviewed maximum age.
 - Request latency exceeds the reviewed p95 threshold.
 
 ### Info
@@ -385,7 +393,7 @@ and [restoring a downloaded backup locally](https://supabase.com/docs/guides/loc
 
 - Daily: review Platform Overview and unresolved alerts.
 - On alert: classify the problem as Lobby, Gateway, Supabase, monitoring, or external game.
-- Weekly: review game trends, errors, database growth, and overdue rounds.
+- Weekly: review game trends, errors, database growth, and overdue financial matches.
 - Monthly: verify a backup can be restored and review alert thresholds.
 - After a production deployment: verify the deployed site, Gateway when changed, and one Loader path.
 
@@ -398,7 +406,7 @@ full activity dashboards can follow when their trusted data exists.
 
 ### Phase 0: Availability
 
-1. Add a non-mutating Gateway health endpoint.
+1. Use the deployed non-mutating Gateway health endpoint.
 2. Confirm the current monitoring vendor, limits, and cost.
 3. Add Lobby and Gateway synthetic checks.
 4. Create the minimal System Health dashboard.
@@ -421,9 +429,10 @@ Only metrics supported by reliable data are shown.
 
 1. Define the shared game-ready, heartbeat, close, and error event contract.
 2. Select one game repository for validation.
-3. Implement stable guest or member identity before publishing DAU, WAU, and MAU.
+3. Define trusted activity events and cross-browser/device reporting rules before
+   publishing DAU, WAU, and MAU.
 4. Enable concurrency and play time after heartbeat is reliable.
-5. Enable RTP only for trusted rounds and wallet data.
+5. Enable RTP only for trusted settlements and wallet data.
 6. Add Game Type Overview when the sample size is useful.
 
 ## Reassessment Triggers
