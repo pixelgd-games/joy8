@@ -10,8 +10,9 @@ The platform includes public Lobby browsing, Google/password/guest member entry,
 persistent player enrollment and one server-authorized wallet/settlement flow.
 The member migrations, four platform foundation migrations and session-scope
 correction and the Joy8 object rebrand are applied; Joy8 Gateway version 1 is active.
-The matching front end is released through main. Product activation and real
-Google/email/linking/recovery acceptance remain outstanding.
+The matching front end is released through main. Cloudflare custom SMTP and
+Turnstile protection are configured for Supabase Auth; product activation and
+real Google/email/linking/recovery acceptance remain outstanding.
 
 Wallet-ledger cleanup, continuous per-hand settlement and the Mahjong private
 schema are installed in Supabase. Mahjong has 22 product tables and a hidden
@@ -511,9 +512,17 @@ session for `pixelgd.games@gmail.com`, organization Pixel GD, project
   The suffix accommodates the encoded `next` and `flow` query parameters while
   keeping the host and member route fixed. The allowlist contains 11 entries in
   total; all former Looty callback URLs have been removed.
-- Email delivery still uses Supabase's built-in testing service. Custom SMTP is
-  not configured. CAPTCHA is off. Hosted password policy and real provider,
-  linking, verification and recovery behavior remain to be validated.
+- Cloudflare Email Sending custom SMTP is active for `Joy8 <no-reply@joy8.cc>`.
+  Supabase Auth continues to issue and validate verification/recovery tokens;
+  the SMTP credential is encrypted in Supabase and is not stored in this repo.
+- The project-wide Auth email limit is 100 messages per hour and the existing
+  per-user minimum interval is 60 seconds. These are abuse limits, not delivery
+  guarantees or a substitute for provider monitoring.
+- Cloudflare Turnstile Managed protection is enabled for Auth on `joy8.cc` and
+  its subdomains. The public site key is used by the member client; the secret
+  exists only in Cloudflare and Supabase. Real signup, verification, recovery,
+  promotion and linking behavior still require end-to-end acceptance with a
+  non-team mailbox.
 
 The CLI wrapper still supports project/migration listing and database reads;
 its combined `config diff` read was denied. The authorized dashboard inspection
@@ -524,7 +533,9 @@ It does not establish that the CLI now has configuration read/write access.
 
 - Hosting: Cloudflare Pages.
 - Production branch: `main`.
-- Production hostnames: `joy8.pages.dev`, `joy8.cc`, and `www.joy8.cc`.
+- Production hostnames: `joy8.cc` and `www.joy8.cc`. The Pages deployment URL
+  `joy8.pages.dev` redirects to the canonical `https://joy8.cc` host while
+  preserving the path, query, and fragment.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.

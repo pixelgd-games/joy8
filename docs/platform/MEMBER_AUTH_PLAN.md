@@ -1,7 +1,7 @@
 # Joy8 Member and Authentication Plan
 
-Status: member migrations and Gateway are active; the matching front end is released from main. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
-Last reviewed: 2026-09-18.
+Status: member migrations and Gateway are active; Cloudflare SMTP and Turnstile are configured for Supabase Auth. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
+Last reviewed: 2026-09-19.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -48,9 +48,9 @@ in the owning repository, not a first-release platform dependency.
 
 - Public member UI and Gateway source now implement the entry/upgrade/recovery
   foundation. The two member migrations are applied and the Gateway is deployed.
-  Hosted entry settings are enabled, but SMTP and real
-  provider acceptance remain pending. [README.md](../../README.md) owns
-  the implementation details and test limits.
+  Hosted entry settings, Cloudflare custom SMTP and Turnstile are enabled.
+  Real provider and email-delivery acceptance remain pending.
+  [README.md](../../README.md) owns the implementation details and test limits.
 - Deletion requests, cleanup/retention, and branded cross-origin entry are not
   implemented. Same-origin `/account/` belongs to Joy8 and returns only to the
   Lobby, a validated `/game/?slug=...`, or `/play-test/?slug=...` route.
@@ -145,10 +145,10 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
   player, wallet, history, or an already active match's accounting obligation.
 - **Recovery:** provide email verification and password reset. Provider accounts
   use provider recovery; guests recover only while their approved session survives.
-- **Email delivery:** configure a production SMTP provider and test delivery
-  before public password registration. Supabase's default sender is for testing;
-  no paid provider or account change is authorized here.
-  Supabase Auth continues to issue and validate verification/recovery tokens.
+- **Email delivery:** Cloudflare Email Sending custom SMTP is configured for
+  `Joy8 <no-reply@joy8.cc>`. Test real delivery before public password
+  registration. Supabase Auth continues to issue and validate
+  verification/recovery tokens.
   Custom delivery does not mean rebuilding password authentication or storing
   passwords in Joy8 tables.
 - **Closure/deletion:** expose a request flow, and separately define Auth/profile
@@ -178,7 +178,7 @@ third stage; no product needs a separate temporary membership system.
 ## Remaining Decisions
 
 - Exact guest-session retention/cleanup and account-closure retention periods.
-- SMTP provider, delivery configuration, and password/abuse policy.
+- Real SMTP delivery acceptance and the final password/abuse policy.
 - Validate implemented linking/conflict handling and member/admin isolation with
   real providers before release; separate-player merging remains unsupported.
 - Branded H5 entry origins, paths, repository ownership, copy, and localization.
@@ -190,29 +190,33 @@ deferred. Purchase launch timing belongs in the product plan.
 
 ## Email Delivery Setup and Acceptance
 
-The user has not selected a production sender or sending domain. Do not guess
-either or deploy a new mail server. Keep custom SMTP configuration pending until
-the service/domain and scope are confirmed. Never request credentials in chat.
+Cloudflare Email Sending is the selected provider. The verified sender is
+`Joy8 <no-reply@joy8.cc>` and Supabase custom SMTP is configured with
+`smtp.mx.cloudflare.net` on port 465. The credential is stored only in provider
+settings; never copy it into chat, source, logs, or documentation. Supabase Auth
+email sending is limited to 100 messages per hour with a 60-second minimum
+interval per user. Cloudflare Turnstile Managed protection is also enabled for
+Auth; its secret is stored only in Cloudflare and Supabase.
 
-1. Confirm the sending domain and sender mailbox; complete the selected provider's
-   domain/DNS verification and delivery authentication.
-2. Configure the provider's SMTP host, port, username/password and sender in the
-   Joy8 project's Auth settings using the authorized account. Store secrets in
-   provider settings only, not front-end environment variables or source.
-3. Retain Joy8's approved Site URL and account callback allowlist. Keep the
+1. Cloudflare sending-domain/DNS verification and Supabase SMTP configuration
+   are complete. Keep credentials in provider settings only.
+2. Retain Joy8's approved Site URL and account callback allowlist. Keep the
    verification link semantics supplied by Auth; no custom token issuer is needed.
-4. Test a new email/password signup, unverified-login rejection, verification,
+   The public Turnstile site key may be used by the client; its secret must
+   remain provider-side.
+3. Test a new email/password signup, unverified-login rejection, verification,
    password reset, guest email promotion, expired/replayed links and an already
    registered address. Confirm the same player and all wallet scopes survive
    promotion. Do not infer email delivery from a successful API response.
-5. Test delivery to a non-project-team mailbox, because the default Supabase
+4. Test delivery to a non-project-team mailbox, because the default Supabase
    sender is restricted to team recipients. Record failures without mail content,
    passwords, codes or token-bearing links.
 
 Google real-account binding acceptance is deferred by the user. Keep it marked
-pending; fixture and guest tests do not replace provider acceptance. Hosted
-password/abuse settings, guest retention, closure policy and branded-entry
-ownership remain separate release gates above.
+pending; fixture and guest tests do not replace provider acceptance. SMTP setup
+is complete, but a successful API response does not prove real delivery. Hosted
+password policy, guest retention, closure policy and branded-entry ownership
+remain separate release gates above.
 
 ## Technical References
 

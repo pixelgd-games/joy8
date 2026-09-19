@@ -60,14 +60,16 @@ saved through the dashboard. The exact current settings and remaining CLI
 configuration-access limitation are recorded in
 [README.md](../../README.md#hosted-auth-configuration). Do not treat that CLI
 limitation as inability to inspect the project or replace the working token
-without evidence. SMTP, hosted password/abuse policy, and real provider acceptance
-remain release gates.
+without evidence. Cloudflare custom SMTP and Turnstile are now configured;
+real email/provider acceptance and the final hosted password policy remain
+release gates.
 
 Current behavior:
 
 - Member entry, persistent guest, promotion, recovery and enrollment checks are
-  implemented. The member migrations and Gateway are active; the matching front
-  end is released from main. Real provider acceptance remains outstanding.
+  implemented. The member migrations and Gateway are active. Cloudflare custom
+  SMTP and Turnstile are configured; real delivery/provider acceptance remains
+  outstanding.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
 - Wallet scope is resolved by trusted platform/game policy. Mahjong's enabled
   zero-credit identity policy does not establish funded-play readiness.
@@ -86,8 +88,10 @@ The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH
 ### Guest Data Growth
 
 Guest entry creates a persistent Auth identity and enrolled player; game launch
-reuses that player's wallet and creates a session. Retention, cleanup and
-public anonymous-signup abuse controls are not finalized.
+reuses that player's wallet and creates a session. Auth entry is protected by
+Cloudflare Turnstile, a 100-message/hour project email limit and a 60-second
+per-user email interval. Retention, cleanup and broader public-signup abuse
+controls are not finalized.
 
 Before volume grows materially:
 
@@ -132,7 +136,10 @@ Direction:
 
 `create-session` requires an allowed Origin and all routes use database-backed IP rate limits. This blocks common cross-origin misuse but does not make Origin an unforgeable client identity.
 
-If production evidence shows abuse, evaluate edge protection, CAPTCHA, device attestation, or a stronger issuance design. Do not add these preemptively without an observed need and a privacy review.
+Cloudflare Turnstile now protects Supabase Auth entry but does not prove identity
+for Gateway session issuance. If production evidence shows Gateway abuse,
+evaluate edge protection, device attestation, or a stronger issuance design with
+a privacy review.
 
 ### Forwarded Client Address Trust Is Unverified
 
@@ -166,8 +173,8 @@ rollback, zero-POINT provisioning and promotion preserving both wallet scopes,
 ledger and reservations. Its engine and fixture limits are documented in
 [README.md](../../README.md#verification). Native PostgreSQL 17.6 also passes
 14 competing-connection cases against that schema. Hosted guest acceptance is limited
-to the checks in README; Google/email, linking, recovery and production load
-remain unverified.
+to the checks in README; Turnstile token forwarding has local coverage, while
+Google/email delivery, linking, recovery and production load remain unverified.
 
 Not fully automated:
 

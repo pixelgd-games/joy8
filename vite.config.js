@@ -1,7 +1,19 @@
 import { defineConfig } from "vite"
 import { resolve } from "path"
 
+const canonicalHostRedirect = {
+  name: "joy8-canonical-host",
+  transformIndexHtml() {
+    return [{
+      tag: "script",
+      children: 'if (location.hostname === "joy8.pages.dev") location.replace("https://joy8.cc" + location.pathname + location.search + location.hash)',
+      injectTo: "head-prepend",
+    }]
+  },
+}
+
 export default defineConfig({
+  plugins: [canonicalHostRedirect],
   build: {
     rollupOptions: {
       input: {

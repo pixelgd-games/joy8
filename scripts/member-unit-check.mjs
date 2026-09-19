@@ -16,8 +16,8 @@ function fixture(initialUser = null) {
     auth: {
       getSession: async () => ok({ session: user ? { user } : null }),
       getUser: async () => ok({ user }),
-      signInAnonymously: async () => {
-        calls.push(["anonymous"])
+      signInAnonymously: async (args) => {
+        calls.push(["anonymous", args])
         await new Promise((resolve) => setTimeout(resolve, 5))
         user = guestUser
         return ok({ user })
@@ -199,13 +199,25 @@ test("invalid or replayed callbacks cannot enroll or fall back to a new guest", 
 
 test("email password sign-in enrolls only after successful authentication", async () => {
   const f = fixture()
-  assert.equal((await f.service.signIn(" player@example.com ", "password" )).player_account_ref, "player-1")
+  assert.equal((await f.service.signIn(" player@example.com ", "password", "captcha-1" )).player_account_ref, "player-1")
   assert.deepEqual(f.calls.map(([name]) => name), ["password", "rpc"])
+  assert.deepEqual(f.calls[0][1].options, { captchaToken: "captcha-1" })
   assert.equal(f.calls[1][1], "joy8-gateway/enroll-member")
   const rejected = fixture()
   rejected.client.auth.signInWithPassword = async () => ({ error: { code: "email_not_confirmed" } })
   await assert.rejects(rejected.service.signIn("player@example.com", "password"), { code: "email_not_confirmed" })
   assert.deepEqual(rejected.calls, [])
+})
+
+test("email signup, recovery and anonymous entry forward captcha tokens", async () => {
+  const f = fixture()
+  await f.service.register("player@example.com", "long-password", "captcha-signup")
+  await f.service.resetPassword("player@example.com", "captcha-recovery")
+  await f.service.guest("captcha-guest")
+  assert.equal(f.calls[0][1].options.captchaToken, "captcha-signup")
+  assert.equal(f.calls[1][2].captchaToken, "captcha-recovery")
+  assert.deepEqual(f.calls[2], ["anonymous", { options: { captchaToken: "captcha-guest" } }])
+  assert.equal(memberErrorMessage({ code: "captcha_required" }), "請先完成安全驗證。")
 })
 
 test("password setup requires verified nonanonymous identity and minimum strength", async () => {

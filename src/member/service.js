@@ -37,6 +37,9 @@ export function memberErrorMessage(error) {
     email_exists: "這個 Email 已有帳號，請改用原帳號登入或找回密碼。",
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
     over_email_send_rate_limit: "驗證信寄送太頻繁，請稍後再試。",
+    captcha_failed: "安全驗證失敗，請重新驗證後再試。",
+    captcha_required: "請先完成安全驗證。",
+    captcha_unavailable: "安全驗證暫時無法載入，請稍後再試。",
     guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 或 Email。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
@@ -70,18 +73,18 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return member
   }
 
-  async function signIn(email, password) {
+  async function signIn(email, password, captchaToken) {
     if ((await session())?.user?.is_anonymous) {
       throw Object.assign(new Error("Upgrade the guest or sign out explicitly"), { code: "identity_conflict" })
     }
-    checked(await client.auth.signInWithPassword({ email: email.trim(), password }))
+    checked(await client.auth.signInWithPassword({ email: email.trim(), password, ...(captchaToken ? { options: { captchaToken } } : {}) }))
     return membership(true)
   }
 
-  async function guest() {
+  async function guest(captchaToken) {
     if (!guestLock) throw Object.assign(new Error("Web Locks unavailable"), { code: "guest_lock_unavailable" })
     return guestLock(async () => {
-      if (!(await session())) checked(await client.auth.signInAnonymously())
+      if (!(await session())) checked(await client.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined))
       return membership(true)
     })
   }
@@ -96,14 +99,14 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return { url: data.url, expectedUserId: current?.user?.id ?? null }
   }
 
-  async function register(email, password) {
+  async function register(email, password, captchaToken) {
     const current = await session()
     if (current?.user?.is_anonymous) {
       checked(await client.auth.updateUser({ email: email.trim() }, { emailRedirectTo: callbackUrl("upgrade") }))
       return { verificationSent: true, expectedUserId: current.user.id }
     }
     if (current) throw new Error("Already signed in")
-    checked(await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: callbackUrl("signup") } }))
+    checked(await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: callbackUrl("signup"), ...(captchaToken ? { captchaToken } : {}) } }))
     return { verificationSent: true, expectedUserId: null }
   }
 
@@ -124,8 +127,8 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return data
   }
 
-  async function resetPassword(email) {
-    checked(await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: callbackUrl("recovery") }))
+  async function resetPassword(email, captchaToken) {
+    checked(await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: callbackUrl("recovery"), ...(captchaToken ? { captchaToken } : {}) }))
   }
 
   async function setPassword(password) {

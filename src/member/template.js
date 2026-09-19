@@ -24,6 +24,7 @@ export const memberCardMarkup = `
             </div>
             <p id="password-hint" class="account-note" hidden>請使用至少 10 個字元。</p>
             <button id="reset-button" type="button" class="account-text account-reset">忘記密碼？</button>
+            <div id="member-captcha" class="account-captcha" aria-label="安全驗證"></div>
             <button id="email-submit" class="account-primary" type="submit">登入</button>
           </form>
           <div id="provider-options">

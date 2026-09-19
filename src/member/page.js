@@ -1,5 +1,6 @@
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
+import { createMemberCaptcha } from "./captcha.js"
 import { createMemberService, memberErrorMessage } from "./service.js"
 
 export function initMemberPanel(root, options = {}) {
@@ -13,6 +14,7 @@ export function initMemberPanel(root, options = {}) {
     next: params.get("next"),
     guestLock: navigator.locks ? (fn) => navigator.locks.request("joy8-guest-entry", fn) : null,
   })
+  const captcha = options.captcha ?? createMemberCaptcha(root)
   const pendingKey = "joy8-member-link-user"
   const entryDescription = $("account-description").textContent
   let user = null
@@ -106,8 +108,12 @@ export function initMemberPanel(root, options = {}) {
   }))
 
   $("guest-button").addEventListener("click", () => run(async () => {
-    await service.guest()
-    continuePlaying()
+    try {
+      await service.guest(await captcha.token())
+      continuePlaying()
+    } finally {
+      captcha.reset()
+    }
   }))
 
   $("email-form").addEventListener("submit", (event) => {
@@ -119,18 +125,23 @@ export function initMemberPanel(root, options = {}) {
     }
     run(async () => {
       const email = $("email").value
-      if (formMode === "reset") {
-        await service.resetPassword(email)
-        sessionStorage.removeItem(pendingKey)
-        status("如果此 Email 可以找回帳號，你會收到重設密碼信。請在這個瀏覽器開啟連結。")
-      } else if (formMode === "register") {
-        const result = await service.register(email, $("password").value)
-        if (result.expectedUserId) sessionStorage.setItem(pendingKey, result.expectedUserId)
-        else sessionStorage.removeItem(pendingKey)
-        status("請到信箱查看驗證信，並在這個瀏覽器開啟連結。若已有帳號，請使用登入或忘記密碼。")
-      } else {
-        await service.signIn(email, $("password").value)
-        continuePlaying()
+      try {
+        const captchaToken = await captcha.token()
+        if (formMode === "reset") {
+          await service.resetPassword(email, captchaToken)
+          sessionStorage.removeItem(pendingKey)
+          status("如果此 Email 可以找回帳號，你會收到重設密碼信。請在這個瀏覽器開啟連結。")
+        } else if (formMode === "register") {
+          const result = await service.register(email, $("password").value, captchaToken)
+          if (result.expectedUserId) sessionStorage.setItem(pendingKey, result.expectedUserId)
+          else sessionStorage.removeItem(pendingKey)
+          status("請到信箱查看驗證信，並在這個瀏覽器開啟連結。若已有帳號，請使用登入或忘記密碼。")
+        } else {
+          await service.signIn(email, $("password").value, captchaToken)
+          continuePlaying()
+        }
+      } finally {
+        captcha.reset()
       }
     })
   })
@@ -176,6 +187,7 @@ export function initMemberPanel(root, options = {}) {
   })
 
   const ready = run(async () => {
+    await captcha.ready
     if (callbackError) throw new Error("Authentication callback failed")
     if (authCode) {
       await service.completeCallback(authCode, sessionStorage.getItem(pendingKey), flow)
@@ -210,6 +222,7 @@ export function initMemberPanel(root, options = {}) {
     ready,
     dispose() {
       disposed = true
+      captcha.dispose()
       window.removeEventListener("focus", onFocus)
       for (const input of root.querySelectorAll('input[type="password"]')) input.value = ""
     },

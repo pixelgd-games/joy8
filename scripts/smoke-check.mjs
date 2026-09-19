@@ -22,6 +22,7 @@ try {
   console.log("Running build...")
   runBuild()
   verifySecurityHeaders()
+  verifyCanonicalHostRedirect()
 
   const appPort = await getFreePort()
   const cdpPort = await getFreePort()
@@ -102,6 +103,26 @@ function verifySecurityHeaders() {
     if (!headers.includes(expected)) throw new Error(`Missing production security header: ${expected}`)
   }
   console.log("OK Production security headers")
+}
+
+function verifyCanonicalHostRedirect() {
+  const entryFiles = [
+    "index.html",
+    "account/index.html",
+    "admin/login/index.html",
+    "admin/games/index.html",
+    "admin/games/new/index.html",
+    "admin/games/edit/index.html",
+    "game/index.html",
+    "play-test/index.html",
+  ]
+  for (const entryFile of entryFiles) {
+    const html = readFileSync(path.join(cwd, "dist", entryFile), "utf8")
+    if (!html.includes('location.hostname === "joy8.pages.dev"') || !html.includes('"https://joy8.cc"')) {
+      throw new Error(`Missing canonical-host redirect: ${entryFile}`)
+    }
+  }
+  console.log("OK Canonical production-host redirect")
 }
 
 function startDevServer(port) {
@@ -581,7 +602,11 @@ async function expectMemberContinuation(client) {
         roots.push(root)
         let complete
         const continued = new Promise(resolve => { complete = resolve })
-        const panel = initMemberPanel(root, { params: new URLSearchParams({ next, ...extra }), onContinue: path => { paths.push(path); complete(path) } })
+        const panel = initMemberPanel(root, {
+          params: new URLSearchParams({ next, ...extra }),
+          onContinue: path => { paths.push(path); complete(path) },
+          captcha: { ready: Promise.resolve(), token: async () => "fixture-captcha", reset() {}, dispose() {} },
+        })
         panels.push(panel)
         return { root, panel, continued }
       }
