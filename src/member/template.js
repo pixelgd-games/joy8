@@ -23,7 +23,6 @@ export const memberCardMarkup = `
               <input id="register-confirm-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" />
             </div>
             <p id="password-hint" class="account-note" hidden>請使用至少 10 個字元。</p>
-            <button id="reset-button" type="button" class="account-text account-reset">忘記密碼？</button>
             <div id="member-captcha" class="account-captcha" aria-label="安全驗證"></div>
             <button id="email-submit" class="account-primary" type="submit">登入</button>
           </form>
@@ -33,7 +32,16 @@ export const memberCardMarkup = `
           </div>
           <button id="guest-button" type="button" class="account-secondary">先以訪客遊玩</button>
           <p id="guest-notice" class="account-note">訪客進度保留在目前瀏覽器。清除資料或換裝置後可能無法找回，建議稍後綁定帳號。</p>
-          <p id="account-switch" class="account-switch"><span id="account-switch-prompt">還沒有帳號？</span> <button id="register-button" type="button" class="account-text">建立帳號</button></p>
+          <div id="account-switch" class="account-switch">
+            <span id="account-switch-prompt" hidden></span>
+            <button id="register-button" type="button" class="account-text">建立帳號</button>
+            <span id="account-switch-separator" aria-hidden="true">·</span>
+            <button id="reset-button" type="button" class="account-text">忘記密碼</button>
+          </div>
+        </div>
+        <div id="completion-panel" class="account-completion" tabindex="-1" hidden>
+          <p id="completion-message"></p>
+          <button id="completion-action" type="button" class="account-primary">返回登入</button>
         </div>
         <form id="new-password-form" hidden>
           <label for="new-password">設定密碼</label>

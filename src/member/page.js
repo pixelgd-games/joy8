@@ -30,6 +30,20 @@ export function initMemberPanel(root, options = {}) {
     $("account-status").dataset.error = String(error)
   }
 
+  function completion(title, message, action = "返回登入") {
+    formMode = "complete"
+    $("account-title").textContent = title
+    $("account-description").hidden = true
+    $("identity-summary").hidden = true
+    $("signin-options").hidden = true
+    $("new-password-form").hidden = true
+    $("completion-message").textContent = message
+    $("completion-action").textContent = action
+    $("completion-panel").hidden = false
+    status()
+    $("completion-panel").focus()
+  }
+
   async function run(action) {
     if (busy || disposed) return
     busy = true
@@ -60,6 +74,10 @@ export function initMemberPanel(root, options = {}) {
     const guest = user?.is_anonymous === true
     const creating = value === "register"
     const emailOnly = value === "reset" || (creating && guest)
+    const signin = value === "signin"
+    $("completion-panel").hidden = true
+    $("identity-summary").hidden = !user
+    $("signin-options").hidden = Boolean(user && !guest)
     $("account-title").textContent = guest ? "訪客帳號" : user ? ["recovery", "upgrade"].includes(flow) ? "設定密碼" : "我的帳號" : value === "register" ? "建立帳號" : value === "reset" ? "找回密碼" : "登入"
     $("account-description").textContent = guest ? "綁定帳號後，可在其他裝置找回進度。" : user || value !== "signin" ? "" : entryDescription
     $("account-description").hidden = !$("account-description").textContent
@@ -72,11 +90,13 @@ export function initMemberPanel(root, options = {}) {
     $("confirm-password-field").hidden = !creating || guest
     $("register-confirm-password").required = creating && !guest
     $("password-hint").hidden = !creating || guest
-    $("reset-button").hidden = value !== "signin" || Boolean(user)
+    $("reset-button").hidden = !signin || Boolean(user)
+    $("account-switch-separator").hidden = !signin || Boolean(user)
     $("email-submit").textContent = value === "reset" ? "寄送重設密碼信" : guest ? "寄送綁定驗證信" : creating ? "寄送帳號驗證信" : "登入"
     $("account-switch").hidden = Boolean(user)
-    $("account-switch-prompt").textContent = creating ? "已經有帳號？" : value === "reset" ? "想起密碼了？" : "還沒有帳號？"
-    $("register-button").textContent = value === "signin" ? "建立帳號" : "返回登入"
+    $("account-switch-prompt").textContent = creating ? "已經有帳號？" : value === "reset" ? "想起密碼了？" : ""
+    $("account-switch-prompt").hidden = signin
+    $("register-button").textContent = signin ? "建立帳號" : "返回登入"
     $("guest-button").hidden = Boolean(user) || value !== "signin"
     $("guest-notice").hidden = Boolean(user) || value !== "signin"
   }
@@ -131,12 +151,12 @@ export function initMemberPanel(root, options = {}) {
         if (formMode === "reset") {
           await service.resetPassword(email, captchaToken)
           sessionStorage.removeItem(pendingKey)
-          status("如果此 Email 可以找回帳號，你會收到重設密碼信。請在這個瀏覽器開啟連結。")
+          completion("請查看信箱", "如果此 Email 可以找回帳號，你會收到重設密碼信。請在這個瀏覽器開啟信件中的連結。")
         } else if (formMode === "register") {
           const result = await service.register(email, $("password").value, captchaToken)
           if (result.expectedUserId) sessionStorage.setItem(pendingKey, result.expectedUserId)
           else sessionStorage.removeItem(pendingKey)
-          status("如果這個 Email 可以建立帳號，你會收到驗證信，請在這個瀏覽器開啟連結。若已有帳號，系統不會再寄註冊信，請使用登入或忘記密碼。")
+          completion("請查看信箱", "如果這個 Email 可以建立帳號，你會收到驗證信。請在這個瀏覽器開啟信件中的連結；若已有帳號，請返回登入或使用忘記密碼。")
         } else {
           await service.signIn(email, $("password").value, captchaToken)
           continuePlaying()
@@ -154,6 +174,10 @@ export function initMemberPanel(root, options = {}) {
   $("reset-button").addEventListener("click", () => {
     status()
     mode("reset")
+  })
+  $("completion-action").addEventListener("click", () => {
+    status()
+    mode(user?.is_anonymous ? "register" : "signin")
   })
   $("enroll-button").addEventListener("click", () => run(async () => {
     await service.membership(true)
@@ -198,8 +222,7 @@ export function initMemberPanel(root, options = {}) {
         if (!signupWasVerifiedWithoutSession(error, flow)) throw error
         flow = null
         await refresh()
-        mode("signin")
-        status("信箱驗證成功，請使用剛設定的 Email 與密碼登入。")
+        completion("信箱驗證完成", "帳號已完成驗證，請返回登入並使用剛設定的 Email 與密碼。")
         return
       }
       sessionStorage.removeItem(pendingKey)

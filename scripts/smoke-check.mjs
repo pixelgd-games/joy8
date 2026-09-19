@@ -408,6 +408,8 @@ async function expectMemberEntry(client, appPort) {
   const controls = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
+      const loginActions = document.getElementById("reset-button").closest("#account-switch")
+        && document.getElementById("account-switch").getBoundingClientRect().top >= document.getElementById("guest-notice").getBoundingClientRect().bottom
       document.getElementById("register-button").click()
       const registration = document.getElementById("password").minLength === 10
         && document.getElementById("password").autocomplete === "new-password"
@@ -429,7 +431,7 @@ async function expectMemberEntry(client, appPort) {
         && document.getElementById("account-title").textContent === "找回密碼"
         && document.getElementById("provider-options").hidden
       document.getElementById("register-button").click()
-      return registration && mismatch && recovery && !document.getElementById("password-field").hidden
+      return loginActions && registration && mismatch && recovery && !document.getElementById("password-field").hidden
         && document.getElementById("account-title").textContent === "登入"
     })()`,
   })
@@ -583,7 +585,7 @@ async function expectMemberContinuation(client) {
     returnByValue: true,
     expression: `Promise.all([import("/src/member/page.js"), import("/src/member/template.js"), import("/src/lib/memberClient.js")]).then(async ([{ initMemberPanel }, { memberCardMarkup }, { memberSupabase }]) => {
       const auth = memberSupabase.auth
-      const saved = Object.fromEntries(["getSession", "signInWithPassword", "signInAnonymously", "exchangeCodeForSession"].map(key => [key, auth[key]]))
+      const saved = Object.fromEntries(["getSession", "signInWithPassword", "signInAnonymously", "signUp", "resetPasswordForEmail", "exchangeCodeForSession"].map(key => [key, auth[key]]))
       const descriptor = Object.getOwnPropertyDescriptor(memberSupabase, "functions")
       let user = null
       const paths = []
@@ -592,6 +594,8 @@ async function expectMemberContinuation(client) {
       auth.getSession = async () => ({ data: { session: user ? { user } : null }, error: null })
       auth.signInWithPassword = async () => { user = { id: "fixture-member", is_anonymous: false }; return { data: { user }, error: null } }
       auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
+      auth.signUp = async () => ({ data: { user: { id: "pending-member" }, session: null }, error: null })
+      auth.resetPasswordForEmail = async () => ({ data: {}, error: null })
       auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
       Object.defineProperty(memberSupabase, "functions", { configurable: true, value: { invoke: async () => ({ data: { member: { player_account_ref: "fixture-player", account_type: user?.is_anonymous ? "guest" : "registered" } }, error: null }) } })
       const mount = (next, extra = {}) => {
@@ -616,6 +620,45 @@ async function expectMemberContinuation(client) {
         root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
       }
       try {
+        const signup = mount("/")
+        await signup.panel.ready
+        signup.root.querySelector("#register-button").click()
+        signup.root.querySelector("#email").value = "fixture@example.invalid"
+        signup.root.querySelector("#password").value = "fixture-password"
+        signup.root.querySelector("#register-confirm-password").value = "fixture-password"
+        signup.root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const signupComplete = signup.root.querySelector("#account-title").textContent === "請查看信箱"
+          && !signup.root.querySelector("#completion-panel").hidden
+          && signup.root.querySelector("#signin-options").hidden
+          && signup.root.querySelector("#completion-message").textContent.includes("驗證信")
+        signup.root.querySelector("#completion-action").click()
+        const signupReturned = signup.root.querySelector("#account-title").textContent === "登入"
+          && signup.root.querySelector("#completion-panel").hidden
+          && !signup.root.querySelector("#signin-options").hidden
+        signup.panel.dispose()
+        user = null
+        const reset = mount("/")
+        await reset.panel.ready
+        reset.root.querySelector("#reset-button").click()
+        reset.root.querySelector("#email").value = "fixture@example.invalid"
+        reset.root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
+        await new Promise(resolve => setTimeout(resolve, 0))
+        const resetComplete = reset.root.querySelector("#account-title").textContent === "請查看信箱"
+          && !reset.root.querySelector("#completion-panel").hidden
+          && reset.root.querySelector("#signin-options").hidden
+          && reset.root.querySelector("#completion-message").textContent.includes("重設密碼信")
+        reset.panel.dispose()
+        user = null
+        auth.exchangeCodeForSession = async () => ({ data: { user: null, session: null }, error: { code: "pkce_code_verifier_not_found" } })
+        const verified = mount("/", { code: "fixture-code", flow: "signup" })
+        await verified.panel.ready
+        const verifiedComplete = verified.root.querySelector("#account-title").textContent === "信箱驗證完成"
+          && !verified.root.querySelector("#completion-panel").hidden
+          && verified.root.querySelector("#signin-options").hidden
+        verified.panel.dispose()
+        auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
+        user = null
         const password = mount("/game/?slug=password-game")
         await password.panel.ready
         submit(password.root)
@@ -643,7 +686,7 @@ async function expectMemberContinuation(client) {
         user = null
         const callback = mount("/game/?slug=callback-game", { code: "fixture-code", flow: "signin" })
         await callback.panel.ready
-        return paths
+        return { paths, signupComplete, signupReturned, resetComplete, verifiedComplete }
       } finally {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
@@ -653,10 +696,12 @@ async function expectMemberContinuation(client) {
       }
     })`,
   })
-  if (result.exceptionDetails || JSON.stringify(result.result.value) !== JSON.stringify(["/game/?slug=password-game", "/game/?slug=guest-game", "/game/?slug=callback-game"])) {
+  const expectedPaths = ["/game/?slug=password-game", "/game/?slug=guest-game", "/game/?slug=callback-game"]
+  const value = result.result.value
+  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.signupComplete || !value?.signupReturned || !value?.resetComplete || !value?.verifiedComplete) {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
-  console.log("OK Password, guest and callback continuation; late completion cannot launch a cancelled game")
+  console.log("OK Member completion states, password, guest and callback continuation; late completion cannot launch a cancelled game")
 }
 
 async function expectGameIframeSecurity(client) {
