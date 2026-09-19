@@ -157,8 +157,9 @@ echo endpoint. Local mocked headers and IP-format validation cannot prove this.
 
 ### Automation Coverage
 
-Current local checks cover the static build, key pages, iframe restrictions,
-load timeout, cover fallback, error presentation, member service logic, Gateway
+Current local checks cover the static build and production security-header artifact,
+key pages, iframe restrictions, credential-free launch URLs, load timeout,
+Joy8-managed cover validation and fallback, error presentation, member service logic, Gateway
 membership authorization, safe return paths, and responsive member UI. The
 isolated member SQL suite loads the current platform migrations and checks roles,
 rollback, zero-POINT provisioning and promotion preserving both wallet scopes,
@@ -172,7 +173,7 @@ Not fully automated:
 
 - Loader success from session creation through a real game iframe.
 - Admin create, edit, delete, publish, and ordering flows.
-- URL-helper and admin-form validation.
+- Full browser-level admin-form validation.
 - Every Gateway request validator and public error mapping.
 - Browser-level member-versus-guest session behavior.
 - Accessibility behavior for modal focus and keyboard navigation.

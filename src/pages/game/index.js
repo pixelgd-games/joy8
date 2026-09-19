@@ -1,5 +1,5 @@
 import { supabase, supabaseFunctionsUrl } from "../../lib/supabaseClient.js"
-import { appendQueryParams, normalizeLaunchUrl } from "../../lib/urls.js"
+import { normalizeLaunchUrl } from "../../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { mountGameFrame } from "./iframe.js"
 import { memberSupabase } from "../../lib/memberClient.js"
@@ -138,20 +138,20 @@ async function main() {
 
 function mountSession(gameUrl, gameName, launchSession) {
   const gatewayUrl = supabaseFunctionsUrl ? `${supabaseFunctionsUrl}/joy8-gateway` : ""
-  const sessionGameUrl = appendQueryParams(gameUrl, {
+  const launch = {
     joy8_session_id: launchSession.session_id,
     joy8_launch_code: launchSession.launch_code,
     joy8_game_id: launchSession.game_id,
     joy8_currency: launchSession.currency,
     joy8_gateway_url: gatewayUrl,
     joy8_protocol: "server-v1",
-  })
+  }
 
-  if (!sessionGameUrl) {
+  if (!gatewayUrl) {
     showError({
       code: ERROR_CODES.GAME_URL_INVALID,
-      title: "Game URL is invalid",
-      message: "Joy8 could not prepare the game launch URL.",
+      title: "Gateway URL is invalid",
+      message: "Joy8 could not prepare the secure game launch.",
     })
     return
   }
@@ -159,7 +159,7 @@ function mountSession(gameUrl, gameName, launchSession) {
   document.getElementById("private-start")?.remove()
   const copy = document.querySelector(".loader-copy")
   if (copy) copy.textContent = "正在進入遊戲…"
-  mountGameIframe(sessionGameUrl, gameName)
+  mountGameIframe(gameUrl, gameName, launch)
   primeParentScroll()
 }
 
@@ -183,7 +183,7 @@ async function createLaunchSession(gameSlug) {
   return data
 }
 
-function mountGameIframe(gameUrl, gameName) {
+function mountGameIframe(gameUrl, gameName, launch) {
   const gameRoot = document.getElementById("game")
   if (!gameRoot) return
 
@@ -191,6 +191,7 @@ function mountGameIframe(gameUrl, gameName) {
     gameRoot,
     gameUrl,
     gameName,
+    launch,
     timeoutMs: GAME_LOAD_TIMEOUT_MS,
     onLoad: hideLoading,
     onTimeout: () => {
@@ -224,8 +225,9 @@ function failed(error) {
 
 if (privateEntry) {
   const card = document.querySelector(".loader-card")
-  card.querySelector(".loader-ring")?.remove()
-  card.querySelector(".loader-copy").textContent = "登入 Joy8 或使用快速登入，即可進入測試。"
+  card?.querySelector(".loader-ring")?.remove()
+  const privateCopy = card?.querySelector(".loader-copy")
+  if (privateCopy) privateCopy.textContent = "登入 Joy8 或使用快速登入，即可進入測試。"
   const button = document.createElement("button")
   button.id = "private-start"
   button.type = "button"
@@ -239,7 +241,8 @@ if (privateEntry) {
     try { await main() } catch (error) { failed(error) }
     finally { button.disabled = false }
   })
-  card.append(button, status)
+  if (card) card.append(button, status)
+  else failed(new Error("Private Loader card is missing"))
 } else {
   main().catch(failed)
 }

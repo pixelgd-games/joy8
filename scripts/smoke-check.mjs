@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
@@ -21,6 +21,7 @@ let browser
 try {
   console.log("Running build...")
   runBuild()
+  verifySecurityHeaders()
 
   const appPort = await getFreePort()
   const cdpPort = await getFreePort()
@@ -88,6 +89,19 @@ function runBuild() {
   if (result.status !== 0) {
     throw new Error(`Build failed with status ${result.status}.`)
   }
+}
+
+function verifySecurityHeaders() {
+  const headers = readFileSync(path.join(cwd, "dist", "_headers"), "utf8")
+  for (const expected of [
+    "Content-Security-Policy: frame-ancestors 'none'",
+    "X-Frame-Options: DENY",
+    "X-Content-Type-Options: nosniff",
+    "Referrer-Policy: strict-origin-when-cross-origin",
+  ]) {
+    if (!headers.includes(expected)) throw new Error(`Missing production security header: ${expected}`)
+  }
+  console.log("OK Production security headers")
 }
 
 function startDevServer(port) {
@@ -322,8 +336,8 @@ async function expectPrivateEntry(client, appPort) {
   const launched = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`new Promise(resolve=>setTimeout(()=>{
     const iframe=document.querySelector("iframe")
     const url=iframe && new URL(iframe.src)
-    resolve(Boolean(url && url.searchParams.get("joy8_launch_code")==="fixture-only-code"
-      && !url.searchParams.has("access_token") && iframe.referrerPolicy==="no-referrer"
+    resolve(Boolean(url && ![...url.searchParams.keys()].some(key=>key.startsWith("joy8_"))
+      && !iframe.src.includes("fixture-only-code") && !url.searchParams.has("access_token") && iframe.referrerPolicy==="no-referrer"
       && window.privateCalls.filter(x=>x.route.endsWith("/private-session")).length===2
       && !JSON.stringify({...localStorage,...sessionStorage}).includes("fixture-only-code")))
   },100))` })
@@ -698,14 +712,15 @@ async function expectLaunchUrlPolicy(client) {
     awaitPromise: true,
     returnByValue: true,
     expression: `
-      import("/src/lib/urls.js").then(({ appendQueryParams, normalizeLaunchUrl }) => ({
+      import("/src/lib/urls.js").then(({ normalizeCoverPath, normalizeLaunchUrl }) => ({
         secure: normalizeLaunchUrl("https://game.example/play") === "https://game.example/play",
         rootRelative: normalizeLaunchUrl("/game/local/?mode=test") === "/game/local/?mode=test",
         localHttp: normalizeLaunchUrl("http://localhost:8080/play") === "http://localhost:8080/play",
         externalHttpBlocked: normalizeLaunchUrl("http://game.example/play") === "",
         protocolRelativeBlocked: normalizeLaunchUrl("//game.example/play") === "",
-        insecureAppendBlocked: appendQueryParams("http://game.example/play", { session: "test" }) === "",
-        staleExchangeRemoved: !appendQueryParams("https://game.example/?joy8_exchange_url=old", { joy8_exchange_url: "" }).includes("joy8_exchange_url"),
+        validCover: normalizeCoverPath("/games/test-game/cover.webp", "test-game") === "/games/test-game/cover.webp",
+        externalCoverBlocked: normalizeCoverPath("https://game.example/cover.webp", "test-game") === "",
+        wrongSlugCoverBlocked: normalizeCoverPath("/games/other/cover.webp", "test-game") === "",
       }))
     `,
   })
@@ -736,8 +751,6 @@ async function expectLobbyThumbnailFallback(client) {
           type: "arcade",
         }])
 
-        const image = root.querySelector("img")
-        image.dispatchEvent(new Event("error"))
         const poster = root.querySelector(".game-tile-poster")
 
         return {

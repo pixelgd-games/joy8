@@ -182,10 +182,11 @@ The responsive Lobby uses four columns on touch devices with a low-height landsc
 2. It loads the matching published game from `public_games_v1`.
 3. It normalizes `launch_url` as an HTTPS URL or a root-relative platform path. HTTP is accepted only between loopback hosts during local development.
 4. It calls `joy8-gateway/create-session`.
-5. It appends the returned session parameters to the game URL.
-6. It creates the iframe with the Joy8 sandbox, permissions, referrer policy, and load timeout.
+5. It creates the iframe from the catalog URL without putting launch credentials in that URL.
+6. The game announces its Joy8 Client from an approved parent origin, then the
+   Loader delivers the session parameters once through an origin-checked in-memory message.
 
-The iframe receives:
+The iframe receives this launch payload through `postMessage`:
 
 - `joy8_session_id`
 - `joy8_launch_code`
@@ -194,7 +195,11 @@ The iframe receives:
 - `joy8_protocol` (`server-v1`)
 - `joy8_gateway_url`
 
-The launch code is single-use and valid for two minutes. The trusted game backend exchanges it for an in-memory, balance-only token valid for at most 15 minutes and no later than session expiry. The Loader never passes a Supabase anonymous key, member JWT, or service-role key into the iframe.
+The launch code is single-use and valid for two minutes. It never enters the
+game URL, HTTP request, browser storage or Analytics. The trusted game backend
+exchanges it for an in-memory, balance-only token valid for at most 15 minutes
+and no later than session expiry. The Loader never passes a Supabase anonymous
+key, member JWT, or service-role key into the iframe.
 
 The full game-facing contract is in `docs/platform/GAME_PLATFORM_INTEGRATION.md`.
 
@@ -253,6 +258,7 @@ Current safeguards include:
 - POINT validation and trusted per-game wallet policy.
 - Idempotent atomic match settlement.
 - Game-scoped backend keys and reservation/participant isolation.
+- `Cache-Control: no-store` on every JSON response, including launch and renewed tokens.
 
 The Gateway uses `verify_jwt=false` because it performs its own launch-code, token, origin, scope, session, and rate-limit checks. Its protected database RPCs are granted only to `service_role`.
 
@@ -522,13 +528,16 @@ It does not establish that the CLI now has configuration read/write access.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- `public/_headers` denies framing of Joy8 pages and supplies the production
+  content-type and referrer protections copied into the Cloudflare Pages build.
 
 A push to `main` triggers production deployment. Do not push documentation or code changes unless the user explicitly requests it.
 
 Joy8 remains on Cloudflare Pages. Mahjong H5 is planned for separate static
-hosting on Cloudflare, but its upload is deferred until asset/readiness work is
-complete. Godot remains local during development; GCP/VPS selection and payment
-are deferred until external multiplayer testing requires an always-on server.
+hosting on Cloudflare, but it is not part of the current Joy8 deployment and
+still requires its own asset/readiness review. Godot remains local during
+development; GCP/VPS selection and payment are deferred until external
+multiplayer testing requires an always-on server.
 SMTP belongs to Joy8/Supabase Auth and does not depend on that server host.
 
 The Supabase `joy8-gateway` Edge Function is deployed separately from Cloudflare

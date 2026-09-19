@@ -4,7 +4,7 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-18. The server-authorized base and continuous
+Current source reviewed: 2026-09-19. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
 version 8 includes private entry and the settlement-error mappings.
 See [README.md](../../README.md) for verification and product-activation limits.
@@ -78,14 +78,15 @@ Do not modify a game repository from a Joy8 repository task. Switch to the named
 5. The Gateway requires a verified Supabase user session and existing enrollment,
    including a persistent anonymous Auth session for guests.
 6. The reviewed session RPC resolves the enrolled platform player and configured wallet.
-7. The Loader appends the returned session parameters to the game URL.
-8. The Loader creates the iframe.
+7. The Loader creates the iframe from the catalog URL without launch parameters.
+8. The game announces a ready Joy8 Client from an approved parent origin; the
+   Loader verifies that frame and delivers the launch payload once in memory.
 9. The game backend exchanges the launch code once, then gives the client a balance-only token.
 10. The client keeps that token in memory; financial operations belong to the game backend.
 
 The current Loader requests `POINT` with a one-hour session expiry.
 
-## Loader Query Parameters
+## Loader In-Memory Handoff
 
 ### Private test entry
 
@@ -115,9 +116,21 @@ See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
 | `joy8_protocol` | Protocol version | Must be `server-v1` |
 | `joy8_gateway_url` | Gateway base URL | Use for wallet routes |
 
-The Loader supplies these parameters, but URL values remain untrusted inputs.
-Validate the configured Gateway origin and derive identity, game, wallet, and
-permissions from the trusted exchange result, never from URL claims alone.
+The Joy8 Client installs its message listener before loading the game runtime,
+rejects any retired `joy8_*` query transport and sends
+`{type:"joy8-launch-ready-v1",protocol:"server-v1"}` to its configured Joy8
+parent origins. The Loader accepts that readiness message only from the mounted
+iframe and expected game origin, then sends exactly one
+`{type:"joy8-launch-v1",launch:{...}}` response. The game accepts it only from
+`window.parent` at an approved Joy8 origin, validates the exact field set and
+trusted Gateway/game configuration, removes the listener and exposes the launch
+code to its runtime once. A missing or invalid message fails visibly without a
+Local Client fallback.
+
+No launch field is appended to the iframe URL. The launch code therefore never
+enters the initial HTTP request, CDN/access log, browser storage or Analytics.
+Identity, game, wallet and permissions still come only from the trusted exchange
+result, never from message claims. There is no query-parameter compatibility path.
 
 ## Iframe Contract
 
@@ -131,7 +144,10 @@ referrerpolicy="no-referrer"
 
 For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader uses eager loading and a 30-second load-event timeout.
 
-The current timeout observes the iframe `load` event, not game readiness. If a future ready handshake is introduced, it must extend this contract explicitly; a game-specific workaround must not replace the platform behavior.
+The credential-ready message only proves that the game installed its Joy8 Client;
+it is not gameplay readiness. The current 30-second timeout still observes the
+iframe `load` event. A future gameplay-ready or heartbeat signal must extend this
+contract explicitly rather than treating credential delivery as readiness.
 
 The game is responsible for allowing Joy8 to embed it and for functioning under this sandbox. If CSP, `X-Frame-Options`, resource loading, or in-game rendering fails, diagnose and report the game-side problem; do not weaken the platform shell without a security review.
 
@@ -233,8 +249,8 @@ order and value spelling are part of the retry identity.
 
 ### Exchange, Renewal and Re-entry
 
-The Loader supplies `joy8_protocol=server-v1`,
-the one-use launch code and public correlation IDs. There is no browser exchange endpoint.
+The Loader supplies `joy8_protocol=server-v1`, the one-use launch code and public
+correlation IDs through the in-memory handoff. There is no browser exchange endpoint.
 The game sends the code to its own authenticated backend handoff; that backend
 is the sole redeemer through `server-exchange-v1`:
 
@@ -247,9 +263,9 @@ exchange result for player/game binding. Return fields are `version`,
 `session_id`, `game_id`, `player_account_ref`, `account_type`, `wallet_scope`
 (`platform` or `game`), `currency` (`POINT`),
 `gateway_token`, `gateway_token_expires_at`, `expires_at`, and `scopes:["balance"]`.
-The game may receive the short-lived balance token, never the backend key.
-Capture and remove launch credentials from the game's URL before telemetry,
-resource links or game navigation. Keep game credentials only in memory.
+The game may receive the short-lived balance token, never the backend key. Keep
+game credentials only in memory. Reject any launch credential found in a URL;
+do not retain a compatibility parser for the retired query transport.
 
 `server-renew-v1` takes `{"version":1,"session_id":"<UUID>"}` and returns the
 same shape with a new balance token. Renewal invalidates the previous token;
@@ -509,7 +525,9 @@ Before listing a game through the Joy8 Lobby:
 3. Confirm CSP and `X-Frame-Options` allow Joy8 embedding.
 4. Verify the game runs with the documented iframe sandbox and permissions.
 5. Implement an explicit Joy8 Client; do not detect Joy8 from iframe presence.
-6. Use the designated single launch-code redeemer; keep client game tokens in memory and validate the server handoff.
+6. Implement the origin-checked ready/launch message handoff, use the designated
+   single launch-code redeemer, keep client game tokens in memory and validate
+   the server handoff.
 7. Use a stable `match_ref` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
 9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance.

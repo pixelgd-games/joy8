@@ -1,4 +1,5 @@
 import assert from "node:assert/strict"
+import { readFile } from "node:fs/promises"
 
 const originalFetch = globalThis.fetch
 let handleRequest
@@ -17,7 +18,11 @@ globalThis.Deno = {
 }
 
 try {
-  const { callRpc, resolveAuthUser } = await import("../supabase/functions/joy8-gateway/index.ts")
+  const { callRpc, resolveAuthUser, SERVER_ERROR_STATUSES } = await import("../supabase/functions/joy8-gateway/index.ts")
+  const integrationContract = await readFile(new URL("../docs/platform/GAME_PLATFORM_INTEGRATION.md", import.meta.url), "utf8")
+  const stableErrorTable = integrationContract.split("| HTTP | Stable errors |")[1]?.split("\n\n")[0] || ""
+  const documentedServerErrors = [...stableErrorTable.matchAll(/`(JOY8_[A-Z_]+)`/g)].map((match) => match[1]).sort()
+  assert.deepEqual(Object.keys(SERVER_ERROR_STATUSES).sort(), documentedServerErrors)
 
   globalThis.fetch = async () => ({
     ok: true,
@@ -148,6 +153,7 @@ try {
   memberRows = [{ player_account_id: "player-1", account_type: "guest" }]
   const launched = await request("create-session", { slug: "test", auth_user_id: "victim" })
   assert.equal(launched.status, 200)
+  assert.equal(launched.headers.get("cache-control"), "no-store")
   assert.equal((await launched.json()).account_type, "guest")
   assert.equal(rpcCalls.find(({ name }) => name === "create_game_session").args.p_auth_user_id, "verified-user")
 
@@ -222,7 +228,7 @@ try {
   assert.equal((await request("server-open-v1", [], key, null)).status, 400)
   assert.equal((await request("server-open-v1", { data: "x".repeat(17000) }, key, null)).status, 400)
   assert.equal(serverCalls.length, count)
-  for (const [code, status] of [["JOY8_BACKEND_UNAUTHORIZED", 401], ["JOY8_IDEMPOTENCY_CONFLICT", 409], ["JOY8_SETTLEMENT_SEQUENCE", 409], ["JOY8_WALLET_INACTIVE", 403], ["JOY8_MATCH_NOT_FOUND", 404]]) {
+  for (const [code, status] of Object.entries(SERVER_ERROR_STATUSES)) {
     serverError = { message: code }
     const response = await request("server-settle-v1", {}, key, null)
     assert.equal(response.status, status)

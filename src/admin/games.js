@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabaseClient.js"
-import { normalizeLaunchUrl } from "../lib/urls.js"
+import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
 import { requireAdmin, signOut } from "./auth.js"
 
@@ -105,7 +105,7 @@ function createGameRow(game) {
   row.append(
     createTextCell(game.name),
     createTextCell(game.slug),
-    createLinkCell(game.thumbnail, "thumbnail"),
+    createLinkCell(normalizeCoverPath(game.thumbnail, game.slug), "thumbnail", Boolean(game.thumbnail)),
     createTextCell(game.type),
     createTextCell(game.supports_live ? "是" : "否"),
     createTextCell(game.published ? "是" : "否"),
@@ -123,12 +123,12 @@ function createTextCell(value) {
   return cell
 }
 
-function createLinkCell(rawUrl, label) {
+function createLinkCell(rawUrl, label, invalid = false) {
   const cell = document.createElement("td")
   const href = normalizeLaunchUrl(rawUrl)
 
   if (!href) {
-    if (rawUrl) cell.textContent = "URL 格式不支援"
+    if (rawUrl || invalid) cell.textContent = "URL 格式不支援"
     return cell
   }
 

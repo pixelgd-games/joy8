@@ -1,4 +1,5 @@
 import { buildGameUrl, getGameTypeLabel } from "./utils.js"
+import { normalizeCoverPath } from "../../lib/urls.js"
 
 const TEXT = {
   openGame: "Open game",
@@ -72,12 +73,13 @@ function createGameTile(game) {
 
 function createTilePoster(game, gameUrl) {
   const displayName = getDisplayName(game)
+  const thumbnail = normalizeCoverPath(game.thumbnail, game.slug)
   const poster = document.createElement("a")
   poster.className = "game-tile-poster"
   poster.href = gameUrl
   poster.setAttribute("aria-label", `${TEXT.openGame}: ${displayName}`)
 
-  if (shouldShowThumbnail(game)) {
+  if (thumbnail) {
     const image = document.createElement("img")
     image.className = "game-tile-poster-image"
     image.alt = ""
@@ -87,7 +89,7 @@ function createTilePoster(game, gameUrl) {
       image.remove()
       poster.classList.add("is-empty")
     }, { once: true })
-    image.src = game.thumbnail
+    image.src = thumbnail
     poster.append(image)
   } else {
     poster.classList.add("is-empty")
@@ -135,8 +137,4 @@ function getDisplayName(game) {
     .join(" ")
 
   return slugName || "Untitled Game"
-}
-
-function shouldShowThumbnail(game) {
-  return Boolean(game.thumbnail)
 }

@@ -28,33 +28,13 @@ export function normalizeLaunchUrl(rawValue) {
   }
 }
 
-export function appendQueryParams(rawValue, params) {
-  const value = normalizeLaunchUrl(rawValue)
-  if (!value) return ""
+export function normalizeCoverPath(rawValue, slug) {
+  const value = String(rawValue || "").trim()
+  const normalizedSlug = String(slug || "").trim()
+  if (!value || !/^[a-z0-9-]+$/.test(normalizedSlug)) return ""
 
-  try {
-    const isRootRelative = ROOT_RELATIVE_PATH.test(value)
-    const url = new URL(value, isRootRelative ? getBaseOrigin() : undefined)
-    for (const key of [...url.searchParams.keys()]) {
-      if (key.startsWith("joy8_")) url.searchParams.delete(key)
-    }
-
-    for (const [key, paramValue] of Object.entries(params || {})) {
-      if (paramValue === undefined || paramValue === null || paramValue === "") {
-        url.searchParams.delete(key)
-        continue
-      }
-      url.searchParams.set(key, String(paramValue))
-    }
-
-    if (isRootRelative) {
-      return `${url.pathname}${url.search}${url.hash}`
-    }
-
-    return url.href
-  } catch {
-    return ""
-  }
+  const expected = `/games/${normalizedSlug}/cover.webp`
+  return value === expected ? expected : ""
 }
 
 function getBaseOrigin() {

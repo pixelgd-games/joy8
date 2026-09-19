@@ -1,5 +1,5 @@
 import { supabase } from "../lib/supabaseClient.js";
-import { normalizeLaunchUrl } from "../lib/urls.js";
+import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js";
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js";
 import { requireAdmin } from "./auth.js";
 
@@ -89,15 +89,20 @@ async function submitForm(e) {
   if (!sortOrderCheck.ok) return showValidationError(sortOrderCheck.msg);
   const launchUrlInput = val("launch_url").trim();
   const launchUrl = normalizeLaunchUrl(launchUrlInput);
+  const thumbnailInput = val("thumbnail").trim();
+  const thumbnail = normalizeCoverPath(thumbnailInput, slugCheck.slug);
 
   if (launchUrlInput && !launchUrl) {
     return showValidationError("launch url 只能使用 https://、/ 開頭的站內路徑或本機開發網址");
+  }
+  if (thumbnailInput && !thumbnail) {
+    return showValidationError(`封面必須使用 /games/${slugCheck.slug}/cover.webp`);
   }
 
   const payload = {
     name,
     slug: slugCheck.slug,
-    thumbnail: val("thumbnail").trim(),
+    thumbnail,
     type: val("type"),
     supports_live: checked("supports_live"),
     published: checked("published"),
@@ -108,6 +113,9 @@ async function submitForm(e) {
   if (!payload.name) return showValidationError("名稱不能為空");
   if (payload.published && !launchUrl) {
     return showValidationError("已上架遊戲需要 launch url");
+  }
+  if (payload.published && !thumbnail) {
+    return showValidationError("已上架遊戲需要符合規格的 Joy8 封面");
   }
 
   const submitBtn = form.querySelector('button[type="submit"]');

@@ -57,20 +57,6 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4173",
   "http://127.0.0.1:4173",
 ]
-const ROUTES = new Set([
-  "health",
-  "server-exchange-v1",
-  "server-renew-v1",
-  "server-open-v1",
-  "server-settle-v1",
-  "server-status-v1",
-  "server-cancel-v1",
-  "member",
-  "enroll-member",
-  "create-session",
-  "private-session",
-  "balance",
-])
 const RATE_LIMITS: Record<string, RateLimitConfig> = {
   health: { limit: 30, windowSeconds: 60 },
   "server-exchange-v1": { limit: 120, windowSeconds: 60 },
@@ -85,6 +71,29 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
   "private-session": { limit: 30, windowSeconds: 300 },
   balance: { limit: 120, windowSeconds: 60 },
 }
+const ROUTES = new Set(Object.keys(RATE_LIMITS))
+export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.freeze({
+  JOY8_BACKEND_UNAUTHORIZED: 401,
+  JOY8_GAME_NOT_READY: 403,
+  JOY8_PLAYER_INACTIVE: 403,
+  JOY8_WALLET_INACTIVE: 403,
+  JOY8_SESSION_INVALID: 403,
+  JOY8_ADAPTER_UNAVAILABLE: 503,
+  JOY8_ADAPTER_REJECTED: 409,
+  JOY8_INVALID_REQUEST: 400,
+  JOY8_INVALID_AMOUNT: 400,
+  JOY8_INVALID_ENTRY: 400,
+  JOY8_LIMIT_EXCEEDED: 400,
+  JOY8_RULE_MISMATCH: 409,
+  JOY8_IDEMPOTENCY_CONFLICT: 409,
+  JOY8_MATCH_FINALIZED: 409,
+  JOY8_MATCH_NOT_FOUND: 404,
+  JOY8_UNBALANCED_SETTLEMENT: 400,
+  JOY8_WALLET_OCCUPIED: 409,
+  JOY8_INSUFFICIENT_BALANCE: 409,
+  JOY8_SETTLEMENT_SEQUENCE: 409,
+  JOY8_UPSTREAM_UNAVAILABLE: 503,
+})
 const PUBLIC_RPC_MESSAGES = new Set([
   "game is not available", "game session is not active", "player account is not active",
   "player membership is required", "verified member identity is required",
@@ -204,16 +213,7 @@ async function serverOperation(route: string, request: Request, headers: Headers
   if (!result.ok) {
     const error = result.body as { message?: string; code?: string } | null
     const code = error?.message ?? ""
-    const statuses: Record<string, number> = {
-      JOY8_BACKEND_UNAUTHORIZED: 401, JOY8_GAME_NOT_READY: 403, JOY8_PLAYER_INACTIVE: 403,
-      JOY8_WALLET_INACTIVE: 403, JOY8_SESSION_INVALID: 403, JOY8_ADAPTER_UNAVAILABLE: 503,
-      JOY8_ADAPTER_REJECTED: 409, JOY8_INVALID_REQUEST: 400, JOY8_INVALID_AMOUNT: 400,
-      JOY8_INVALID_ENTRY: 400, JOY8_LIMIT_EXCEEDED: 400, JOY8_RULE_MISMATCH: 409,
-      JOY8_IDEMPOTENCY_CONFLICT: 409, JOY8_MATCH_FINALIZED: 409, JOY8_MATCH_NOT_FOUND: 404,
-      JOY8_UNBALANCED_SETTLEMENT: 400, JOY8_WALLET_OCCUPIED: 409, JOY8_INSUFFICIENT_BALANCE: 409,
-      JOY8_SETTLEMENT_SEQUENCE: 409,
-    }
-    if (statuses[code]) return jsonResponse({ error: code }, statuses[code], headers)
+    if (SERVER_ERROR_STATUSES[code]) return jsonResponse({ error: code }, SERVER_ERROR_STATUSES[code], headers)
     if (error?.code === "22P02") return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
     return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
   }
@@ -261,7 +261,7 @@ async function createPrivateSession(request: Request, headers: HeadersInit): Pro
   if (!row || Array.isArray(row) || !row.session_id || !row.launch_code || !row.game_id || !row.launch_url || row.protocol !== "server-v1") {
     return jsonResponse({ error: "Gateway returned an empty session" }, 502, headers)
   }
-  return jsonResponse(row, 200, { ...headers, "Cache-Control": "no-store" })
+  return jsonResponse(row, 200, headers)
 }
 
 async function createSession(request: Request, headers: HeadersInit): Promise<Response> {
@@ -447,7 +447,7 @@ async function enforceRateLimit(
   const config = RATE_LIMITS[route]
 
   if (!config) {
-    return null
+    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
   }
 
   const clientAddress = getClientAddress(request)
@@ -527,6 +527,7 @@ function buildCorsHeaders(
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
     "X-Joy8-Request-Id": requestId,
     Vary: "Origin",
   }
