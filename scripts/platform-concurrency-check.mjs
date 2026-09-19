@@ -9,27 +9,27 @@ const db = await createLocalPostgres()
 const secret = randomBytes(32).toString("hex")
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 const launchSql = "select * from public.create_game_session('test-game','POINT',3600,null,$1)"
-const openSql = "select public.looty_open_match_v1($1,$2::jsonb) result"
-const settleSql = "select public.looty_settle_match_v1($1,$2::jsonb) result"
+const openSql = "select public.joy8_open_match_v1($1,$2::jsonb) result"
+const settleSql = "select public.joy8_settle_match_v1($1,$2::jsonb) result"
 let game
 before(async () => {
   await loadPlatformDatabase(db)
   game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("insert into public.looty_wallet_policies(initial_credit,enabled) values(1000,true) returning id")).id
-  await db.query("insert into public.looty_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [game, policy])
-  await db.query("insert into public.looty_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.looty_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
+  const policy = (await one("insert into public.joy8_wallet_policies(initial_credit,enabled) values(1000,true) returning id")).id
+  await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [game, policy])
+  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
 })
 after(() => db.close())
 
 async function identity() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
-  const member = await one("select * from public.looty_resolve_member($1,true)", [auth])
+  const member = await one("select * from public.joy8_resolve_member($1,true)", [auth])
   return { auth, id: member.player_account_id }
 }
 async function ready() {
   const player = await identity()
   const session = await one(launchSql, [player.auth])
-  await db.query("select public.looty_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: session.launch_code })])
+  await db.query("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: session.launch_code })])
   return { ...player, ...session }
 }
 const opening = (members, ref = randomUUID()) => ({ version: 1, match_ref: ref, rule_version: "v1", participants: members.map(p => ({ session_id: p.session_id, reserve: "100.00" })) })
@@ -42,7 +42,7 @@ async function race(hold, holdValues, works, release = "commit") {
     for (const [sql, values, role = "service_role"] of works) {
       const client = await db.connect()
       clients.push(client)
-      assert.ok(["service_role", "looty_test"].includes(role))
+      assert.ok(["service_role", "joy8_test"].includes(role))
       await client.query(`set role ${role}`)
       pending.push(client.query(sql, values).then(r => ({ rows: r.rows }), error => ({ error })))
     }
@@ -80,7 +80,7 @@ test("two competing matches cannot reserve the same wallet", async () => {
   const p = await ready()
   const results = await race("select id from public.wallet_accounts where id=$1 for update", [p.wallet_account_id], [opening([p]), opening([p])].map(body => [openSql, [secret, JSON.stringify(body)]]))
   assert.equal(results.filter(r => !r.error).length, 1)
-  assert.equal(results.filter(r => r.error?.message.includes("LOOTY_WALLET_OCCUPIED")).length, 1)
+  assert.equal(results.filter(r => r.error?.message.includes("JOY8_WALLET_OCCUPIED")).length, 1)
   assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [p.wallet_account_id])).locked_balance, "100.00")
 })
 
@@ -99,29 +99,29 @@ test("changed concurrent retry conflicts with the committed content", async () =
   const request = settlement(players, body.match_ref)
   const changed = { ...request, entries: request.entries.map(e => ({ ...e, amount: e.amount.replace("90", "80") })) }
   const results = await race(settleSql, [secret, JSON.stringify(request)], [[settleSql, [secret, JSON.stringify(changed)]]])
-  assert.match(results[0].error.message, /LOOTY_IDEMPOTENCY_CONFLICT/)
+  assert.match(results[0].error.message, /JOY8_IDEMPOTENCY_CONFLICT/)
 })
 
 test("freeze committed first rejects every waiting settlement without partial accounting", async () => {
   const players = [await ready(), await ready()], body = opening(players)
   await db.query(openSql, [secret, JSON.stringify(body)])
   const results = await race("update public.wallet_accounts set status='frozen' where id=$1", [players[0].wallet_account_id], [[settleSql, [secret, JSON.stringify(settlement(players, body.match_ref))]]])
-  assert.match(results[0].error.message, /LOOTY_WALLET_INACTIVE/)
+  assert.match(results[0].error.message, /JOY8_WALLET_INACTIVE/)
   for (const p of players) assert.equal((await one("select balance from public.wallet_accounts where id=$1", [p.wallet_account_id])).balance, "1000.00")
 })
 
 test("settlement committed first completes before a waiting freeze", async () => {
   const players = [await ready(), await ready()], body = opening(players)
   await db.query(openSql, [secret, JSON.stringify(body)])
-  success(await race(settleSql, [secret, JSON.stringify(settlement(players, body.match_ref))], [["update public.wallet_accounts set status='frozen' where id=$1 returning id", [players[0].wallet_account_id], "looty_test"]]))
+  success(await race(settleSql, [secret, JSON.stringify(settlement(players, body.match_ref))], [["update public.wallet_accounts set status='frozen' where id=$1 returning id", [players[0].wallet_account_id], "joy8_test"]]))
   assert.equal((await one("select balance from public.wallet_accounts where id=$1", [players[0].wallet_account_id])).balance, "910.00")
 })
 
 test("revocation committed first rejects a queued server operation", async () => {
   const p = await ready()
-  const results = await race("update public.looty_backend_keys set revoked_at=now() where game_id=$1", [game], [[openSql, [secret, JSON.stringify(opening([p]))]]])
-  assert.match(results[0].error.message, /LOOTY_BACKEND_UNAUTHORIZED/)
-  await db.query("update public.looty_backend_keys set revoked_at=null where game_id=$1", [game])
+  const results = await race("update public.joy8_backend_keys set revoked_at=now() where game_id=$1", [game], [[openSql, [secret, JSON.stringify(opening([p]))]]])
+  assert.match(results[0].error.message, /JOY8_BACKEND_UNAUTHORIZED/)
+  await db.query("update public.joy8_backend_keys set revoked_at=null where game_id=$1", [game])
 })
 
 test("rolled back settlement permits the waiting retry to commit once", async () => {

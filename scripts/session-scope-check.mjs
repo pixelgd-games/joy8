@@ -7,24 +7,28 @@ import { memberSql } from "./fixtures/member-database.mjs"
 const db = await createTestDatabase()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 let session, token, beforeData, beforeSecurity
-const active = async (...args) => (await db.query(`select * from public.looty_active_session(${args.map((_, i) => `$${i + 1}`).join(",")})`, args)).rows
+const active = async (...args) => (await db.query(`select * from public.joy8_active_session(${args.map((_, i) => `$${i + 1}`).join(",")})`, args)).rows
 const dataSnapshot = async () => ({
   wallets: (await db.query("select * from public.wallet_accounts order by id")).rows,
   sessions: (await db.query("select * from public.game_sessions order by id")).rows,
   ledger: (await db.query("select * from public.wallet_transactions order by id")).rows,
 })
-const security = () => one("select proowner,proacl,prosecdef,proconfig from pg_proc where oid='public.looty_active_session(text,text)'::regprocedure")
+const security = () => one("select proowner,proacl,prosecdef,proconfig from pg_proc where oid='public.joy8_active_session(text,text)'::regprocedure")
 
 before(async () => {
   const games = await loadMemberPlatformDatabase(db)
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
-  await db.query("select * from public.looty_resolve_member($1,true)", [auth])
+  await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
   session = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
-  const access = await one("select public.looty_server_session_v1($1,'exchange',$2::jsonb) result", [games.keys.get(games.game), JSON.stringify({ version: 1, launch_code: session.launch_code })])
+  const access = await one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb) result", [games.keys.get(games.game), JSON.stringify({ version: 1, launch_code: session.launch_code })])
   token = access.result.gateway_token
   beforeData = await dataSnapshot()
   beforeSecurity = await security()
-  await db.exec(await memberSql("../../supabase/migrations/20260917100000_active_session_scope.sql"))
+  const scopeSql = (await memberSql("../../supabase/migrations/20260917100000_active_session_scope.sql"))
+    .replaceAll("LOOTY", "JOY8")
+    .replaceAll("Looty", "Joy8")
+    .replaceAll("looty", "joy8")
+  await db.exec(scopeSql)
 })
 beforeEach(() => db.exec("begin"))
 afterEach(() => db.exec("rollback"))
@@ -80,7 +84,7 @@ for (const [name, update] of [
 
 test("browser and service roles cannot invoke the internal helper directly", async () => {
   for (const role of ["anon", "authenticated", "service_role"]) {
-    assert.equal((await one("select has_function_privilege($1,'public.looty_active_session(text,text)','EXECUTE') allowed", [role])).allowed, false)
+    assert.equal((await one("select has_function_privilege($1,'public.joy8_active_session(text,text)','EXECUTE') allowed", [role])).allowed, false)
     await db.exec("savepoint scope_role")
     await db.exec(`set local role ${role}`)
     await assert.rejects(active(token), error => error.code === "42501")

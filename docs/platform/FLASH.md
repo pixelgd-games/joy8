@@ -1,6 +1,6 @@
 # Flash System Context
 
-This document provides stable, high-level context for Looty's place in the wider Flash system. It is not the source of truth for Looty routes, database fields, deployment state, or short-term plans.
+This document provides stable, high-level context for Joy8's place in the wider Flash system. It is not the source of truth for Joy8 routes, database fields, deployment state, or short-term plans.
 
 Read `../../README.md` for the current repository and `../product/PRODUCT_SCOPE.md` for the approved product boundary.
 
@@ -10,14 +10,14 @@ Flash is a modular game system, not one application or one required request path
 
 | Module | Primary responsibility |
 | --- | --- |
-| Looty | Game entry, player platform, Lobby, platform administration |
+| Joy8 | Game entry, player platform, Lobby, platform administration |
 | GD Games | Game content and front-end presentation |
 | Aura | Authoritative logic for general games |
 | Hype5 | Real-time multiplayer and room synchronization |
 | FuGhost | Gambling-game adjudication and probability decisions |
 | Spinnova | Full wallet, ledger, economic settlement |
 
-The module names and responsibilities are context, not authorization to add dependencies. A change in Looty must remain within Looty's approved scope unless the user explicitly requests a cross-module design.
+The module names and responsibilities are context, not authorization to add dependencies. A change in Joy8 must remain within Joy8's approved scope unless the user explicitly requests a cross-module design.
 
 ## Composition Principles
 
@@ -34,17 +34,17 @@ These examples are illustrative:
 
 | Product shape | Possible modules |
 | --- | --- |
-| General single-player game | Looty, GD Games, Aura |
-| General multiplayer game | Looty, GD Games, Hype5, Aura |
-| Gambling single-player game | Looty, GD Games, FuGhost |
-| Gambling multiplayer game | Looty, GD Games, Hype5, FuGhost |
+| General single-player game | Joy8, GD Games, Aura |
+| General multiplayer game | Joy8, GD Games, Hype5, Aura |
+| Gambling single-player game | Joy8, GD Games, FuGhost |
+| Gambling multiplayer game | Joy8, GD Games, Hype5, FuGhost |
 | Product requiring a full economic ledger | Add Spinnova where appropriate |
 
 Do not turn an example into a mandatory dependency chain.
 
-## Looty's Role
+## Joy8's Role
 
-Looty can provide the platform layer for:
+Joy8 can provide the platform layer for:
 
 - Game discovery and entry.
 - Player identity and session entry.
@@ -56,9 +56,9 @@ Looty can provide the platform layer for:
 
 The current implemented subset is listed in `../../README.md`.
 
-## What Looty Does Not Own
+## What Joy8 Does Not Own
 
-Looty does not own:
+Joy8 does not own:
 
 - Final authoritative rules for a general game.
 - Real-time multiplayer room synchronization.
@@ -69,8 +69,8 @@ Looty does not own:
 
 Those responsibilities may belong to a product backend or a selected sibling
 module. The current platform plan explicitly assigns reusable human-wallet
-authority and trusted atomic posting to Looty; this does not assign gameplay
-adjudication to Looty or require Spinnova. A product's own approved backend may
+authority and trusted atomic posting to Joy8; this does not assign gameplay
+adjudication to Joy8 or require Spinnova. A product's own approved backend may
 provide its authority without adopting Aura, Hype5, or FuGhost. Follow the local
 product and integration documents; this context is not a mandatory module chain.
 
@@ -78,11 +78,11 @@ product and integration documents; this context is not a mandatory module chain.
 
 Flash modules may use Cloudflare Pages, Cloudflare Workers, Render, or Supabase according to their own repository and product requirements. This document deliberately does not record current host locations because they can change independently.
 
-Never infer that Looty must adopt another module's deployment model. Looty's current deployment is defined in `../../README.md`.
+Never infer that Joy8 must adopt another module's deployment model. Joy8's current deployment is defined in `../../README.md`.
 
 ## AI Guidance
 
-- Start from Looty's own repository and product boundary.
+- Start from Joy8's own repository and product boundary.
 - Introduce a sibling-module dependency only when the task explicitly requires it.
 - Verify the sibling module's own instructions before cross-project work.
 - Keep integration contracts narrow and versionable.

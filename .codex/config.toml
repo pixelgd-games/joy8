@@ -1,4 +1,4 @@
-[mcp_servers.supabase_looty_readonly]
+[mcp_servers.supabase_joy8_readonly]
 url = "https://mcp.supabase.com/mcp?project_ref=lsazydefvnuqglultqii&read_only=true"
 enabled = false
 required = false

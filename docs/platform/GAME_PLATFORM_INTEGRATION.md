@@ -1,6 +1,6 @@
-# Looty Game Platform Integration
+# Joy8 Game Platform Integration
 
-This document is the authoritative runtime contract between Looty and a game. It defines platform selection, launch parameters, Gateway requests, wallet behavior, and responsibility boundaries.
+This document is the authoritative runtime contract between Joy8 and a game. It defines platform selection, launch parameters, Gateway requests, wallet behavior, and responsibility boundaries.
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
@@ -14,16 +14,16 @@ this protocol in their own repositories before activation.
 
 ## Core Rule
 
-A game owns gameplay. Looty owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
+A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
 
 A game must never:
 
-- Log a player into Looty.
+- Log a player into Joy8.
 - Receive identity-provider credentials.
 - Receive a Supabase anonymous key, member JWT, or service-role key from the Loader.
-- Write Looty player, wallet, session, round, or transaction tables.
+- Write Joy8 player, wallet, session, round, or transaction tables.
 - Change a player balance directly.
-- Store a Looty launch code or Gateway token in local storage, session storage, IndexedDB, logs, Analytics, or save data.
+- Store a Joy8 launch code or Gateway token in local storage, session storage, IndexedDB, logs, Analytics, or save data.
 
 ## Platform Clients
 
@@ -31,13 +31,13 @@ A non-gambling game that targets multiple platforms should keep one gameplay cor
 
 | Client | Use |
 | --- | --- |
-| Looty Client | Looty launch parameters and Looty Gateway |
+| Joy8 Client | Joy8 launch parameters and Joy8 Gateway |
 | CrazyGames Client | CrazyGames SDK, ads, saves, and platform lifecycle |
 | Local Client | Local development and contract simulation only |
 
 Only one platform client may be active during a session.
 
-Selection must use an explicit build target or an equally reliable platform signal. Iframe presence is not enough because Looty and CrazyGames may both embed games.
+Selection must use an explicit build target or an equally reliable platform signal. Iframe presence is not enough because Joy8 and CrazyGames may both embed games.
 
 The Local Client must never activate automatically after a production client fails to initialize. A real-platform failure must produce a visible error.
 
@@ -47,7 +47,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 
 ## Responsibility Matrix
 
-| Concern | Looty Platform | Game |
+| Concern | Joy8 Platform | Game |
 | --- | --- | --- |
 | Game catalog and published status | Owns | Does not own |
 | Member or guest identity | Owns | Does not own |
@@ -63,9 +63,9 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | Authoritative rooms, matches, hands, actions, results, and history | Does not own | Owns in its game database |
 | Game-specific save data | Provides a platform adapter when applicable | Owns the payload |
 
-Do not modify a game repository from a Looty repository task. Switch to the named game repository for game-side changes.
+Do not modify a game repository from a Joy8 repository task. Switch to the named game repository for game-side changes.
 
-## Looty Launch Flow
+## Joy8 Launch Flow
 
 1. A player opens `/game/?slug=<slug>`.
    The Lobby checks membership before navigating there. Missing member
@@ -74,7 +74,7 @@ Do not modify a game repository from a Looty repository task. Switch to the name
    Entry UX and cancellation rules belong to `MEMBER_AUTH_PLAN.md`.
 2. The Loader reads the published game from `public_games_v1`.
 3. It normalizes the `launch_url`. Root-relative platform paths and HTTPS URLs are accepted. HTTP is accepted only between loopback hosts during local development.
-4. It calls `looty-gateway/create-session`.
+4. It calls `joy8-gateway/create-session`.
 5. The Gateway requires a verified Supabase user session and existing enrollment,
    including a persistent anonymous Auth session for guests.
 6. The reviewed session RPC resolves the enrolled platform player and configured wallet.
@@ -89,7 +89,7 @@ The current Loader requests `POINT` with a one-hour session expiry.
 
 ### Private test entry
 
-Looty's `/play-test/?slug=...` uses the same member flow and iframe shell.
+Joy8's `/play-test/?slug=...` uses the same member flow and iframe shell.
 `POST /private-session` accepts only `{ "slug": "..." }` with a verified member
 bearer and an allowed browser Origin. Its service-only RPC checks backend entry
 configuration, exact Origin and hidden catalog status. Every active enrolled
@@ -99,7 +99,7 @@ one-use launch code. The response additionally includes backend-owned `game_name
 and `launch_url`; the browser cannot select the URL or identity. It uses no-store.
 The public `create-session` path remains restricted to published games.
 
-The current local Mahjong binding uses Looty `http://localhost:5173` and game
+The current local Mahjong binding uses Joy8 `http://localhost:5173` and game
 `http://localhost:4391/`. Entry configuration remains backend-controlled. The
 private entry and Gateway are installed; real game acceptance remains pending.
 See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
@@ -108,12 +108,12 @@ See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
 
 | Parameter | Meaning | Handling |
 | --- | --- | --- |
-| `looty_session_id` | Public session reference | May be used for correlation; not authorization |
-| `looty_launch_code` | One-time exchange credential | Exchange immediately; keep in memory; never log |
-| `looty_game_id` | Looty game identifier | Treat as platform metadata |
-| `looty_currency` | Session currency | Currently `POINT` |
-| `looty_protocol` | Protocol version | Must be `server-v1` |
-| `looty_gateway_url` | Gateway base URL | Use for wallet routes |
+| `joy8_session_id` | Public session reference | May be used for correlation; not authorization |
+| `joy8_launch_code` | One-time exchange credential | Exchange immediately; keep in memory; never log |
+| `joy8_game_id` | Joy8 game identifier | Treat as platform metadata |
+| `joy8_currency` | Session currency | Currently `POINT` |
+| `joy8_protocol` | Protocol version | Must be `server-v1` |
+| `joy8_gateway_url` | Gateway base URL | Use for wallet routes |
 
 The Loader supplies these parameters, but URL values remain untrusted inputs.
 Validate the configured Gateway origin and derive identity, game, wallet, and
@@ -133,15 +133,15 @@ For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader us
 
 The current timeout observes the iframe `load` event, not game readiness. If a future ready handshake is introduced, it must extend this contract explicitly; a game-specific workaround must not replace the platform behavior.
 
-The game is responsible for allowing Looty to embed it and for functioning under this sandbox. If CSP, `X-Frame-Options`, resource loading, or in-game rendering fails, diagnose and report the game-side problem; do not weaken the platform shell without a security review.
+The game is responsible for allowing Joy8 to embed it and for functioning under this sandbox. If CSP, `X-Frame-Options`, resource loading, or in-game rendering fails, diagnose and report the game-side problem; do not weaken the platform shell without a security review.
 
 ## Gateway Base URL
 
 ```text
-https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway
+https://lsazydefvnuqglultqii.supabase.co/functions/v1/joy8-gateway
 ```
 
-All routes accept `POST` JSON. The Gateway adds `X-Looty-Request-Id` to responses.
+All routes accept `POST` JSON. The Gateway adds `X-Joy8-Request-Id` to responses.
 
 ## Session Creation
 
@@ -174,7 +174,7 @@ Rules:
 - A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
   user's own verified session is supported and remains a guest. Missing enrollment
   or an inactive player blocks launch; it never creates a replacement guest.
-- The route requires an allowed Looty origin. Localhost development ports are accepted.
+- The route requires an allowed Joy8 origin. Localhost development ports are accepted.
 
 Relevant response fields:
 
@@ -202,7 +202,7 @@ wallet models. There is no browser payout or legacy Demo path.
 
 ### Configuration and Credentials
 
-Looty selects the wallet from `looty_game_policies` and `looty_wallet_policies`.
+Joy8 selects the wallet from `joy8_game_policies` and `joy8_wallet_policies`.
 A null policy game ID means the shared platform wallet; a game ID means that
 game's independent wallet. A durable wallet cannot be replaced by freezing or
 closing it. A missing or disabled policy denies launch/open. The replacement
@@ -210,7 +210,7 @@ has one accounting flow; test execution uses isolated local data. Disable a poli
 to pause new activity while retaining durable references for existing matches.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
-`Content-Type: application/json` and no browser Origin. Looty stores a SHA-256
+`Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
 hash, game ID, allowed actions, expiry and revocation time for each key. The key
 authorizes one game; no request can select another game or wallet scope. Origin
 checks are additional protection, not proof of identity. Products never receive
@@ -218,7 +218,7 @@ the project service-role key or direct platform table grants.
 
 Provision keys only during reviewed product activation. Generate them with a
 cryptographically secure random source, deliver the plaintext only to the
-product backend's secret store, and retain only the hash in Looty. For rotation,
+product backend's secret store, and retain only the hash in Joy8. For rotation,
 provision a replacement with the same reviewed scope, update the backend,
 verify it, then revoke the old key. Revoke a compromised key immediately;
 replacement credentials must retain access to status/retry for existing matches.
@@ -227,13 +227,13 @@ All routes below use POST, a 16 KiB body limit and an IP-based limit of 120 call
 per route per minute. Unknown request fields are rejected. Amounts are decimal
 **strings**, such as `"100.00"`, with at most two decimal places; JSON numbers,
 exponents and extra precision are rejected. Player IDs in entries use canonical
-lowercase UUID strings. Request hashes are computed by Looty from PostgreSQL
+lowercase UUID strings. Request hashes are computed by Joy8 from PostgreSQL
 JSONB text, not supplied by the caller. JSON object order is irrelevant; array
 order and value spelling are part of the retry identity.
 
 ### Exchange, Renewal and Re-entry
 
-The Loader supplies `looty_protocol=server-v1`,
+The Loader supplies `joy8_protocol=server-v1`,
 the one-use launch code and public correlation IDs. There is no browser exchange endpoint.
 The game sends the code to its own authenticated backend handoff; that backend
 is the sole redeemer through `server-exchange-v1`:
@@ -242,7 +242,7 @@ is the sole redeemer through `server-exchange-v1`:
 {"version":1,"launch_code":"<one-use 64-character code>"}
 ```
 
-The backend must validate its configured Looty Gateway host and use only the
+The backend must validate its configured Joy8 Gateway host and use only the
 exchange result for player/game binding. Return fields are `version`,
 `session_id`, `game_id`, `player_account_ref`, `account_type`, `wallet_scope`
 (`platform` or `game`), `currency` (`POINT`),
@@ -283,7 +283,7 @@ be called: those routes and their database functions are removed.
 `product_participants` is optional. There must be at least one human participant;
 the combined count must fit the trusted per-game limit (default 16, maximum 64).
 Reserve the maximum authorized loss, not merely the first action's stake.
-The reserve must be positive and within the configured entry limit. Looty checks
+The reserve must be positive and within the configured entry limit. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
 wallet can occupy only one open match, including across shared-wallet titles.
 The opening locks funds without moving the balance. Its response is
@@ -316,7 +316,7 @@ accounts must belong to the opening. Loss cannot exceed the recorded reserve;
 every absolute entry must fit the opening's snapshotted limit. Fee entries are
 positive, game-bound and separate from player or AI funding.
 
-Looty validates authority, rules reference, account binding and accounting;
+Joy8 validates authority, rules reference, account binding and accounting;
 the game backend and its adapter validate the actual gameplay result. All human
 wallet changes, product-account changes, fee entries, immutable settlement rows,
 product commit marker and reservation updates commit in one transaction.
@@ -339,7 +339,7 @@ A single-hand game uses number 1 and `final:true`. A multi-hand game opens one
 financial match for the entire table and posts each completed hand in order:
 
 - Number must equal the match's committed count plus one. A skipped number or
-  a repeated number under another operation key returns `LOOTY_SETTLEMENT_SEQUENCE`.
+  a repeated number under another operation key returns `JOY8_SETTLEMENT_SEQUENCE`.
 - `final:false` posts human, product and fee movements immediately, keeps the
   match open and retains every participant's occupancy. For each account the
   remaining reserve becomes prior reserve plus that hand's signed net movement.
@@ -360,7 +360,7 @@ financial match for the entire table and posts each completed hand in order:
   have a non-null last result. Disconnection alone still never authorizes cancel.
 
 Human and AI adapter mutations share the same transaction. The trusted settle
-payload additionally supplies `next_product_participants`, computed by Looty
+payload additionally supplies `next_product_participants`, computed by Joy8
 from the current product reserves and validated signed entries. An adapter must
 apply these rolling holds, retain its open state for `final:false`, validate the
 hand number and result, and release on final/cancel. An adapter implementing only
@@ -385,14 +385,14 @@ registration. Do not grant the runtime membership in its deployment owner role.
 The platform validates the registered signature/owner boundary and requires
 `{"committed":true}`; the caller cannot select a function or table.
 
-Actions are `open`, `settle` and `cancel`; the second argument is the Looty match
+Actions are `open`, `settle` and `cancel`; the second argument is the Joy8 match
 UUID. Payload always includes `version:1`, trusted `game_id` and `request`.
 Settlement also supplies `settlement_id`, `request_hash` and, under continuous settlement, `next_product_participants`. The adapter validates
 its game binding and authoritative product state, reserves/reconciles product
 accounts in deterministic order, and writes its durable commit marker. It must
 throw on any mismatch. It cannot make external HTTP side effects or commit a
 separate transaction. Product-only locks follow platform wallet/fee locks; no
-other product path may hold those locks and then call back into Looty.
+other product path may hold those locks and then call back into Joy8.
 
 The fixture adapter demonstrates rollback and permission isolation only. Each
 product still implements/reviews its own gameplay and AI accounting invariants.
@@ -413,13 +413,13 @@ browser disconnection and token expiry do not authorize cancellation.
 
 | HTTP | Stable errors |
 | --- | --- |
-| 400 | `LOOTY_INVALID_REQUEST`, `LOOTY_INVALID_AMOUNT`, `LOOTY_INVALID_ENTRY`, `LOOTY_LIMIT_EXCEEDED`, `LOOTY_UNBALANCED_SETTLEMENT` |
-| 401 | `LOOTY_BACKEND_UNAUTHORIZED` |
-| 403 | `LOOTY_GAME_NOT_READY`, `LOOTY_PLAYER_INACTIVE`, `LOOTY_WALLET_INACTIVE`, `LOOTY_SESSION_INVALID` |
-| 404 | `LOOTY_MATCH_NOT_FOUND` |
-| 409 | `LOOTY_IDEMPOTENCY_CONFLICT`, `LOOTY_MATCH_FINALIZED`, `LOOTY_SETTLEMENT_SEQUENCE`, `LOOTY_RULE_MISMATCH`, `LOOTY_WALLET_OCCUPIED`, `LOOTY_INSUFFICIENT_BALANCE`, `LOOTY_ADAPTER_REJECTED` |
+| 400 | `JOY8_INVALID_REQUEST`, `JOY8_INVALID_AMOUNT`, `JOY8_INVALID_ENTRY`, `JOY8_LIMIT_EXCEEDED`, `JOY8_UNBALANCED_SETTLEMENT` |
+| 401 | `JOY8_BACKEND_UNAUTHORIZED` |
+| 403 | `JOY8_GAME_NOT_READY`, `JOY8_PLAYER_INACTIVE`, `JOY8_WALLET_INACTIVE`, `JOY8_SESSION_INVALID` |
+| 404 | `JOY8_MATCH_NOT_FOUND` |
+| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED` |
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
-| 502/503 | Invalid/upstream-unavailable response; `LOOTY_UPSTREAM_UNAVAILABLE` or `LOOTY_ADAPTER_UNAVAILABLE` |
+| 502/503 | Invalid/upstream-unavailable response; `JOY8_UPSTREAM_UNAVAILABLE` or `JOY8_ADAPTER_UNAVAILABLE` |
 
 Internal database diagnostics are not returned. No generic player compensation,
 purchase or funding endpoint is enabled. Correcting a committed result requires
@@ -467,13 +467,13 @@ On failure:
 
 ## Member and Direct Entry Boundary
 
-The source requires an authenticated, enrolled Looty player before launch, whether
+The source requires an authenticated, enrolled Joy8 player before launch, whether
 registered or a persistent guest. Authentication, provider login, guest identity,
 linking and branded entry are platform responsibilities.
 
-Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Looty session contract without copying identity-provider logic into the game.
+Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Joy8 session contract without copying identity-provider logic into the game.
 
-This member contract applies only when the Looty Client is active. CrazyGames and other external platform clients must use their own identity services and must not initialize Looty Auth, sessions, or wallets.
+This member contract applies only when the Joy8 Client is active. CrazyGames and other external platform clients must use their own identity services and must not initialize Joy8 Auth, sessions, or wallets.
 
 ## Database Boundary
 
@@ -483,12 +483,12 @@ The Gateway currently operates through protected RPCs over:
 - `wallet_accounts`
 - `wallet_transactions`
 - `game_sessions`
-- `looty_matches`, `looty_match_participants`
-- `looty_settlements`, `looty_settlement_entries`, `looty_fee_accounts`
-- `looty_wallet_policies`, `looty_game_policies`, `looty_backend_keys`
+- `joy8_matches`, `joy8_match_participants`
+- `joy8_settlements`, `joy8_settlement_entries`, `joy8_fee_accounts`
+- `joy8_wallet_policies`, `joy8_game_policies`, `joy8_backend_keys`
 - `gateway_rate_limits`
 
-Looty stores match reservations and platform accounting results, not authoritative
+Joy8 stores match reservations and platform accounting results, not authoritative
 rooms, gameplay actions, progression or rankings. Products correlate their own
 records using stable game/match and player references. Their schema and runtime
 roles remain isolated even inside the same physical Supabase project.
@@ -502,23 +502,23 @@ Database operation rules and the current schema summary are in `../../README.md`
 The platform fixture verifies the protocol, not a product's actual gameplay or
 hosted integration. Complete the owning product's integration before activation.
 
-Before listing a game through the Looty Lobby:
+Before listing a game through the Joy8 Lobby:
 
-1. Confirm the product is allowed on Looty and classify whether it is gambling.
+1. Confirm the product is allowed on Joy8 and classify whether it is gambling.
 2. Confirm the game has a stable HTTPS `launch_url`.
-3. Confirm CSP and `X-Frame-Options` allow Looty embedding.
+3. Confirm CSP and `X-Frame-Options` allow Joy8 embedding.
 4. Verify the game runs with the documented iframe sandbox and permissions.
-5. Implement an explicit Looty Client; do not detect Looty from iframe presence.
+5. Implement an explicit Joy8 Client; do not detect Joy8 from iframe presence.
 6. Use the designated single launch-code redeemer; keep client game tokens in memory and validate the server handoff.
 7. Use a stable `match_ref` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
 9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance.
 10. Confirm no launch code, Gateway token, member JWT, or provider credential reaches storage, logs, analytics, or save data.
-11. Add the Looty-managed `750 x 1000` WebP cover in this repository.
+11. Add the Joy8-managed `750 x 1000` WebP cover in this repository.
 12. Test Lobby to Loader to iframe on the target production origin.
 
 For a dual-platform non-gambling game, also complete the CrazyGames checklist in `CRAZYGAMES_INTEGRATION.md`.
 
 ## Contract Changes
 
-Any change to parameter names, token lifetime, endpoint shape, wallet semantics, iframe permissions, platform selection, or error behavior is a contract change. Update this document with the implementation and verify both the Looty Loader and the affected game client.
+Any change to parameter names, token lifetime, endpoint shape, wallet semantics, iframe permissions, platform selection, or error behavior is a contract change. Update this document with the implementation and verify both the Joy8 Loader and the affected game client.

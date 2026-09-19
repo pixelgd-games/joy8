@@ -36,7 +36,7 @@ try {
 
   await expectPageText(client, appPort, "/", (text) => {
     const normalizedText = text.toLowerCase()
-    return normalizedText.includes("looty")
+    return normalizedText.includes("joy8")
       && normalizedText.includes("game list")
       && normalizedText.includes("featured games")
       && !normalizedText.includes("game list failed to load")
@@ -52,18 +52,18 @@ try {
   await expectPrivateEntry(client, appPort)
 
   await expectPageText(client, appPort, "/game/", (text) => {
-    return text.includes("LOOTY-GAME-001")
+    return text.includes("JOY8-GAME-001")
   }, "Loader missing slug shows error")
 
   await expectMemberEntry(client, appPort)
 
   await expectPageText(client, appPort, "/admin/login/", (text) => {
-    return text.includes("Looty Admin") && text.includes("Google")
+    return text.includes("Joy8 Admin") && text.includes("Google")
   }, "Admin login loads")
 
   await showSyntheticError(client)
   await waitForText(client, (text) => {
-    return text.includes("LOOTY-SMOKE-001") && text.includes("Smoke test error modal")
+    return text.includes("JOY8-SMOKE-001") && text.includes("Smoke test error modal")
   }, "Shared error modal shows code")
   await expectErrorPresentation(client)
 
@@ -114,7 +114,7 @@ function startDevServer(port) {
 }
 
 async function startBrowser(browserPath, cdpPort) {
-  const profile = await mkdtemp(path.join(tmpdir(), "looty-smoke-browser-"))
+  const profile = await mkdtemp(path.join(tmpdir(), "joy8-smoke-browser-"))
   const instance = spawn(browserPath, [
     "--headless",
     "--disable-gpu",
@@ -287,7 +287,7 @@ async function showSyntheticError(client) {
     expression: `
       import("/src/ui/error-modal.js").then(({ showErrorModal }) => {
         showErrorModal({
-          code: "LOOTY-SMOKE-001",
+          code: "JOY8-SMOKE-001",
           title: "Smoke test error",
           message: "Smoke test error modal",
           reload: false,
@@ -309,7 +309,7 @@ async function expectPrivateEntry(client, appPort) {
         window.privateCalls.push({route,args})
         if(route.endsWith("/member")) return {data:{member:{player_account_ref:"fixture-player",account_type:"registered"}},error:null}
         if(!window.privateAllowed) return {data:null,error:new Error("denied")}
-        return {data:{session_id:"fixture-session",game_id:"fixture-game",protocol:"server-v1",currency:"POINT",game_name:"Private fixture",launch_code:"fixture-only-code",launch_url:location.origin+"/icons/looty-app-icon-192.png"},error:null}
+        return {data:{session_id:"fixture-session",game_id:"fixture-game",protocol:"server-v1",currency:"POINT",game_name:"Private fixture",launch_code:"fixture-only-code",launch_url:location.origin+"/icons/joy8-app-icon-192.png"},error:null}
       }}})
       document.getElementById("private-start").click()
     })`,
@@ -322,7 +322,7 @@ async function expectPrivateEntry(client, appPort) {
   const launched = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`new Promise(resolve=>setTimeout(()=>{
     const iframe=document.querySelector("iframe")
     const url=iframe && new URL(iframe.src)
-    resolve(Boolean(url && url.searchParams.get("looty_launch_code")==="fixture-only-code"
+    resolve(Boolean(url && url.searchParams.get("joy8_launch_code")==="fixture-only-code"
       && !url.searchParams.has("access_token") && iframe.referrerPolicy==="no-referrer"
       && window.privateCalls.filter(x=>x.route.endsWith("/private-session")).length===2
       && !JSON.stringify({...localStorage,...sessionStorage}).includes("fixture-only-code")))
@@ -336,25 +336,25 @@ async function expectErrorPresentation(client) {
   const result = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
-      const modal = document.querySelector(".looty-error-modal")
-      const dialog = document.querySelector(".looty-error-dialog")
+      const modal = document.querySelector(".joy8-error-modal")
+      const dialog = document.querySelector(".joy8-error-dialog")
       const bounds = dialog.getBoundingClientRect()
       const positioned = getComputedStyle(modal).position === "fixed"
       document.documentElement.style.setProperty("--text", "rgb(23, 45, 67)")
       const shared = getComputedStyle(modal).color === "rgb(23, 45, 67)"
       document.documentElement.style.removeProperty("--text")
       dialog.querySelector("button").click()
-      const closed = !document.querySelector(".looty-error-modal") && !document.body.classList.contains("looty-error-modal-open")
+      const closed = !document.querySelector(".joy8-error-modal") && !document.body.classList.contains("joy8-error-modal-open")
       return positioned && shared && bounds.left >= 0 && bounds.right <= innerWidth && closed
     })()`,
   })
   if (!result.result.value) throw new Error("Error modal theme, mobile layout or close action failed")
   for (const dismiss of [
     'document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }))',
-    'document.querySelector(".looty-error-modal").click()',
+    'document.querySelector(".joy8-error-modal").click()',
   ]) {
     await showSyntheticError(client)
-    const dismissal = await client.send("Runtime.evaluate", { returnByValue: true, expression: `${dismiss}; !document.querySelector(".looty-error-modal") && !document.body.classList.contains("looty-error-modal-open")` })
+    const dismissal = await client.send("Runtime.evaluate", { returnByValue: true, expression: `${dismiss}; !document.querySelector(".joy8-error-modal") && !document.body.classList.contains("joy8-error-modal-open")` })
     if (!dismissal.result.value) throw new Error("Error modal dismissal failed")
   }
   await client.send("Emulation.clearDeviceMetricsOverride")
@@ -685,7 +685,7 @@ async function expectGameIframeSecurity(client) {
     || result.referrerPolicy !== "no-referrer"
     || result.allowFullscreen !== true
     || result.timeoutTriggered !== true
-    || result.timeoutCode !== "LOOTY-GAME-006"
+    || result.timeoutCode !== "JOY8-GAME-006"
   ) {
     throw new Error(`Game iframe security check failed: ${JSON.stringify(result)}`)
   }
@@ -705,7 +705,7 @@ async function expectLaunchUrlPolicy(client) {
         externalHttpBlocked: normalizeLaunchUrl("http://game.example/play") === "",
         protocolRelativeBlocked: normalizeLaunchUrl("//game.example/play") === "",
         insecureAppendBlocked: appendQueryParams("http://game.example/play", { session: "test" }) === "",
-        staleExchangeRemoved: !appendQueryParams("https://game.example/?looty_exchange_url=old", { looty_exchange_url: "" }).includes("looty_exchange_url"),
+        staleExchangeRemoved: !appendQueryParams("https://game.example/?joy8_exchange_url=old", { joy8_exchange_url: "" }).includes("joy8_exchange_url"),
       }))
     `,
   })

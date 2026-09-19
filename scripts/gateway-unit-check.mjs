@@ -17,7 +17,7 @@ globalThis.Deno = {
 }
 
 try {
-  const { callRpc, resolveAuthUser } = await import("../supabase/functions/looty-gateway/index.ts")
+  const { callRpc, resolveAuthUser } = await import("../supabase/functions/joy8-gateway/index.ts")
 
   globalThis.fetch = async () => ({
     ok: true,
@@ -41,7 +41,7 @@ try {
   const rpcResult = await callRpc("test_rpc", {})
   assert.equal(rpcResult.ok, false)
   assert.deepEqual(rpcResult.body, {
-    code: "LOOTY_UPSTREAM_UNAVAILABLE",
+    code: "JOY8_UPSTREAM_UNAVAILABLE",
     message: "Gateway upstream request failed",
   })
 
@@ -100,22 +100,22 @@ try {
     const name = url.split("/").at(-1)
     const args = JSON.parse(options.body)
     rpcCalls.push({ name, args })
-    if (name === "looty_consume_gateway_rate_limit") return Response.json(true)
-    if (name === "looty_resolve_member") {
+    if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
+    if (name === "joy8_resolve_member") {
       return memberError ? Response.json(memberError, { status: 403 }) : Response.json(memberRows)
     }
     if (name === "create_game_session") return sessionError ? Response.json(sessionError, { status: 400 }) : Response.json([{
       session_id: "session-1", player_account_id: "player-1", game_id: "game-1",
       launch_code: "one-use-code", account_type: "guest", currency: "POINT", protocol: "server-v1",
     }])
-    if (name === "looty_cleanup_gateway_runtime") return Response.json([])
-    if (name === "looty_create_private_session") return sessionError ? Response.json(sessionError, { status: 403 }) : Response.json({
+    if (name === "joy8_cleanup_gateway_runtime") return Response.json([])
+    if (name === "joy8_create_private_session") return sessionError ? Response.json(sessionError, { status: 403 }) : Response.json({
       session_id: "private-session", game_id: "game-1", launch_code: "private-code", protocol: "server-v1",
       launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", currency: "POINT",
     })
     throw new Error(`Unexpected RPC ${name}`)
   }
-  const request = (route, body = {}, token = "member-token", origin = "https://looty-git.pages.dev") => handleRequest(new Request(`https://gateway.example/${route}`, {
+  const request = (route, body = {}, token = "member-token", origin = "https://joy8.pages.dev") => handleRequest(new Request(`https://gateway.example/${route}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: "anon-key", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
@@ -125,11 +125,11 @@ try {
     assert.equal((await request(route, {}, "", null)).status, 403)
     for (const token of ["", "anon-key"]) assert.equal((await request(route, {}, token)).status, 401)
   }
-  assert.equal(rpcCalls.some(({ name }) => name === "looty_resolve_member" || name === "create_game_session"), false)
+  assert.equal(rpcCalls.some(({ name }) => name === "joy8_resolve_member" || name === "create_game_session"), false)
   assert.equal((await request("enroll-member", { p_auth_user_id: "victim", account_type: "registered" })).status, 400)
   const memberResponse = await request("member")
   assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", account_type: "guest" } })
-  assert.deepEqual(rpcCalls.at(-1), { name: "looty_resolve_member", args: { p_auth_user_id: "verified-user", p_enroll: false } })
+  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_member", args: { p_auth_user_id: "verified-user", p_enroll: false } })
   assert.equal((await request("enroll-member")).status, 200)
   assert.equal(rpcCalls.at(-1).args.p_enroll, true)
 
@@ -153,8 +153,8 @@ try {
 
   for (const [code, message, status] of [
     ["P0002", "game is not available", 404],
-    ["22023", "LOOTY_INVALID_REQUEST", 400],
-    ["42501", "LOOTY_WALLET_INACTIVE", 403],
+    ["22023", "JOY8_INVALID_REQUEST", 400],
+    ["42501", "JOY8_WALLET_INACTIVE", 403],
   ]) {
     sessionError = { code, message }
     const response = await request("create-session", { slug: "test" })
@@ -180,11 +180,11 @@ try {
   const privateResponse = await request("private-session", { slug: "mahjong-clash" }, "member-token", "http://localhost:5173")
   assert.equal(privateResponse.status, 200)
   assert.equal(privateResponse.headers.get("cache-control"), "no-store")
-  assert.deepEqual(rpcCalls.at(-1), { name: "looty_create_private_session", args: { p_game_slug: "mahjong-clash", p_auth_user_id: "verified-user", p_origin: "http://localhost:5173" } })
-  sessionError = { code: "42501", message: "LOOTY_PRIVATE_ENTRY_DENIED" }
+  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_create_private_session", args: { p_game_slug: "mahjong-clash", p_auth_user_id: "verified-user", p_origin: "http://localhost:5173" } })
+  sessionError = { code: "42501", message: "JOY8_PRIVATE_ENTRY_DENIED" }
   const privateDenied = await request("private-session", { slug: "mahjong-clash" })
   assert.equal(privateDenied.status, 403)
-  assert.deepEqual(await privateDenied.json(), { error: "LOOTY_PRIVATE_ENTRY_DENIED" })
+  assert.deepEqual(await privateDenied.json(), { error: "JOY8_PRIVATE_ENTRY_DENIED" })
   sessionError = null
 
   for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
@@ -195,15 +195,15 @@ try {
   const serverCalls = []
   globalThis.fetch = async (url, options) => {
     const name = url.split("/").at(-1)
-    if (name === "looty_consume_gateway_rate_limit") return Response.json(true)
-    if (name === "looty_platform_health_v1") return Response.json(health)
+    if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
+    if (name === "joy8_platform_health_v1") return Response.json(health)
     serverCalls.push({ name, args: JSON.parse(options.body) })
     return serverError ? Response.json(serverError, { status: 400 }) : Response.json({ version: 1, state: "open" })
   }
   const expected = {
-    exchange: "looty_server_session_v1", renew: "looty_server_session_v1",
-    open: "looty_open_match_v1", settle: "looty_settle_match_v1",
-    status: "looty_match_status_v1", cancel: "looty_match_status_v1",
+    exchange: "joy8_server_session_v1", renew: "joy8_server_session_v1",
+    open: "joy8_open_match_v1", settle: "joy8_settle_match_v1",
+    status: "joy8_match_status_v1", cancel: "joy8_match_status_v1",
   }
   for (const [action, name] of Object.entries(expected)) {
     const route = `server-${action}-v1`
@@ -222,14 +222,14 @@ try {
   assert.equal((await request("server-open-v1", [], key, null)).status, 400)
   assert.equal((await request("server-open-v1", { data: "x".repeat(17000) }, key, null)).status, 400)
   assert.equal(serverCalls.length, count)
-  for (const [code, status] of [["LOOTY_BACKEND_UNAUTHORIZED", 401], ["LOOTY_IDEMPOTENCY_CONFLICT", 409], ["LOOTY_SETTLEMENT_SEQUENCE", 409], ["LOOTY_WALLET_INACTIVE", 403], ["LOOTY_MATCH_NOT_FOUND", 404]]) {
+  for (const [code, status] of [["JOY8_BACKEND_UNAUTHORIZED", 401], ["JOY8_IDEMPOTENCY_CONFLICT", 409], ["JOY8_SETTLEMENT_SEQUENCE", 409], ["JOY8_WALLET_INACTIVE", 403], ["JOY8_MATCH_NOT_FOUND", 404]]) {
     serverError = { message: code }
     const response = await request("server-settle-v1", {}, key, null)
     assert.equal(response.status, status)
     assert.deepEqual(await response.json(), { error: code })
   }
   serverError = { message: "private database diagnostic", details: key }
-  assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "LOOTY_UPSTREAM_UNAVAILABLE" })
+  assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "JOY8_UPSTREAM_UNAVAILABLE" })
   assert.deepEqual(await (await request("health", {}, "", null)).json(), { status: "ok" })
   health = false
   assert.equal((await request("health", {}, "", null)).status, 503)

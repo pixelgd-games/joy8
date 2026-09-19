@@ -1,4 +1,4 @@
-# Looty Analytics and Monitoring
+# Joy8 Analytics and Monitoring
 
 Status: dashboards/alerts planned. Gateway health is deployed; read-only
 reconciliation queries are available for manual operations.
@@ -23,7 +23,7 @@ Principles:
 - Keep test POINT, operational POINT activity, and actual payment receipts separate.
   A POINT fee or AI funding entry is not cash revenue. The product and integration
   documents own the corresponding wallet and transaction-source definitions.
-- Add game instrumentation only through the Looty integration contract.
+- Add game instrumentation only through the Joy8 integration contract.
 - Never record credentials, launch codes, Gateway tokens, or complete request bodies.
 
 ## Proposed Initial Stack
@@ -131,7 +131,7 @@ Do not build a separate custom dashboard for every game.
 
 Count successfully created `game_sessions`.
 
-This proves that Looty issued launch authorization. It does not prove that the iframe loaded, the game became ready, or the player completed a round.
+This proves that Joy8 issued launch authorization. It does not prove that the iframe loaded, the game became ready, or the player completed a round.
 
 ### Active Accounts
 
@@ -235,7 +235,7 @@ Heartbeat, game-ready, play-time, and game error events belong to a future versi
 
 Rules:
 
-- Games report through the Gateway or another explicitly reviewed Looty endpoint.
+- Games report through the Gateway or another explicitly reviewed Joy8 endpoint.
 - Games never write an analytics table directly.
 - No game repository is changed until the user names the game and puts that repository in scope.
 - A game without these events remains playable and shows unavailable metrics.
@@ -290,7 +290,7 @@ The hosted health/rejection check passed against Gateway version 8.
 It should distinguish:
 
 - Edge Function reachable.
-- Critical Looty database dependency reachable.
+- Critical Joy8 database dependency reachable.
 
 It must not:
 
@@ -308,11 +308,11 @@ Do not monitor health by repeatedly calling `create-session`.
    Never include request bodies or credentials in an incident record.
 2. On an uncertain settlement response, the product calls `server-status-v1` and
    retries the original content/key if needed. A timeout is not a cancellation.
-3. Before every database read, verify `scripts/supabase-looty.cmd projects list`
-   selects the linked Looty project. After platform SQL application, run the
+3. Before every database read, verify `scripts/supabase-joy8.cmd projects list`
+   selects the linked Joy8 project. After platform SQL application, run the
    same wrapper with `db query --linked --file scripts/sql/platform-reconciliation.sql`.
    Wallet-ledger, reservation, fee and balancing mismatch counts should be zero.
-   These checks cover Looty accounting; each adapter must also reconcile its
+   These checks cover Joy8 accounting; each adapter must also reconcile its
    product balances and commit markers. They do not prove legitimate gameplay.
 4. Open matches older than 24 hours are a diagnostic signal, not an automatic
    void rule. Inspect authoritative product state before completing or cancelling.
@@ -374,7 +374,7 @@ isolated destination, and verify schema, roles/grants, Auth/player references,
 wallet/ledger totals, reservations, settlements and product markers. Check Storage
 objects and provider/Edge Function settings separately; database restoration
 alone does not prove these services are restored. Never test by overwriting the
-live Looty project. Local synthetic SQL tests are not a hosted backup restore.
+live Joy8 project. Local synthetic SQL tests are not a hosted backup restore.
 The storage destination, credentials and actual restore test remain pending;
 do not mark recovery complete based on a preflight query.
 
@@ -430,7 +430,7 @@ Only metrics supported by reliable data are shown.
 
 Reassess the low-cost stack when any of these becomes true:
 
-- Looty accepts real payments.
+- Joy8 accepts real payments.
 - A separately approved product decision changes the current prohibition on
   redemption, withdrawal, or prizes of monetary value.
 - A formal uptime SLA is required.

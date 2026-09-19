@@ -2,7 +2,7 @@
 
 This document is the internal source of truth for preparing a non-gambling game build for CrazyGames. It covers platform separation, SDK behavior, ads, saves, quality requirements, and submission assets.
 
-Looty runtime integration is defined in `GAME_PLATFORM_INTEGRATION.md`. A shared game core must still keep the two platform clients isolated.
+Joy8 runtime integration is defined in `GAME_PLATFORM_INTEGRATION.md`. A shared game core must still keep the two platform clients isolated.
 
 Version: 1.1.
 
@@ -14,26 +14,26 @@ This guide applies only to non-gambling games.
 
 Do not create a CrazyGames Client, build, SDK integration, ad flow, or store submission for a product whose core loop includes betting, wagering, payouts, a redeemable-value wallet, casino mechanics, or equivalent gambling behavior.
 
-Classification is based on actual gameplay and transaction mechanics, not only Looty's `games.type`. Every product in `D:\Studio\Project-Gaming` is treated as gambling unless the user explicitly moves and reclassifies it.
+Classification is based on actual gameplay and transaction mechanics, not only Joy8's `games.type`. Every product in `D:\Studio\Project-Gaming` is treated as gambling unless the user explicitly moves and reclassifies it.
 
 ## Non-Negotiable Separation
 
 A CrazyGames build:
 
 - Uses the CrazyGames SDK and CrazyGames-approved services only.
-- Does not read a Looty launch code or Gateway token.
-- Does not call the Looty Gateway.
-- Does not initialize a Looty wallet.
-- Does not perform Looty bet, payout, refund, or round operations.
+- Does not read a Joy8 launch code or Gateway token.
+- Does not call the Joy8 Gateway.
+- Does not initialize a Joy8 wallet.
+- Does not perform Joy8 bet, payout, refund, or round operations.
 
-A Looty build must not initialize the CrazyGames SDK or load CrazyGames ads.
+A Joy8 build must not initialize the CrazyGames SDK or load CrazyGames ads.
 
 ## Shared Game Architecture
 
 ```text
 Shared Game Core
   └─ Explicit Platform Client
-       ├─ Looty Client
+       ├─ Joy8 Client
        ├─ CrazyGames Client
        └─ Local Client
 ```
@@ -47,7 +47,7 @@ The CrazyGames Client owns:
 - Platform mute and chat settings.
 - User, multiplayer, invitation, and purchase modules when applicable.
 
-It does not own Looty identity, sessions, credentials, Gateway calls, wallet operations, or settlement.
+It does not own Joy8 identity, sessions, credentials, Gateway calls, wallet operations, or settlement.
 
 The platform client must finish `init()` before the game calls platform features. Expose platform capabilities explicitly and disable unsupported features safely.
 
@@ -61,7 +61,7 @@ Recommended:
 - One game version.
 - Explicit platform entry points or build settings.
 - A separate CrazyGames upload artifact.
-- A separate Looty deployment URL.
+- A separate Joy8 deployment URL.
 
 Do not force the two platforms to share one production URL. They may contain the same gameplay version while producing distinct platform configurations and artifacts.
 
@@ -166,7 +166,7 @@ Platform settings:
 
 ## Advertising
 
-Use only CrazyGames SDK ads. Do not integrate another ad network, Looty ads, or another platform's ads in this build.
+Use only CrazyGames SDK ads. Do not integrate another ad network, Joy8 ads, or another platform's ads in this build.
 
 ### Basic Launch
 
@@ -292,7 +292,7 @@ Submission data:
 
 - [ ] The game is confirmed non-gambling.
 - [ ] The CrazyGames platform target is explicit.
-- [ ] The build contains no Looty Gateway or wallet call.
+- [ ] The build contains no Joy8 Gateway or wallet call.
 - [ ] Total size is at most 250 MB and file count at most 1,500.
 - [ ] Initial download is at most 50 MB; mobile-homepage target is at most 20 MB.
 - [ ] Chrome, Edge, mobile, and a 4 GB Chromebook-class device pass.

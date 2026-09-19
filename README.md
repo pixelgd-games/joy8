@@ -1,15 +1,15 @@
-# Looty
+# Joy8
 
-Looty is a lightweight H5 game platform. This repository contains the public Lobby, the Game Loader, the game administration pages, and the Looty Gateway Edge Function.
+Joy8 is a lightweight H5 game platform. This repository contains the public Lobby, the Game Loader, the game administration pages, and the Joy8 Gateway Edge Function.
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-18.
+Last implementation review: 2026-09-19.
 
 The platform includes public Lobby browsing, Google/password/guest member entry,
 persistent player enrollment and one server-authorized wallet/settlement flow.
 The member migrations, four platform foundation migrations and session-scope
-correction are applied; Gateway version 8 is active.
+correction and the Joy8 object rebrand are applied; Joy8 Gateway version 1 is active.
 The matching front end is released through main. Product activation and real
 Google/email/linking/recovery acceptance remain outstanding.
 
@@ -21,9 +21,9 @@ exchange/renew backend key are configured in the game's ignored local environmen
 TLS certificate/hostname verification and restricted access passed against hosted
 Supabase. No wallet, AI funding or public entry was created by installation.
 The key cannot open or settle matches; funded-play configuration remains pending.
-Looty's local `/play-test/` entry is available at `http://localhost:5173` and uses
+Joy8's local `/play-test/` entry is available at `http://localhost:5173` and uses
 normal member/guest authentication and backend entry configuration, with no
-per-player test allowlist. Gateway version 8 is active with the private
+per-player test allowlist. Joy8 Gateway version 1 is active with the private
 session route and continuous-settlement error mapping. Hosted health, rejection
 and identity-key scope checks passed. The test-entry page is part of the standard
 Cloudflare front-end build, but Mahjong's backend entry remains bound to localhost;
@@ -35,11 +35,11 @@ the remaining configuration gates.
 
 ## Current Scope
 
-Looty currently provides:
+Joy8 currently provides:
 
 - A public mobile-first game Lobby.
 - A database-backed game catalog exposed through `public_games_v1`.
-- A Game Loader that creates a Looty session and embeds a selected game in an iframe.
+- A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
 - A reusable `/account/` entry for Google, Email/password, and persistent guests,
   with verification, recovery, guest promotion, and explicit player enrollment.
   Google, email, linking and recovery still require real provider acceptance.
@@ -49,7 +49,7 @@ Looty currently provides:
 - Cloudflare Pages static deployment from the `main` branch.
 - PWA metadata and install support for the Lobby.
 
-Looty does not currently provide:
+Joy8 does not currently provide:
 
 - Fully provider-verified public member flows or branded cross-origin handoff.
 - Production money movement.
@@ -92,7 +92,7 @@ Protocol details belong in [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLA
 Browser
   ├─ Lobby ─────────────── public_games_v1
   ├─ Member entry ──────── Supabase Auth + Gateway member/enroll-member
-  ├─ Admin pages ───────── games + is_looty_admin()
+  ├─ Admin pages ───────── games + is_joy8_admin()
   └─ Game Loader
        ├─ published entry: public_games_v1 + Gateway create-session
        ├─ test entry: Gateway private-session + backend entry configuration
@@ -105,7 +105,7 @@ Browser
 
 The front end is a Vite multi-page application written in vanilla JavaScript and
 CSS. Admin/catalog use the existing Supabase client. Member entry and launch use
-a separate PKCE client with storage key `looty-member-auth-v1`; Auth session
+a separate PKCE client with storage key `joy8-member-auth-v1`; Auth session
 storage is platform-owned and never passed into games. The Gateway is the only
 public path to protected player, game-session, and wallet RPCs. Separate browser
 storage does not grant administrator or player eligibility.
@@ -140,11 +140,11 @@ Vite declares these entries in `vite.config.js`.
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
 | `src/styles/` | Shared tokens plus theme, Lobby, Loader and error-modal styles |
-| `supabase/functions/looty-gateway/index.ts` | Gateway Edge Function |
+| `supabase/functions/joy8-gateway/index.ts` | Gateway Edge Function |
 | `supabase/migrations/` | Incremental database migrations |
 | `supabase/drafts/` | Unapproved SQL excluded from automatic migration discovery |
 | `scripts/` | Local verification and Supabase routing helpers |
-| `public/games/<slug>/cover.webp` | Looty-managed Lobby covers |
+| `public/games/<slug>/cover.webp` | Joy8-managed Lobby covers |
 
 ## Runtime Flows
 
@@ -181,18 +181,18 @@ The responsive Lobby uses four columns on touch devices with a low-height landsc
    and opens the member dialog. Backend failures stop launch visibly.
 2. It loads the matching published game from `public_games_v1`.
 3. It normalizes `launch_url` as an HTTPS URL or a root-relative platform path. HTTP is accepted only between loopback hosts during local development.
-4. It calls `looty-gateway/create-session`.
+4. It calls `joy8-gateway/create-session`.
 5. It appends the returned session parameters to the game URL.
-6. It creates the iframe with the Looty sandbox, permissions, referrer policy, and load timeout.
+6. It creates the iframe with the Joy8 sandbox, permissions, referrer policy, and load timeout.
 
 The iframe receives:
 
-- `looty_session_id`
-- `looty_launch_code`
-- `looty_game_id`
-- `looty_currency`
-- `looty_protocol` (`server-v1`)
-- `looty_gateway_url`
+- `joy8_session_id`
+- `joy8_launch_code`
+- `joy8_game_id`
+- `joy8_currency`
+- `joy8_protocol` (`server-v1`)
+- `joy8_gateway_url`
 
 The launch code is single-use and valid for two minutes. The trusted game backend exchanges it for an in-memory, balance-only token valid for at most 15 minutes and no later than session expiry. The Loader never passes a Supabase anonymous key, member JWT, or service-role key into the iframe.
 
@@ -221,7 +221,7 @@ execution only to the service role. Neither member route provisions a wallet.
 ### Administration
 
 1. An administrator signs in with Google OAuth.
-2. The browser calls `is_looty_admin()`.
+2. The browser calls `is_joy8_admin()`.
 3. Authorized users can list, create, edit, publish, and unpublish catalog records.
 4. Public users read only the safe fields exposed by `public_games_v1`.
 
@@ -229,7 +229,7 @@ The front end does not write player, wallet, round, or session tables directly.
 
 ## Gateway
 
-Hosted Gateway version 8 implements these POST routes:
+Hosted Joy8 Gateway version 1 implements these POST routes:
 
 - member, enroll-member, create-session, private-session, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
@@ -238,7 +238,7 @@ Hosted Gateway version 8 implements these POST routes:
 The public base URL is:
 
 ```text
-https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway
+https://lsazydefvnuqglultqii.supabase.co/functions/v1/joy8-gateway
 ```
 
 Current safeguards include:
@@ -258,7 +258,7 @@ The Gateway uses `verify_jwt=false` because it performs its own launch-code, tok
 
 ## Database
 
-The Looty Supabase project is `Looty`, ref `lsazydefvnuqglultqii`.
+The Joy8 Supabase project is `Joy8`, ref `lsazydefvnuqglultqii`.
 
 The replacement retains games, admin_users, public_games_v1, player_accounts,
 wallet_accounts, wallet_transactions, game_sessions and gateway_rate_limits.
@@ -284,7 +284,8 @@ and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
 Do not promote them alongside the installed schema; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 35 local and hosted migration records match, including the eight Mahjong
+All 36 local and hosted migration records match, including the Joy8 rebrand,
+the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist. Installation checks verified unchanged Auth/player IDs,
 existing catalog records and administrator count, with no wallets, sessions,
@@ -367,7 +368,7 @@ The same command runs three cutover guard checks: non-test sessions, outstanding
 reservations and external cascading foreign keys must abort the reset while
 retaining the original data and schema (23 PGlite cases in total).
 
-With `LOOTY_TEST_PG_BIN` set as below, `npm run test:platform-pg` runs those cases
+With `JOY8_TEST_PG_BIN` set as below, `npm run test:platform-pg` runs those cases
 plus eight actual competing-connection cases on native PostgreSQL 17.6 (28 cases).
 They observe database lock waits for launch, occupancy, duplicate/changed
 settlement, both freeze orderings, key revocation, and rollback/retry. These
@@ -385,7 +386,7 @@ settlement body only in its ledger column name; the test compares the definition
 PGlite fixture. Its 18 cases cover per-hand posting, final release, rolling human
 and AI reservations, replay/order rejection, zero-reserve occupancy, expired
 sessions, backend rotation, cancellation, frozen wallets, permissions, rollback,
-immutable records and the open-table application guard. With `LOOTY_TEST_PG_BIN`
+immutable records and the open-table application guard. With `JOY8_TEST_PG_BIN`
 set as below, `npm run test:continuous-pg` runs the same cases and seven observed
 lock-contention cases on PostgreSQL 17.6 (25 cases total). These tests neither apply
 hosted SQL nor implement Mahjong's durable adapter; the foundational single-posting
@@ -408,7 +409,7 @@ correction to verify unchanged data and permissions.
 Its 12 checks cover the corrected balance default, null/unsupported scopes,
 token scope, invalid/expired credentials, revoked sessions, inactive players/wallets,
 unchanged stored data and internal-helper permissions. It uses PGlite by default;
-with `LOOTY_TEST_PG_BIN` configured, run `npm run test:session-scope-pg`
+with `JOY8_TEST_PG_BIN` configured, run `npm run test:session-scope-pg`
 to run the same checks on native PostgreSQL 17.6. Both engines
 pass. The same correction is loaded by member/platform acceptance tests.
 The internal helper defaults to `balance`; explicit null or other scopes still
@@ -417,10 +418,10 @@ unchanged. Hosted definition, grants and before/after record counts were verifie
 through `scripts/sql/session-scope-verification.sql`. This is not a hosted gameplay
 test. Gateway publication was not required for the database-only correction.
 
-Set `LOOTY_TEST_PG_BIN` to an absolute directory containing PostgreSQL 17's
+Set `JOY8_TEST_PG_BIN` to an absolute directory containing PostgreSQL 17's
 `postgres`, `initdb`, and `pg_ctl` executables, then run the relevant `test:*-pg` command.
 All PostgreSQL entry scripts use the same runner and set
-`LOOTY_TEST_ENGINE=postgres17`; no separate member/platform engine setting is used.
+`JOY8_TEST_ENGINE=postgres17`; no separate member/platform engine setting is used.
 The shared database factory accepts only `pglite` or `postgres17` and defaults to
 PGlite. Historical cutover guard tests explicitly use PGlite.
 The helper creates an isolated temporary cluster, binds only to `127.0.0.1` on
@@ -430,9 +431,9 @@ It does not install a Windows service or require Docker. On Windows, the tested
 portable runtime can be prepared outside the repository with:
 
 ```powershell
-$lootyPgTools = Join-Path $env:TEMP 'looty-pg17-tools'
-npm install --prefix $lootyPgTools --ignore-scripts --no-audit --no-fund --save-exact '@embedded-postgres/windows-x64@17.6.0-beta.15'
-$env:LOOTY_TEST_PG_BIN = Join-Path $lootyPgTools 'node_modules\@embedded-postgres\windows-x64\native\bin'
+$joy8PgTools = Join-Path $env:TEMP 'joy8-pg17-tools'
+npm install --prefix $joy8PgTools --ignore-scripts --no-audit --no-fund --save-exact '@embedded-postgres/windows-x64@17.6.0-beta.15'
+$env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\windows-x64\native\bin'
 npm run test:member-pg
 npm run test:session-scope-pg
 npm run test:ledger-cleanup-pg
@@ -471,30 +472,30 @@ For Markdown-only changes, validate document links, paths, language, and archite
 
 ## Supabase Operations
 
-Looty uses a project-specific wrapper:
+Joy8 uses a project-specific wrapper:
 
 ```powershell
-.\scripts\supabase-looty.cmd projects list
+.\scripts\supabase-joy8.cmd projects list
 ```
 
 The result must show:
 
 ```text
-Looty / lsazydefvnuqglultqii / linked: true
+Joy8 / lsazydefvnuqglultqii / linked: true
 ```
 
 Do not continue if the active CLI state points only to Aura or another project. Database changes require a small user-reviewed migration before application. See `AGENTS.md` for the complete safety rules.
 
 ### Hosted Auth Configuration
 
-Verified in the Looty dashboard on 2026-09-17 using the user-authorized Chrome
+Verified in the Joy8 dashboard on 2026-09-17 using the user-authorized Chrome
 session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 `lsazydefvnuqglultqii`:
 
 - Google and Email providers, new-user signup and email confirmation are enabled.
 - Anonymous sign-in and manual identity linking are enabled and saved.
-- Site URL is `https://looty-git.pages.dev`.
-- Member redirect allowlist entries are `https://looty-git.pages.dev/account/*`,
+- Site URL is `https://joy8.pages.dev`.
+- Member redirect allowlist entries are `https://joy8.pages.dev/account/*`,
   `http://127.0.0.1:5173/account/*`, `http://localhost:5173/account/*`,
   `http://127.0.0.1:4173/account/*`, and `http://localhost:4173/account/*`.
   The suffix accommodates the encoded `next` and `flow` query parameters while
@@ -513,24 +514,24 @@ It does not establish that the CLI now has configuration read/write access.
 
 - Hosting: Cloudflare Pages.
 - Production branch: `main`.
-- Production hostname: `looty-git.pages.dev`.
+- Production hostname: `joy8.pages.dev`.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 
 A push to `main` triggers production deployment. Do not push documentation or code changes unless the user explicitly requests it.
 
-Looty remains on Cloudflare Pages. Mahjong H5 is planned for separate static
+Joy8 remains on Cloudflare Pages. Mahjong H5 is planned for separate static
 hosting on Cloudflare, but its upload is deferred until asset/readiness work is
 complete. Godot remains local during development; GCP/VPS selection and payment
 are deferred until external multiplayer testing requires an always-on server.
-SMTP belongs to Looty/Supabase Auth and does not depend on that server host.
+SMTP belongs to Joy8/Supabase Auth and does not depend on that server host.
 
 The Supabase Edge Function is deployed separately from Cloudflare Pages.
 
 ## Game and Asset Boundaries
 
-- Looty owns the catalog, Loader, iframe shell, platform error states, and Lobby covers.
+- Joy8 owns the catalog, Loader, iframe shell, platform error states, and Lobby covers.
 - A game owns its rendering, assets, CSP, `X-Frame-Options`, and sandbox compatibility.
 - Game source changes must be made in the named game repository, not here.
 - Lobby covers use `750 x 1000` WebP at `public/games/<slug>/cover.webp`.
@@ -544,7 +545,7 @@ The Supabase Edge Function is deployed separately from Cloudflare Pages.
 | `CLAUDE.md` | Thin Claude Code entry that points back to `AGENTS.md` |
 | `README.md` | Current repository implementation and operation |
 | `docs/product/PRODUCT_SCOPE.md` | Product boundaries, approved direction, and priorities |
-| `docs/platform/GAME_PLATFORM_INTEGRATION.md` | Looty-to-game runtime contract |
+| `docs/platform/GAME_PLATFORM_INTEGRATION.md` | Joy8-to-game runtime contract |
 | `docs/platform/MEMBER_AUTH_PLAN.md` | Platform-wide member, persistent guest, game-wallet relationship, and branded-entry plan |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |

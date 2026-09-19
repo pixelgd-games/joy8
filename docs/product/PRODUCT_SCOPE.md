@@ -1,12 +1,12 @@
-# Looty Product Scope
+# Joy8 Product Scope
 
-This document defines what Looty is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
+This document defines what Joy8 is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
 Last reviewed: 2026-09-17.
 
 ## Product Definition
 
-Looty is a lightweight H5 game platform that gives players one place to discover and launch games while keeping platform identity, sessions, and wallet authority outside individual games.
+Joy8 is a lightweight H5 game platform that gives players one place to discover and launch games while keeping platform identity, sessions, and wallet authority outside individual games.
 
 The product is intentionally small enough for one person to operate:
 
@@ -17,14 +17,14 @@ The product is intentionally small enough for one person to operate:
 
 ## Product Outcomes
 
-Looty succeeds when:
+Joy8 succeeds when:
 
 - A player can discover a published game and launch it reliably from the Lobby.
-- A direct game entry can eventually use the same Looty identity and the correct platform or game-scoped wallet without requiring the public Lobby.
-- A game integrates once with the documented Looty contract instead of implementing platform ownership itself.
+- A direct game entry can eventually use the same Joy8 identity and the correct platform or game-scoped wallet without requiring the public Lobby.
+- A game integrates once with the documented Joy8 contract instead of implementing platform ownership itself.
 - Administrators can manage catalog metadata without exposing protected platform data.
 - The platform can diagnose launch and wallet failures without storing secrets or sensitive player data.
-- A non-gambling game can share one core build across Looty and CrazyGames while keeping platform services isolated.
+- A non-gambling game can share one core build across Joy8 and CrazyGames while keeping platform services isolated.
 
 ## Current Implementation
 
@@ -36,9 +36,9 @@ product activation remains pending as recorded in README and the integration con
 
 ## Ownership Boundaries
 
-### Looty Platform
+### Joy8 Platform
 
-Looty owns:
+Joy8 owns:
 
 - Game discovery and catalog metadata.
 - Platform identity and membership entry.
@@ -63,16 +63,16 @@ Each game owns:
 
 A game must not:
 
-- Authenticate Looty members.
+- Authenticate Joy8 members.
 - receive provider credentials.
 - write player or wallet tables.
-- change a Looty balance directly.
-- write gameplay data into Looty-owned platform tables or another game's schema.
+- change a Joy8 balance directly.
+- write gameplay data into Joy8-owned platform tables or another game's schema.
 - infer a platform from iframe presence alone.
 
 ### Sibling Flash Modules
 
-Looty must not absorb unrelated responsibilities from sibling Flash modules. Cross-module background belongs in `../platform/FLASH.md`; each module remains independently maintainable.
+Joy8 must not absorb unrelated responsibilities from sibling Flash modules. Cross-module background belongs in `../platform/FLASH.md`; each module remains independently maintainable.
 
 ## Approved Platform Direction
 
@@ -80,7 +80,7 @@ Looty must not absorb unrelated responsibilities from sibling Flash modules. Cro
 
 Non-gambling games may use one core build with three explicit platform clients:
 
-- Looty Client.
+- Joy8 Client.
 - CrazyGames Client.
 - Local Client for local development only.
 
@@ -95,15 +95,15 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 - First release: H5. Android and iOS are later work, not first-release gates.
 - Sign-in: Google, basic account/password, and persistent guest access.
   [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns their design.
-- Mahjong Clash is the first adopter, not the architectural center of Looty.
+- Mahjong Clash is the first adopter, not the architectural center of Joy8.
   Platform capabilities must be reusable by other products.
 
 | Product model | Entry and release | Wallet | Game data |
 | --- | --- | --- | --- |
-| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Looty Lobby | One game-scoped wallet per player and game | Game-owned schema and authoritative backend |
-| Looty-native shared-economy game, such as a platform slot or compact table game | Operates with the platform and its shared services | One common platform wallet per player | Game-owned or intentionally shared family schema and backend |
+| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Joy8 Lobby | One game-scoped wallet per player and game | Game-owned schema and authoritative backend |
+| Joy8-native shared-economy game, such as a platform slot or compact table game | Operates with the platform and its shared services | One common platform wallet per player | Game-owned or intentionally shared family schema and backend |
 
-Both use the same Looty membership on Looty-operated surfaces. Independent
+Both use the same Joy8 membership on Joy8-operated surfaces. Independent
 entry does not create a separate member system. A branded entry may remain
 available after Lobby listing; the player keeps the same identity, wallet,
 and product progress through either entrance. Platform-native products retain
@@ -111,11 +111,11 @@ their shared-entry/shared-wallet model; they need not become standalone games.
 Neither model exempts a game from trusted settlement and security requirements.
 
 External channels such as CrazyGames use their own approved platform identity
-and must not initialize Looty Auth, sessions, or wallets.
+and must not initialize Joy8 Auth, sessions, or wallets.
 
 ## Wallet and POINT Direction
 
-- Looty owns human-player wallet authority. Trusted catalog configuration
+- Joy8 owns human-player wallet authority. Trusted catalog configuration
   chooses platform or game scope; clients and games cannot choose their scope.
 - Independent-game balances do not affect another game's or the platform's
   balance. Platform-native games intentionally consume the same balance.
@@ -164,9 +164,9 @@ The present repository cannot recreate the full local database from migrations
 alone. A reviewed bootstrap/fixture and backup/restore procedure are prerequisite
 work, tracked in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).
 
-The initial hosted cost model may share one Supabase project across Looty and
+The initial hosted cost model may share one Supabase project across Joy8 and
 game-owned schemas, with explicit roles and backend boundaries. A game owns
-its detailed gameplay data; Looty keeps only platform and accounting records.
+its detailed gameplay data; Joy8 keeps only platform and accounting records.
 Shared compute, outages, and backups remain coupled. Keep schema dependencies
 separable so a game can later move without changing its identity/wallet contract.
 Each game's runtime host is a separate assignment; sharing Supabase does not
@@ -174,21 +174,21 @@ choose or provide that host.
 
 ## Catalog Direction
 
-The database is the catalog source. Looty must not add a local `enabled-games` allowlist.
+The database is the catalog source. Joy8 must not add a local `enabled-games` allowlist.
 
 A published catalog item needs:
 
 - A stable game identifier and slug.
 - A valid HTTPS launch URL.
-- A Looty-managed `750 x 1000` WebP cover.
+- A Joy8-managed `750 x 1000` WebP cover.
 - Correct type and capability metadata.
 - A verified Loader-to-iframe launch.
 
-Published status describes platform availability; it does not make Looty responsible for changing a game's own source code.
+Published status describes platform availability; it does not make Joy8 responsible for changing a game's own source code.
 
 ## Explicitly Out of Scope
 
-Unless the user changes the product direction, Looty does not own:
+Unless the user changes the product direction, Joy8 does not own:
 
 - A framework migration to React, Vue, or Next.js.
 - A server-rendered application.
@@ -198,7 +198,7 @@ Unless the user changes the product direction, Looty does not own:
 - Game-controlled login or balance mutation.
 - A front-end path to service-role database RPCs.
 - A separate member master for a branded game entry.
-- Conversion between independent game wallets and the Looty platform wallet in the current phase.
+- Conversion between independent game wallets and the Joy8 platform wallet in the current phase.
 - Pre-launch legacy data compatibility.
 - Responsibilities that belong to unrelated Flash products.
 
@@ -229,7 +229,7 @@ observability in [ANALYTICS_MONITORING.md](../operations/ANALYTICS_MONITORING.md
 
 When evaluating a new feature:
 
-1. Keep identity, session, and wallet authority in Looty.
+1. Keep identity, session, and wallet authority in Joy8.
 2. Keep gameplay and rendering in the game.
 3. Prefer a small extension to an existing contract over a parallel system.
 4. Keep one source of truth for catalog and platform data.

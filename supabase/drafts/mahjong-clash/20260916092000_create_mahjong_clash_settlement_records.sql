@@ -1,6 +1,6 @@
--- Review-only Mahjong settlement records. Looty's current Demo POINT wallet is
+-- Review-only Mahjong settlement records. Joy8's current Demo POINT wallet is
 -- shared by player/currency; do not use these records for Mahjong wallet
--- settlement until Looty implements and validates game-scoped wallet resolution.
+-- settlement until Joy8 implements and validates game-scoped wallet resolution.
 create table mahjong_clash.settlements (
   id uuid primary key default gen_random_uuid(),
   match_id uuid not null references mahjong_clash.matches(id) on delete restrict,

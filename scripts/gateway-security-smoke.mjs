@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 
-const gateway = new URL(process.env.GATEWAY_URL || "https://lsazydefvnuqglultqii.supabase.co/functions/v1/looty-gateway")
+const gateway = new URL(process.env.GATEWAY_URL || "https://lsazydefvnuqglultqii.supabase.co/functions/v1/joy8-gateway")
 const production = gateway.hostname === "lsazydefvnuqglultqii.supabase.co"
 if (production && process.env.ALLOW_PRODUCTION_GATEWAY_SMOKE !== "1") {
   throw new Error("Set ALLOW_PRODUCTION_GATEWAY_SMOKE=1 after approving the hosted check; runtime rate counters may change.")
@@ -9,17 +9,17 @@ if (gateway.protocol !== "https:" && !["localhost", "127.0.0.1", "[::1]"].includ
   throw new Error("Gateway must use HTTPS outside loopback")
 }
 const base = gateway.href.replace(/\/+$/, "")
-const origin = process.env.GATEWAY_LOOTY_ORIGIN || "https://looty-git.pages.dev"
+const origin = process.env.GATEWAY_JOY8_ORIGIN || "https://joy8.pages.dev"
 async function post(route, body = {}, browserOrigin = null) {
   return fetch(base + "/" + route, {
     method: "POST", headers: { "Content-Type": "application/json", ...(browserOrigin ? { Origin: browserOrigin } : {}) },
     body: JSON.stringify(body), signal: AbortSignal.timeout(12000),
   })
 }
-assert.equal((await post("create-session", {}, "https://not-looty.example")).status, 403)
+assert.equal((await post("create-session", {}, "https://not-joy8.example")).status, 403)
 assert.equal((await post("create-session")).status, 403)
 assert.equal((await post("create-session", {}, origin)).status, 401)
-assert.equal((await post("private-session", { slug: "mahjong-clash" }, "https://not-looty.example")).status, 403)
+assert.equal((await post("private-session", { slug: "mahjong-clash" }, "https://not-joy8.example")).status, 403)
 assert.equal((await post("private-session", { slug: "mahjong-clash" })).status, 403)
 assert.equal((await post("private-session", { slug: "mahjong-clash" }, "http://localhost:5173")).status, 401)
 for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {

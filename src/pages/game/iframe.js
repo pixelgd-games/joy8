@@ -8,7 +8,7 @@ const IFRAME_PERMISSIONS = "autoplay; fullscreen; gamepad"
 
 export function createGameIframe({ gameUrl, gameName, onLoad }) {
   const iframe = document.createElement("iframe")
-  iframe.title = gameName || "Looty Game"
+  iframe.title = gameName || "Joy8 Game"
   iframe.loading = "eager"
   iframe.referrerPolicy = "no-referrer"
   iframe.setAttribute("sandbox", getSandboxTokens(gameUrl).join(" "))

@@ -10,7 +10,7 @@ for (const [name, setup, expected] of [
 ]) test(`cutover refuses ${name} and retains all data and old schema`, async () => {
   const db = await createTestDatabase("pglite")
   try {
-    await loadMemberDatabase(db)
+    await loadMemberDatabase(db, async () => {}, false)
     const auth = (await db.query("insert into auth.users(is_anonymous) values(true) returning id")).rows[0].id
     await db.query("select * from public.looty_resolve_member($1,true)", [auth])
     const session = (await db.query("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])).rows[0]

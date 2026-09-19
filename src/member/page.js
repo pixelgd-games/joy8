@@ -11,9 +11,9 @@ export function initMemberPanel(root, options = {}) {
   const service = createMemberService(memberSupabase, {
     origin: location.origin,
     next: params.get("next"),
-    guestLock: navigator.locks ? (fn) => navigator.locks.request("looty-guest-entry", fn) : null,
+    guestLock: navigator.locks ? (fn) => navigator.locks.request("joy8-guest-entry", fn) : null,
   })
-  const pendingKey = "looty-member-link-user"
+  const pendingKey = "joy8-member-link-user"
   const entryDescription = $("account-description").textContent
   let user = null
   let formMode = "signin"

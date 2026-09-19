@@ -3,7 +3,7 @@ import test from "node:test"
 import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 
-const origin = "https://looty.example"
+const origin = "https://joy8.example"
 const guestUser = { id: "guest-1", is_anonymous: true }
 const registeredUser = { id: "guest-1", is_anonymous: false, email_confirmed_at: "2026-09-16" }
 
@@ -136,7 +136,7 @@ test("reading membership never creates a guest or enrolls an existing Auth user"
   assert.deepEqual(f.calls, [])
   const signedIn = fixture(registeredUser)
   await signedIn.service.membership()
-  assert.deepEqual(signedIn.calls, [["rpc", "looty-gateway/member", { body: {} }]])
+  assert.deepEqual(signedIn.calls, [["rpc", "joy8-gateway/member", { body: {} }]])
 })
 
 test("concurrent guest entry creates one Auth guest and preserves its player", async () => {
@@ -201,7 +201,7 @@ test("email password sign-in enrolls only after successful authentication", asyn
   const f = fixture()
   assert.equal((await f.service.signIn(" player@example.com ", "password" )).player_account_ref, "player-1")
   assert.deepEqual(f.calls.map(([name]) => name), ["password", "rpc"])
-  assert.equal(f.calls[1][1], "looty-gateway/enroll-member")
+  assert.equal(f.calls[1][1], "joy8-gateway/enroll-member")
   const rejected = fixture()
   rejected.client.auth.signInWithPassword = async () => ({ error: { code: "email_not_confirmed" } })
   await assert.rejects(rejected.service.signIn("player@example.com", "password"), { code: "email_not_confirmed" })

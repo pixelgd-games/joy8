@@ -71,10 +71,10 @@ async function main() {
   }
 
   if (privateEntry) {
-    const { data, error } = await memberSupabase.functions.invoke("looty-gateway/private-session", { body: { slug } })
+    const { data, error } = await memberSupabase.functions.invoke("joy8-gateway/private-session", { body: { slug } })
     if (error) {
       let denied = false
-      try { denied = (await error.context?.json())?.error === "LOOTY_PRIVATE_ENTRY_DENIED" } catch {}
+      try { denied = (await error.context?.json())?.error === "JOY8_PRIVATE_ENTRY_DENIED" } catch {}
       document.getElementById("private-status").textContent = denied
         ? "目前無法從這個網址進入測試，請確認測試入口已啟用。"
         : "目前無法進入測試，請稍後再試。"
@@ -137,21 +137,21 @@ async function main() {
 }
 
 function mountSession(gameUrl, gameName, launchSession) {
-  const gatewayUrl = supabaseFunctionsUrl ? `${supabaseFunctionsUrl}/looty-gateway` : ""
+  const gatewayUrl = supabaseFunctionsUrl ? `${supabaseFunctionsUrl}/joy8-gateway` : ""
   const sessionGameUrl = appendQueryParams(gameUrl, {
-    looty_session_id: launchSession.session_id,
-    looty_launch_code: launchSession.launch_code,
-    looty_game_id: launchSession.game_id,
-    looty_currency: launchSession.currency,
-    looty_gateway_url: gatewayUrl,
-    looty_protocol: "server-v1",
+    joy8_session_id: launchSession.session_id,
+    joy8_launch_code: launchSession.launch_code,
+    joy8_game_id: launchSession.game_id,
+    joy8_currency: launchSession.currency,
+    joy8_gateway_url: gatewayUrl,
+    joy8_protocol: "server-v1",
   })
 
   if (!sessionGameUrl) {
     showError({
       code: ERROR_CODES.GAME_URL_INVALID,
       title: "Game URL is invalid",
-      message: "Looty could not prepare the game launch URL.",
+      message: "Joy8 could not prepare the game launch URL.",
     })
     return
   }
@@ -164,7 +164,7 @@ function mountSession(gameUrl, gameName, launchSession) {
 }
 
 async function createLaunchSession(gameSlug) {
-  const { data, error } = await memberSupabase.functions.invoke("looty-gateway/create-session", {
+  const { data, error } = await memberSupabase.functions.invoke("joy8-gateway/create-session", {
     body: {
       slug: gameSlug,
       currency: "POINT",
@@ -177,7 +177,7 @@ async function createLaunchSession(gameSlug) {
   }
 
   if (!data?.session_id || !data?.launch_code || data.protocol !== "server-v1") {
-    throw new Error("Looty gateway returned an empty session.")
+    throw new Error("Joy8 gateway returned an empty session.")
   }
 
   return data
@@ -225,7 +225,7 @@ function failed(error) {
 if (privateEntry) {
   const card = document.querySelector(".loader-card")
   card.querySelector(".loader-ring")?.remove()
-  card.querySelector(".loader-copy").textContent = "登入 Looty 或使用快速登入，即可進入測試。"
+  card.querySelector(".loader-copy").textContent = "登入 Joy8 或使用快速登入，即可進入測試。"
   const button = document.createElement("button")
   button.id = "private-start"
   button.type = "button"

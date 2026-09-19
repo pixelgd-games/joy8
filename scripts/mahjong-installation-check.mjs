@@ -9,7 +9,7 @@ const gameRoot = process.env.MAHJONG_REVIEW_ROOT
 assert.ok(gameRoot && path.isAbsolute(gameRoot), 'Set MAHJONG_REVIEW_ROOT to the reviewed Mahjong repository')
 const db = new PGlite({ extensions: { pgcrypto } })
 try {
-  const sources = JSON.parse(await readFile(path.join(gameRoot, 'server/fixtures/looty-platform.json'), 'utf8'))
+  const sources = JSON.parse(await readFile(path.join(gameRoot, 'server/fixtures/joy8-platform.json'), 'utf8'))
   for (const source of sources) {
     const sql = await readFile(source.path, 'utf8')
     assert.equal(createHash('sha256').update(sql).digest('hex'), source.sha256, source.path)
@@ -21,16 +21,16 @@ try {
   await db.exec(await readFile('supabase/migrations/20260918010700_mahjong_registration.sql', 'utf8'))
   const one = async sql => (await db.query(sql)).rows[0]
   assert.deepEqual(await one("select published,launch_url from public.games where slug='mahjong-clash'"), { published: false, launch_url: null })
-  const wallet = await one("select p.enabled,p.initial_credit from public.looty_wallet_policies p join public.games g on g.id=p.game_id where g.slug='mahjong-clash'")
+  const wallet = await one("select p.enabled,p.initial_credit from public.joy8_wallet_policies p join public.games g on g.id=p.game_id where g.slug='mahjong-clash'")
   assert.equal(wallet.enabled, false)
   assert.equal(Number(wallet.initial_credit), 0)
   assert.deepEqual(await one("select rolcanlogin,rolsuper,rolbypassrls,rolinherit from pg_roles where rolname='mahjong_clash_runtime'"), { rolcanlogin: false, rolsuper: false, rolbypassrls: false, rolinherit: false })
-  for (const table of ['public.wallet_accounts', 'public.looty_backend_keys', 'mahjong_clash.ai_accounts', 'mahjong_clash.matches']) assert.equal(Number((await one(`select count(*) n from ${table}`)).n), 0)
+  for (const table of ['public.wallet_accounts', 'public.joy8_backend_keys', 'mahjong_clash.ai_accounts', 'mahjong_clash.matches']) assert.equal(Number((await one(`select count(*) n from ${table}`)).n), 0)
   assert.equal((await one('select environment from mahjong_clash.economy_state')).environment, 'operational')
   for (const role of ['anon', 'authenticated', 'service_role', 'mahjong_clash_server']) {
     await db.exec(`set role ${role}`)
     try {
-      await assert.rejects(db.query('select * from public.looty_backend_keys'), /permission denied/)
+      await assert.rejects(db.query('select * from public.joy8_backend_keys'), /permission denied/)
       if (role !== 'mahjong_clash_server') await assert.rejects(db.query('select * from mahjong_clash.integration_pending'), /permission denied/)
       else {
         await assert.rejects(db.query('update mahjong_clash.ai_accounts set balance=10000'), /permission denied/)

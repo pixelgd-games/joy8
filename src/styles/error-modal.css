@@ -1,15 +1,15 @@
 @import "./tokens.css";
 
-.looty-error-modal,
-.looty-error-modal *{
+.joy8-error-modal,
+.joy8-error-modal *{
   box-sizing:border-box;
 }
 
-body.looty-error-modal-open{
+body.joy8-error-modal-open{
   overflow:hidden;
 }
 
-.looty-error-modal{
+.joy8-error-modal{
   position:fixed;
   inset:0;
   z-index:10000;
@@ -23,7 +23,7 @@ body.looty-error-modal-open{
   font-family:var(--font-family);
 }
 
-.looty-error-dialog{
+.joy8-error-dialog{
   width:min(420px,100%);
   padding:24px;
   border:1px solid color-mix(in srgb, var(--accent) 18%, transparent);
@@ -32,7 +32,7 @@ body.looty-error-modal-open{
   box-shadow:0 28px 70px rgba(0,0,0,.46), inset 0 1px 0 rgba(255,255,255,.06);
 }
 
-.looty-error-kicker{
+.joy8-error-kicker{
   margin:0 0 8px;
   color:var(--accent);
   font-size:12px;
@@ -40,20 +40,20 @@ body.looty-error-modal-open{
   letter-spacing:.12em;
 }
 
-.looty-error-title{
+.joy8-error-title{
   margin:0;
   font-size:24px;
   line-height:1.2;
 }
 
-.looty-error-message{
+.joy8-error-message{
   margin:12px 0 0;
   color:color-mix(in srgb, var(--text) 84%, transparent);
   font-size:15px;
   line-height:1.6;
 }
 
-.looty-error-code{
+.joy8-error-code{
   margin:16px 0 0;
   padding:10px 12px;
   border:1px solid rgba(255,255,255,.08);
@@ -65,14 +65,14 @@ body.looty-error-modal-open{
   word-break:break-word;
 }
 
-.looty-error-actions{
+.joy8-error-actions{
   display:flex;
   justify-content:flex-end;
   gap:10px;
   margin-top:20px;
 }
 
-.looty-error-action{
+.joy8-error-action{
   min-height:38px;
   padding:0 16px;
   border:1px solid color-mix(in srgb, var(--accent) 14%, transparent);
@@ -85,26 +85,26 @@ body.looty-error-modal-open{
   cursor:pointer;
 }
 
-.looty-error-action.primary{
+.joy8-error-action.primary{
   border-color:rgba(255,255,255,.08);
   background:linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
   color:#1d2128;
 }
 
 @media (max-width:480px){
-  .looty-error-modal{
+  .joy8-error-modal{
     padding:16px;
   }
 
-  .looty-error-dialog{
+  .joy8-error-dialog{
     padding:20px;
   }
 
-  .looty-error-actions{
+  .joy8-error-actions{
     flex-direction:column;
   }
 
-  .looty-error-action{
+  .joy8-error-action{
     width:100%;
   }
 }

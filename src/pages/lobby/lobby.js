@@ -3,8 +3,8 @@ export function renderLobby() {
     <div class="shell">
       <main class="lobby-page">
         <header class="site-header">
-          <a class="brand-link" href="/" aria-label="Looty lobby">
-            <span class="brand-mark">Looty</span>
+          <a class="brand-link" href="/" aria-label="Joy8 lobby">
+            <span class="brand-mark">Joy8</span>
           </a>
           <div class="header-actions">
             <a class="member-login-link" href="/account/" aria-haspopup="dialog" aria-controls="member-dialog">登入</a>
@@ -18,8 +18,14 @@ export function renderLobby() {
           </div>
         </header>
 
-        <section class="hero" aria-label="Looty hero image">
-          <img class="hero-image" src="/hero/looty-hero-main.webp" alt="" loading="eager" decoding="async">
+        <section class="hero" aria-labelledby="joy8HeroTitle">
+          <img class="hero-image" src="/hero/joy8-hero-main.webp" alt="" loading="eager" decoding="async">
+          <div class="hero-copy">
+            <p class="hero-kicker">PLAY · DISCOVER · REPEAT</p>
+            <h1 class="hero-title" id="joy8HeroTitle">Play more with Joy8.</h1>
+            <p class="hero-description">Instant browser games, all in one place.</p>
+            <a class="hero-action" href="#gamesSection">開始遊玩</a>
+          </div>
         </section>
 
         <section class="content" id="gamesSection">

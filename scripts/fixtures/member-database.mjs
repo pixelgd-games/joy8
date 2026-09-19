@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises"
+import { applyJoy8Rebrand } from "./joy8-rebrand.mjs"
 
 export const memberSql = (path) => readFile(new URL(path, import.meta.url), "utf8")
 
-export async function loadMemberDatabase(db, beforeMemberMigrations = async () => {}) {
+export async function loadMemberDatabase(db, beforeMemberMigrations = async () => {}, rebrand = true) {
   await db.exec(await memberSql("./member-database.sql"))
   for (const migration of [
     "20260709170000_create_platform_account_wallet_core.sql",
@@ -16,4 +17,5 @@ export async function loadMemberDatabase(db, beforeMemberMigrations = async () =
   for (const migration of ["20260916100000_member_enrollment.sql", "20260916101000_require_member_game_session.sql"]) {
     await db.exec(await memberSql(`../../supabase/migrations/${migration}`))
   }
+  if (rebrand) await applyJoy8Rebrand(db)
 }

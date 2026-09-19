@@ -1,6 +1,6 @@
-# Looty AI Working Agreement
+# Joy8 AI Working Agreement
 
-This document is for AI and Codex agents working in the Looty repository. It is not user-facing product documentation.
+This document is for AI and Codex agents working in the Joy8 repository. It is not user-facing product documentation.
 
 ## Project Entry
 
@@ -14,7 +14,7 @@ Before substantive work in this repository:
 
 Do not claim a document was read unless it was read in the current task. Use read-only discovery before editing files or changing external state.
 
-The repository root is `D:\Studio\Project_Code\looty`.
+The repository root is `D:\Studio\Project_Code\joy8`.
 
 For asset creation, movement, cropping, compression, or export, first read `D:\Studio\Project_Art\README.md`.
 
@@ -26,7 +26,7 @@ Read the smallest complete set for the task:
 | --- | --- |
 | Current repository structure, setup, build, or deployment | `README.md` |
 | Product boundaries, priorities, or roadmap | `docs/product/PRODUCT_SCOPE.md` |
-| Looty game launch, iframe, Gateway, wallet, or game integration | `docs/platform/GAME_PLATFORM_INTEGRATION.md` |
+| Joy8 game launch, iframe, Gateway, wallet, or game integration | `docs/platform/GAME_PLATFORM_INTEGRATION.md` |
 | Member authentication, persistent guest identity, game-wallet relationship, or branded game entry | `docs/platform/MEMBER_AUTH_PLAN.md` |
 | CrazyGames builds, SDK, ads, saves, or store submission | `docs/platform/CRAZYGAMES_INTEGRATION.md` |
 | Cross-module Flash context | `docs/platform/FLASH.md` |
@@ -35,7 +35,7 @@ Read the smallest complete set for the task:
 
 For a routine Git upload or download, this file and `README.md` are sufficient unless the change itself requires another document. A first upload must follow the complete Studio Git workflow.
 
-When a non-gambling game ships to both Looty and CrazyGames, read both platform integration documents. Gambling products do not ship to CrazyGames.
+When a non-gambling game ships to both Joy8 and CrazyGames, read both platform integration documents. Gambling products do not ship to CrazyGames.
 
 ## Documentation Ownership
 
@@ -61,36 +61,36 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 
 ## Fixed Product Rules
 
-- Do not convert Looty to React, Vue, Next.js, or another framework unless the user explicitly asks.
+- Do not convert Joy8 to React, Vue, Next.js, or another framework unless the user explicitly asks.
 - Do not change the Cloudflare Pages static deployment architecture.
 - Do not add a local `enabled-games` allowlist.
 - Implement public member entry only through the reviewed `docs/platform/MEMBER_AUTH_PLAN.md`; do not restore the old login UI as a shortcut.
-- Do not move sibling Flash module responsibilities into Looty.
+- Do not move sibling Flash module responsibilities into Joy8.
 - Games must not log players in or modify player balances directly.
-- Looty match/accounting tables store only platform reservations and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Looty Supabase project physically, but games must not access Looty-owned tables, another game's schema, or a project-wide service-role key.
-- Do not modify a game repository during a Looty repository task. Switch to the named game repository for game-side work.
-- The Looty launch code and Gateway token stay in memory only. Never write them to browser storage, logs, or Analytics.
-- Looty owns the Loader iframe shell, permissions, load timeout, and platform error screens.
+- Joy8 match/accounting tables store only platform reservations and settlement summaries. Each game or approved shared game family owns its authoritative player mapping, gameplay state, actions, results, history, progression, and rankings behind a dedicated schema and backend permission boundary. The initial cost model may share the Joy8 Supabase project physically, but games must not access Joy8-owned tables, another game's schema, or a project-wide service-role key.
+- Do not modify a game repository during a Joy8 repository task. Switch to the named game repository for game-side work.
+- The Joy8 launch code and Gateway token stay in memory only. Never write them to browser storage, logs, or Analytics.
+- Joy8 owns the Loader iframe shell, permissions, load timeout, and platform error screens.
 - Each game owns its in-game rendering, resource loading, CSP, `X-Frame-Options`, and sandbox compatibility. Report game-side failures from this repository; do not fix them here.
 - Lobby covers use a `3:4` ratio at `750 x 1000` in WebP format and live at `public/games/<slug>/cover.webp`.
-- Lobby covers are Looty platform assets. Do not place or modify them in a game repository.
+- Lobby covers are Joy8 platform assets. Do not place or modify them in a game repository.
 
 ## Platform Separation
 
-- Non-gambling games may share one core build across Looty, CrazyGames, and local development.
-- Platform differences belong in the Looty Client, CrazyGames Client, and Local Client.
+- Non-gambling games may share one core build across Joy8, CrazyGames, and local development.
+- Platform differences belong in the Joy8 Client, CrazyGames Client, and Local Client.
 - The Local Client is only for local testing. It must not activate automatically when a real platform fails to initialize.
 - Do not detect the platform from the iframe alone.
-- One build must never call Looty and CrazyGames platform services at the same time.
-- A CrazyGames build must not call the Looty Gateway.
-- A Looty build must not initialize the CrazyGames SDK or load CrazyGames ads.
+- One build must never call Joy8 and CrazyGames platform services at the same time.
+- A CrazyGames build must not call the Joy8 Gateway.
+- A Joy8 build must not initialize the CrazyGames SDK or load CrazyGames ads.
 - Gambling classification is based on gameplay and transaction mechanics, not only `games.type`.
 - Every product in `D:\Studio\Project-Gaming` is treated as gambling unless the user explicitly moves and reclassifies it. These products receive no CrazyGames Client, build, SDK, ads, or store assets.
 
 ## Git and GitHub
 
-- The repository is `pixelgd-games/looty`.
-- `origin` must remain `git@github-pixelgd:pixelgd-games/looty.git` unless the user explicitly approves a change.
+- The repository is `pixelgd-games/joy8`.
+- `origin` must remain `git@github-pixelgd:pixelgd-games/joy8.git` unless the user explicitly approves a change.
 - Interpret “upload to Git/GitHub” as commit and push unless the user explicitly requests a pull request.
 - Before pushing, verify the current branch, `git remote get-url origin`, the `github-pixelgd` SSH account route, and the staged file scope.
 - `ssh -T git@github-pixelgd` must identify the `pixelgd-games` account. Stop if it identifies another account.
@@ -101,13 +101,13 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 
 ## Supabase Safety
 
-- The Looty Supabase project is `Looty`, ref `lsazydefvnuqglultqii`.
-- Use `.\scripts\supabase-looty.cmd` for remote Supabase operations.
-- Before every database operation, run `.\scripts\supabase-looty.cmd projects list` and require `Looty / lsazydefvnuqglultqii / linked: true`.
+- The Joy8 Supabase project is `Joy8`, ref `lsazydefvnuqglultqii`.
+- Use `.\scripts\supabase-joy8.cmd` for remote Supabase operations.
+- Before every database operation, run `.\scripts\supabase-joy8.cmd projects list` and require `Joy8 / lsazydefvnuqglultqii / linked: true`.
 - Stop if only the `arua` project appears. Check `.env.supabase.local` before asking the user to log in again.
 - If the wrapper returns `Unauthorized` while `.env.supabase.local` contains a token, stop and ask the user to refresh that token locally. Never ask the user to paste it into chat.
-- Do not use Aura or another project's Supabase CLI state for Looty.
-- Supabase MCP is not authorized for Looty and is not the primary operating method.
+- Do not use Aura or another project's Supabase CLI state for Joy8.
+- Supabase MCP is not authorized for Joy8 and is not the primary operating method.
 - Before changing the database, prepare a small, reviewable SQL migration and ask the user to confirm it.
 - Do not leave unconfirmed baseline or large-rebuild migrations in the active migration folder.
 - `.env.supabase.local` is local-only. Never commit it or expose access tokens, service-role keys, or database passwords in code, documents, logs, or chat.
@@ -116,7 +116,7 @@ When a non-gambling game ships to both Looty and CrazyGames, read both platform 
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
 - Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
-- The wallet model uses game-scoped wallets for independently operated games and one shared platform wallet for Looty-native games; wallet scope must be resolved by trusted Looty configuration, never by a game request.
+- The wallet model uses game-scoped wallets for independently operated games and one shared platform wallet for Joy8-native games; wallet scope must be resolved by trusted Joy8 configuration, never by a game request.
 - Do not recreate the superseded Demo currency hold migration. Current POINT enforcement belongs to the scoped wallet policies and trusted session protocol.
 - Do not preserve an old Demo runtime or add old/new compatibility. Historical migration files are deployment history, not an active fallback. Follow `docs/product/PRODUCT_SCOPE.md` for the approved direction and review provisioning/cutover before changing balances or enabling purchases.
 

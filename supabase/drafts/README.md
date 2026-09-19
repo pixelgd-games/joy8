@@ -24,7 +24,7 @@ Current credentials, expiry, entry ownership and remaining gates are in the revi
 For an isolated complete installation check, set `MAHJONG_REVIEW_ROOT` to the
 absolute Mahjong repository and run `node scripts/mahjong-installation-check.mjs`.
 For the PostgreSQL 17 non-superuser ownership-transfer check, also configure
-`LOOTY_TEST_PG_BIN` per README and run
+`JOY8_TEST_PG_BIN` per README and run
 `node scripts/mahjong-native-installation-check.mjs`. Both use local fixtures;
 neither reads hosted credentials. The native case verifies temporary schema
 CREATE and role SET/INHERIT privileges are removed after ownership transfer,

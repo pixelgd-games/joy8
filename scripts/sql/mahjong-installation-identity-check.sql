@@ -7,7 +7,7 @@ select jsonb_build_object(
   'wallets',(select count(*) from public.wallet_accounts),
   'transactions',(select count(*) from public.wallet_transactions),
   'sessions',(select count(*) from public.game_sessions),
-  'matches',(select count(*) from public.looty_matches),
-  'settlements',(select count(*) from public.looty_settlements)
+  'matches',(select count(*) from public.joy8_matches),
+  'settlements',(select count(*) from public.joy8_settlements)
 ) as installation_snapshot;
 commit;

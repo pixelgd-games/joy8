@@ -6,18 +6,18 @@ param(
 $ErrorActionPreference = "Stop"
 
 $ProjectRef = "lsazydefvnuqglultqii"
-$ProjectName = "Looty"
+$ProjectName = "Joy8"
 $Root = Split-Path -Parent $PSScriptRoot
 $EnvFile = Join-Path $Root ".env.supabase.local"
 
-function Stop-LootySupabase {
+function Stop-Joy8Supabase {
   param([string]$Message)
   Write-Host $Message -ForegroundColor Red
   exit 1
 }
 
 if (!(Test-Path -LiteralPath $EnvFile)) {
-  Stop-LootySupabase "Missing .env.supabase.local. Copy .env.supabase.local.example, then fill Looty token and DB password."
+  Stop-Joy8Supabase "Missing .env.supabase.local. Copy .env.supabase.local.example, then fill Joy8 token and DB password."
 }
 
 foreach ($rawLine in Get-Content -LiteralPath $EnvFile -Encoding UTF8) {
@@ -51,7 +51,7 @@ foreach ($rawLine in Get-Content -LiteralPath $EnvFile -Encoding UTF8) {
 }
 
 if ([string]::IsNullOrWhiteSpace($env:SUPABASE_ACCESS_TOKEN)) {
-  Stop-LootySupabase "Missing SUPABASE_ACCESS_TOKEN in .env.supabase.local."
+  Stop-Joy8Supabase "Missing SUPABASE_ACCESS_TOKEN in .env.supabase.local."
 }
 
 if ([string]::IsNullOrWhiteSpace($env:SUPABASE_PROJECT_ID)) {
@@ -59,7 +59,7 @@ if ([string]::IsNullOrWhiteSpace($env:SUPABASE_PROJECT_ID)) {
 }
 
 if ($env:SUPABASE_PROJECT_ID -ne $ProjectRef) {
-  Stop-LootySupabase "SUPABASE_PROJECT_ID must be $ProjectRef for Looty."
+  Stop-Joy8Supabase "SUPABASE_PROJECT_ID must be $ProjectRef for Joy8."
 }
 
 if ($SupabaseArgs.Count -eq 0) {
@@ -79,7 +79,7 @@ if (!$isProjectsList) {
   $projectListText = $projectList -join "`n"
 
   if ($projectListText -notmatch [regex]::Escape($ProjectName) -or $projectListText -notmatch [regex]::Escape($ProjectRef)) {
-    Stop-LootySupabase "Supabase token does not show Looty / $ProjectRef. Stop before running command."
+    Stop-Joy8Supabase "Supabase token does not show Joy8 / $ProjectRef. Stop before running command."
   }
 }
 

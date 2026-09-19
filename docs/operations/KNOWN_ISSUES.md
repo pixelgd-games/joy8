@@ -1,4 +1,4 @@
-# Looty Known Issues
+# Joy8 Known Issues
 
 This document contains only confirmed, currently relevant limitations, risks, and deferred launch decisions. It is not a work queue by itself; do not implement an item unless the user places it in scope.
 
@@ -45,7 +45,7 @@ identity-only game policy and zero opening credit. The restricted TLS database
 connection passed; the game has only an expiring exchange/renew key. Test entry
 uses ordinary member/guest authentication without per-player approval.
 Real sign-in/game acceptance and funded-play policy/key
-scopes remain incomplete. The test page ships with Looty, but Mahjong entry is
+scopes remain incomplete. The test page ships with Joy8, but Mahjong entry is
 configured only for localhost and its public release is not activated.
 See [the activation review](../../supabase/drafts/MAHJONG_REVIEW.md).
 
@@ -98,7 +98,7 @@ Before volume grows materially:
 
 ### Synchronous Gateway Runtime Cleanup
 
-After a successful `create-session`, the Gateway calls `looty_cleanup_gateway_runtime` synchronously.
+After a successful `create-session`, the Gateway calls `joy8_cleanup_gateway_runtime` synchronously.
 
 Risk:
 
@@ -144,7 +144,7 @@ the selected rate-limit key. This is an unverified boundary, not a confirmed byp
 [Cloudflare documents](https://developers.cloudflare.com/fundamentals/reference/http-headers/)
 that it can append to an existing forwarded chain and that Worker subrequests
 have distinct client-IP behavior. The [Supabase example](https://supabase.com/docs/guides/functions/examples/cloudflare-turnstile)
-uses the first forwarded address, but does not establish Looty's complete ingress
+uses the first forwarded address, but does not establish Joy8's complete ingress
 trust contract. Neither source proves the hosted fallback branches safe.
 
 Before changing this selection, verify the managed ingress contract or run a
@@ -204,7 +204,7 @@ Direction:
 
 The Loader's 30-second timeout observes the iframe `load` event. A game can load its document and then stall internally.
 
-A more accurate signal requires an explicit game-ready handshake in the game integration contract. This is cross-repository work and must not be simulated only in the Looty shell.
+A more accurate signal requires an explicit game-ready handshake in the game integration contract. This is cross-repository work and must not be simulated only in the Joy8 shell.
 
 ### Error Modal Accessibility
 
@@ -234,5 +234,5 @@ These are not issues:
 - The iframe sandbox is intentionally restrictive.
 - Cross-origin games currently receive `allow-same-origin` for their own storage compatibility; same-origin games do not.
 - Games own CSP, `X-Frame-Options`, rendering, and resource failures.
-- Looty does not modify a game repository during platform work.
+- Joy8 does not modify a game repository during platform work.
 - Gambling products do not ship to CrazyGames.

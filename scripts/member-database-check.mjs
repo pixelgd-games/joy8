@@ -26,7 +26,7 @@ async function asRole(role, sql, values = []) {
 }
 
 const resolve = (id, enroll = false, role = "service_role") =>
-  asRole(role, "select * from public.looty_resolve_member($1::uuid, $2::boolean)", [id, enroll])
+  asRole(role, "select * from public.joy8_resolve_member($1::uuid, $2::boolean)", [id, enroll])
 const launch = (id, { slug = "test-game", currency = "POINT", seconds = 3600, name = null } = {}, role = "service_role") =>
   asRole(role, "select * from public.create_game_session($1, $2, $3, $4, $5::uuid)", [slug, currency, seconds, name, id])
 const denied = (operation, code = "42501") => assert.rejects(operation, (error) => error.code === code)
@@ -101,7 +101,7 @@ test("launch retries reuse a zero POINT wallet without an automatic grant", asyn
 
 test("guest promotion preserves both wallet scopes, real reservations and ledger", async () => {
   const { id, member } = await enrolled()
-  await db.query("update public.looty_wallet_policies set initial_credit=1000 where id=any($1::uuid[])", [[games.platformPolicy, games.gamePolicy]])
+  await db.query("update public.joy8_wallet_policies set initial_credit=1000 where id=any($1::uuid[])", [[games.platformPolicy, games.gamePolicy]])
   const sessions = []
   for (const slug of ["test-game", "independent-game"]) {
     const [session] = await launch(id, { slug })
@@ -112,7 +112,7 @@ test("guest promotion preserves both wallet scopes, real reservations and ledger
   const snapshot = async () => ({
     wallets: await rows("select * from public.wallet_accounts where id=any($1::uuid[]) order by id", [walletIds]),
     ledger: await rows("select * from public.wallet_transactions where wallet_account_id=any($1::uuid[]) order by id", [walletIds]),
-    reservations: await rows("select * from public.looty_match_participants where player_account_id=$1 order by match_id", [member.player_account_id]),
+    reservations: await rows("select * from public.joy8_match_participants where player_account_id=$1 order by match_id", [member.player_account_id]),
   })
   const before = await snapshot()
   assert.equal(before.wallets.length, 2)
@@ -204,7 +204,7 @@ test("launch secrets are hashed and expire within session lifetime", async () =>
   for (const seconds of [60, 3600]) {
     const [session] = await launch(id, { seconds })
     assert.match(session.launch_code, /^[0-9a-f]{64}$/)
-    const stored = await one("select launch_code_hash=public.looty_hash_secret($1) as hash_matches, launch_code_hash<>$1 as not_plain, launch_code_expires_at<=expires_at as bounded, extract(epoch from launch_code_expires_at-now())::int as ttl from public.game_sessions where id=$2", [session.launch_code, session.session_id])
+    const stored = await one("select launch_code_hash=public.joy8_hash_secret($1) as hash_matches, launch_code_hash<>$1 as not_plain, launch_code_expires_at<=expires_at as bounded, extract(epoch from launch_code_expires_at-now())::int as ttl from public.game_sessions where id=$2", [session.launch_code, session.session_id])
     assert.deepEqual(stored, { hash_matches: true, not_plain: true, bounded: true, ttl: Math.min(seconds, 120) })
   }
 })
@@ -217,7 +217,7 @@ test("unavailable games and invalid launch input create no wallet", async () => 
 })
 
 test("member checks use the deployed accounting schema without Demo objects", async () => {
-  const schema = await one("select to_regclass('public.game_rounds') old_rounds, to_regprocedure('public.record_demo_wallet_initial_credit()') demo_credit, exists(select 1 from information_schema.columns where table_schema='public' and table_name='game_sessions' and column_name='wallet_mode') wallet_mode, to_regprocedure('public.looty_platform_health_v1()') health")
+  const schema = await one("select to_regclass('public.game_rounds') old_rounds, to_regprocedure('public.record_demo_wallet_initial_credit()') demo_credit, exists(select 1 from information_schema.columns where table_schema='public' and table_name='game_sessions' and column_name='wallet_mode') wallet_mode, to_regprocedure('public.joy8_platform_health_v1()') health")
   assert.equal(schema.old_rounds, null)
   assert.equal(schema.demo_credit, null)
   assert.equal(schema.wallet_mode, false)
@@ -240,9 +240,9 @@ test("shared games reuse one wallet and an independent game creates a separate z
 test("unconfigured and disabled policies reject launch without provisioning", async () => {
   const { id, member } = await enrolled()
   await denied(launch(id, { slug: "unconfigured-game" }))
-  await db.query("update public.looty_game_policies set enabled=false where game_id=$1", [games.game])
+  await db.query("update public.joy8_game_policies set enabled=false where game_id=$1", [games.game])
   await denied(launch(id))
-  await db.query("update public.looty_wallet_policies set enabled=false where id=$1", [games.gamePolicy])
+  await db.query("update public.joy8_wallet_policies set enabled=false where id=$1", [games.gamePolicy])
   await denied(launch(id, { slug: "independent-game" }))
   assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).n, 0)
   assert.equal((await one("select count(*)::int n from public.game_sessions where player_account_id=$1", [member.player_account_id])).n, 0)

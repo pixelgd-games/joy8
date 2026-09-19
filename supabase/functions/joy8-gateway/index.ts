@@ -47,9 +47,11 @@ const POINT_CURRENCY = "POINT"
 const MAX_BODY_BYTES = 16 * 1024
 const AUTH_REQUEST_TIMEOUT_MS = 5000
 const RPC_REQUEST_TIMEOUT_MS = 8000
-const UPSTREAM_UNAVAILABLE_CODE = "LOOTY_UPSTREAM_UNAVAILABLE"
+const UPSTREAM_UNAVAILABLE_CODE = "JOY8_UPSTREAM_UNAVAILABLE"
 const DEFAULT_ALLOWED_ORIGINS = [
-  "https://looty-git.pages.dev",
+  "https://joy8.pages.dev",
+  "https://joy8.cc",
+  "https://www.joy8.cc",
   "http://localhost:5173",
   "http://127.0.0.1:5173",
   "http://localhost:4173",
@@ -86,11 +88,11 @@ const RATE_LIMITS: Record<string, RateLimitConfig> = {
 const PUBLIC_RPC_MESSAGES = new Set([
   "game is not available", "game session is not active", "player account is not active",
   "player membership is required", "verified member identity is required",
-  "LOOTY_GAME_NOT_READY", "LOOTY_PLAYER_INACTIVE", "LOOTY_WALLET_INACTIVE", "LOOTY_INVALID_REQUEST",
-  "LOOTY_PRIVATE_ENTRY_DENIED",
+  "JOY8_GAME_NOT_READY", "JOY8_PLAYER_INACTIVE", "JOY8_WALLET_INACTIVE", "JOY8_INVALID_REQUEST",
+  "JOY8_PRIVATE_ENTRY_DENIED",
 ])
 
-const allowedOrigins = (Deno.env.get("LOOTY_ALLOWED_ORIGINS") ?? "")
+const allowedOrigins = (Deno.env.get("JOY8_ALLOWED_ORIGINS") ?? "")
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean)
@@ -155,7 +157,7 @@ async function dispatchRoute(
   headers: HeadersInit,
 ): Promise<Response> {
   if (route === "health") {
-    const result = await callRpc("looty_platform_health_v1", {})
+    const result = await callRpc("joy8_platform_health_v1", {})
     const healthy = result.ok && result.body === true
     return jsonResponse({ status: healthy ? "ok" : "unavailable" }, healthy ? 200 : 503, headers)
   }
@@ -183,19 +185,19 @@ async function dispatchRoute(
 
 async function serverOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
   const match = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{64})$/)
-  if (!match) return jsonResponse({ error: "LOOTY_BACKEND_UNAUTHORIZED" }, 401, headers)
+  if (!match) return jsonResponse({ error: "JOY8_BACKEND_UNAUTHORIZED" }, 401, headers)
   const body = await readJsonBody(request)
-  if (!body.ok) return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
+  if (!body.ok) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   const action = route.slice(7, -3)
   const args: Record<string, unknown> = { p_secret: match[1], p_request: body.value }
   let name: string
   if (action === "exchange" || action === "renew") {
-    name = "looty_server_session_v1"
+    name = "joy8_server_session_v1"
     args.p_action = action
   } else if (action === "open" || action === "settle") {
-    name = action === "open" ? "looty_open_match_v1" : "looty_settle_match_v1"
+    name = action === "open" ? "joy8_open_match_v1" : "joy8_settle_match_v1"
   } else {
-    name = "looty_match_status_v1"
+    name = "joy8_match_status_v1"
     args.p_cancel = action === "cancel"
   }
   const result = await callRpc(name, args)
@@ -203,20 +205,20 @@ async function serverOperation(route: string, request: Request, headers: Headers
     const error = result.body as { message?: string; code?: string } | null
     const code = error?.message ?? ""
     const statuses: Record<string, number> = {
-      LOOTY_BACKEND_UNAUTHORIZED: 401, LOOTY_GAME_NOT_READY: 403, LOOTY_PLAYER_INACTIVE: 403,
-      LOOTY_WALLET_INACTIVE: 403, LOOTY_SESSION_INVALID: 403, LOOTY_ADAPTER_UNAVAILABLE: 503,
-      LOOTY_ADAPTER_REJECTED: 409, LOOTY_INVALID_REQUEST: 400, LOOTY_INVALID_AMOUNT: 400,
-      LOOTY_INVALID_ENTRY: 400, LOOTY_LIMIT_EXCEEDED: 400, LOOTY_RULE_MISMATCH: 409,
-      LOOTY_IDEMPOTENCY_CONFLICT: 409, LOOTY_MATCH_FINALIZED: 409, LOOTY_MATCH_NOT_FOUND: 404,
-      LOOTY_UNBALANCED_SETTLEMENT: 400, LOOTY_WALLET_OCCUPIED: 409, LOOTY_INSUFFICIENT_BALANCE: 409,
-      LOOTY_SETTLEMENT_SEQUENCE: 409,
+      JOY8_BACKEND_UNAUTHORIZED: 401, JOY8_GAME_NOT_READY: 403, JOY8_PLAYER_INACTIVE: 403,
+      JOY8_WALLET_INACTIVE: 403, JOY8_SESSION_INVALID: 403, JOY8_ADAPTER_UNAVAILABLE: 503,
+      JOY8_ADAPTER_REJECTED: 409, JOY8_INVALID_REQUEST: 400, JOY8_INVALID_AMOUNT: 400,
+      JOY8_INVALID_ENTRY: 400, JOY8_LIMIT_EXCEEDED: 400, JOY8_RULE_MISMATCH: 409,
+      JOY8_IDEMPOTENCY_CONFLICT: 409, JOY8_MATCH_FINALIZED: 409, JOY8_MATCH_NOT_FOUND: 404,
+      JOY8_UNBALANCED_SETTLEMENT: 400, JOY8_WALLET_OCCUPIED: 409, JOY8_INSUFFICIENT_BALANCE: 409,
+      JOY8_SETTLEMENT_SEQUENCE: 409,
     }
     if (statuses[code]) return jsonResponse({ error: code }, statuses[code], headers)
-    if (error?.code === "22P02") return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
-    return jsonResponse({ error: "LOOTY_UPSTREAM_UNAVAILABLE" }, 503, headers)
+    if (error?.code === "22P02") return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+    return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
   }
   if (!result.body || typeof result.body !== "object" || Array.isArray(result.body)) {
-    return jsonResponse({ error: "LOOTY_UPSTREAM_UNAVAILABLE" }, 502, headers)
+    return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
   }
   return jsonResponse(result.body as JsonValue, 200, headers)
 }
@@ -228,7 +230,7 @@ async function resolveMember(request: Request, headers: HeadersInit, enroll: boo
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   if (Object.keys(body.value).length) return jsonResponse({ error: "Member request must be empty" }, 400, headers)
-  const result = await callRpc("looty_resolve_member", { p_auth_user_id: auth.userId, p_enroll: enroll })
+  const result = await callRpc("joy8_resolve_member", { p_auth_user_id: auth.userId, p_enroll: enroll })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
   const row = firstRpcRow<{ player_account_id: string; account_type: string }>(result.body)
   if (!row) {
@@ -249,9 +251,9 @@ async function createPrivateSession(request: Request, headers: HeadersInit): Pro
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   const slug = body.value.slug
   if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
-    return jsonResponse({ error: "LOOTY_INVALID_REQUEST" }, 400, headers)
+    return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
-  const result = await callRpc("looty_create_private_session", {
+  const result = await callRpc("joy8_create_private_session", {
     p_game_slug: slug, p_auth_user_id: auth.userId, p_origin: request.headers.get("origin"),
   })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
@@ -308,7 +310,7 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     return jsonResponse({ error: "Display name is too long" }, 400, headers)
   }
 
-  const memberResult = await callRpc("looty_resolve_member", { p_auth_user_id: auth.userId, p_enroll: false })
+  const memberResult = await callRpc("joy8_resolve_member", { p_auth_user_id: auth.userId, p_enroll: false })
   if (!memberResult.ok) {
     return jsonResponse(toPublicRpcError(memberResult.body), statusFromRpcError(memberResult.body), headers)
   }
@@ -334,7 +336,7 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     return jsonResponse({ error: "Gateway returned an empty session" }, 502, headers)
   }
 
-  await callRpc("looty_cleanup_gateway_runtime", {})
+  await callRpc("joy8_cleanup_gateway_runtime", {})
 
   return jsonResponse({
     session_id: row.session_id,
@@ -449,7 +451,7 @@ async function enforceRateLimit(
   }
 
   const clientAddress = getClientAddress(request)
-  const rpcResult = await callRpc("looty_consume_gateway_rate_limit", {
+  const rpcResult = await callRpc("joy8_consume_gateway_rate_limit", {
     p_key: `${route}:${clientAddress}`,
     p_limit: config.limit,
     p_window_seconds: config.windowSeconds,
@@ -509,7 +511,7 @@ function getRoute(url: string): string {
   const parts = pathname.split("/").filter(Boolean)
   const last = parts[parts.length - 1] ?? ""
 
-  if (last === "looty-gateway") {
+  if (last === "joy8-gateway") {
     return "create-session"
   }
 
@@ -525,7 +527,7 @@ function buildCorsHeaders(
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Content-Type": "application/json; charset=utf-8",
-    "X-Looty-Request-Id": requestId,
+    "X-Joy8-Request-Id": requestId,
     Vary: "Origin",
   }
 

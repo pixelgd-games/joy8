@@ -1,4 +1,4 @@
-# Looty Member and Authentication Plan
+# Joy8 Member and Authentication Plan
 
 Status: member migrations and Gateway are active; the matching front end is released from main. Real provider acceptance remains pending. Account lifecycle and branded handoff remain target design.
 Last reviewed: 2026-09-18.
@@ -19,24 +19,24 @@ accounts, with email verification and password recovery; a separate username
 credential system is not required. LINE, Apple, Email OTP, Android, and iOS are
 deferred and do not block this release.
 
-A player can enter through the public Looty Lobby or a Looty-controlled branded
-game entry. Both resolve the same Looty player. A branded entry can open before
+A player can enter through the public Joy8 Lobby or a Joy8-controlled branded
+game entry. Both resolve the same Joy8 player. A branded entry can open before
 the public Lobby and remain available afterward. It presents authentication;
 the gameplay runtime never implements it or receives member/provider credentials.
 This contract is reusable across games and is not Mahjong-specific.
 
 External platform channels follow their own identity contract. They must not
-initialize Looty identity merely because the game also has a Looty build.
+initialize Joy8 identity merely because the game also has a Joy8 build.
 
 ## Responsibility Boundary
 
 | Concern | Owner |
 | --- | --- |
-| Credentials, provider identity and verification | Supabase Auth through Looty-controlled flows |
-| Stable player, membership eligibility, guest upgrade and account lifecycle | Looty backend |
-| H5 sign-in, callback, recovery and account-status UI | Looty-controlled entry surface |
-| Product classification and wallet resolution | Looty trusted configuration and backend |
-| Game session and launch handoff | Looty integration contract |
+| Credentials, provider identity and verification | Supabase Auth through Joy8-controlled flows |
+| Stable player, membership eligibility, guest upgrade and account lifecycle | Joy8 backend |
+| H5 sign-in, callback, recovery and account-status UI | Joy8-controlled entry surface |
+| Product classification and wallet resolution | Joy8 trusted configuration and backend |
+| Game session and launch handoff | Joy8 integration contract |
 | Game-side player mapping, progress and gameplay data | Product backend and schema |
 
 Fix the origin, route, and repository owner of each branded entry before UI
@@ -52,9 +52,9 @@ in the owning repository, not a first-release platform dependency.
   provider acceptance remain pending. [README.md](../../README.md) owns
   the implementation details and test limits.
 - Deletion requests, cleanup/retention, and branded cross-origin entry are not
-  implemented. Same-origin `/account/` belongs to Looty and returns only to the
+  implemented. Same-origin `/account/` belongs to Joy8 and returns only to the
   Lobby, a validated `/game/?slug=...`, or `/play-test/?slug=...` route.
-- The local private-test entry is owned by Looty at
+- The local private-test entry is owned by Joy8 at
   `http://localhost:5173/play-test/?slug=mahjong-clash`; its game frame is owned by
   Mahjong at `http://localhost:4391/`. The implemented shared member callback also
   accepts a validated `/play-test/?slug=...` return path. Authorization belongs to
@@ -75,10 +75,10 @@ in the owning repository, not a first-release platform dependency.
 - Resolve exactly one player and the correct existing wallet scope through
   trusted backend operations. Retries and simultaneous callbacks must not create
   duplicate players, wallets, or initial grants.
-- A provider identity must not silently merge two existing Looty players or
+- A provider identity must not silently merge two existing Joy8 players or
   their wallets based on email, display name, or client-supplied similarity.
 - Supabase provider linking within one Auth user is different from merging
-  existing Looty players. Review its automatic verified-email linking behavior
+  existing Joy8 players. Review its automatic verified-email linking behavior
   and test Google/password conflicts explicitly before enabling the combined flow.
 - Browser storage separation alone does not authorize membership. An
   administrator-only session must not silently enroll a player.
@@ -98,7 +98,7 @@ Define session storage, refresh, expiry, abuse controls, and cleanup before ship
 
 Promotion changes the sign-in method, not the player. Preserve all wallet scopes,
 transactions, and game mappings. If the provider already belongs to another
-Looty player, return a recoverable conflict and require verification of that
+Joy8 player, return a recoverable conflict and require verification of that
 account; do not silently transfer assets. Full registered-player merging remains
 outside this release.
 
@@ -121,7 +121,7 @@ remains deferred.
 
 ```text
 Public Lobby or branded home -> select a game / start playing
-  -> Looty sign-in or persistent guest restoration
+  -> Joy8 sign-in or persistent guest restoration
   -> backend player and wallet resolution
   -> authorized game-session handoff
   -> game runtime
@@ -150,7 +150,7 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
   no paid provider or account change is authorized here.
   Supabase Auth continues to issue and validate verification/recovery tokens.
   Custom delivery does not mean rebuilding password authentication or storing
-  passwords in Looty tables.
+  passwords in Joy8 tables.
 - **Closure/deletion:** expose a request flow, and separately define Auth/profile
   deletion or anonymization, transaction retention, game-data coordination, and
   waiting/recovery periods. Do not directly delete Auth users: current player
@@ -197,9 +197,9 @@ the service/domain and scope are confirmed. Never request credentials in chat.
 1. Confirm the sending domain and sender mailbox; complete the selected provider's
    domain/DNS verification and delivery authentication.
 2. Configure the provider's SMTP host, port, username/password and sender in the
-   Looty project's Auth settings using the authorized account. Store secrets in
+   Joy8 project's Auth settings using the authorized account. Store secrets in
    provider settings only, not front-end environment variables or source.
-3. Retain Looty's approved Site URL and account callback allowlist. Keep the
+3. Retain Joy8's approved Site URL and account callback allowlist. Keep the
    verification link semantics supplied by Auth; no custom token issuer is needed.
 4. Test a new email/password signup, unverified-login rejection, verification,
    password reset, guest email promotion, expired/replayed links and an already

@@ -55,7 +55,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
 
   async function membership(enroll = false) {
     if (!(await session())) return null
-    const result = await client.functions.invoke(`looty-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
+    const result = await client.functions.invoke(`joy8-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
     if (result.error) {
       let code = "member_unavailable"
       try {

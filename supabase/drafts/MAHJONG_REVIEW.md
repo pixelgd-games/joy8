@@ -7,7 +7,7 @@ Hosted play acceptance, publication and funding remain pending.
 
 The user approved this installation. All eight numbered migrations are applied;
 local/hosted history matches. Do not reapply the source candidates. Future changes
-remain incremental migrations through the Looty wrapper with project verification.
+remain incremental migrations through the Joy8 wrapper with project verification.
 
 | Order | Authoritative SQL | Effect |
 | --- | --- | --- |
@@ -25,7 +25,7 @@ Mahjong source root:
 The game files remain owned there; applied numbered migrations retain the
 installation snapshots. Installation created no human wallet,
 POINT credit, AI account, backend key, usable database password or public entry.
-The game runtime gets no Auth tables, Looty tables, service-role key, callback
+The game runtime gets no Auth tables, Joy8 tables, service-role key, callback
 execution, direct AI balance writes or accounting-owner membership. Scoped
 security-definer bridges validate the configured game before accessing a human
 balance or binding. Private checkpoint tables allow trusted runtime persistence;
@@ -45,18 +45,18 @@ The user approved and installed these additions:
 - [Mahjong identity activation](../migrations/20260918010900_mahjong_identity_activation.sql):
   enabled game-scoped zero-credit wallet and four-seat policy with a temporary
   1-POINT reservation ceiling. This is an identity-stage guard, not a gameplay
-  limit or point grant. Looty owns `http://localhost:5173/play-test/?slug=mahjong-clash`;
+  limit or point grant. Joy8 owns `http://localhost:5173/play-test/?slug=mahjong-clash`;
   Mahjong owns the private frame at `http://localhost:4391/`. Public catalog
   visibility stays false and its public launch URL stays null.
 - Restricted `mahjong_clash_runtime` login and a game-scoped exchange/renew-only
   key. Both expire on 2026-09-25 at 15:25 Asia/Taipei. The key cannot open or settle
-  matches. Secret values exist only in the game's ignored `.env.looty.local`.
+  matches. Secret values exist only in the game's ignored `.env.joy8.local`.
 - Gateway version 8 with private sessions and continuous-settlement error mapping.
   Health/rejection checks and actual identity-key scope checks passed. The local
-  test entry is included in Looty's standard front-end build, with backend access
+  test entry is included in Joy8's standard front-end build, with backend access
   bound to localhost. Mahjong has no cloud game build, GCP host or public release.
 
-The player allowlist is removed. Use normal Looty sign-in or persistent guest
+The player allowlist is removed. Use normal Joy8 sign-in or persistent guest
 entry; administrator access does not substitute for player enrollment. No human
 wallet, session, match, AI account or point credit was created by these migrations.
 
@@ -69,7 +69,7 @@ statement, enables only the restricted runtime role and an exchange/renew key,
 and rejects unrelated existing credentials. Do not use it to silently rotate
 working credentials. Existing credential expiry is not permission to reprovision.
 
-Use the Looty wrapper for application, after checking the linked project. Its
+Use the Joy8 wrapper for application, after checking the linked project. Its
 `db query --linked` Management API path runs as `supabase_read_only_user`; it is
 for inspection. Apply approved single-statement credential SQL with the same
 wrapper's `db query --db-url` using the pinned linked pooler and locally loaded
@@ -79,7 +79,7 @@ SQL in committed migration history. Verify remote state before uncertain retries
 After confirmed installation and transfer to the game environment, remove the
 local preparation files; retain them only while application status is uncertain.
 
-The game stores the Supabase CLI's linked CA in ignored `.looty-db-ca.crt.local`;
+The game stores the Supabase CLI's linked CA in ignored `.joy8-db-ca.crt.local`;
 `MAHJONG_DB_CA_FILE` points to that stable copy. Keep TLS verification enabled,
 including hostname verification, as described by
 [Supabase's connection guide](https://supabase.com/docs/guides/database/connecting-to-postgres).
@@ -87,10 +87,10 @@ The certificate's name contains `Supabase Staging Root 2021 CA`; the trusted
 linked CA verifies this project's session-pooler chain and hostname.
 
 `MAHJONG_REVIEW_ROOT=<absolute game root> node scripts/mahjong-connection-check.mjs`
-reads the game's ignored `.env.looty.local` and checks TLS, actual role restrictions
+reads the game's ignored `.env.joy8.local` and checks TLS, actual role restrictions
 and readiness in a read-only transaction. This passed against hosted Supabase;
 it does not start Godot or provision data. Run the wrapper's project check first.
-No real-player Godot/iframe acceptance has been performed. The game's `dev:looty`
+No real-player Godot/iframe acceptance has been performed. The game's `dev:joy8`
 authority has not been started against hosted data. Unlike this read-only check,
 that runtime can persist product state and invoke rule-bound AI funding; review
 the intended effects before starting hosted acceptance.
@@ -102,7 +102,7 @@ These synthetic identities do not establish real provider or funded-play accepta
 
 ## Remaining activation
 
-1. Sign in through Looty or restore the existing guest. Verify the same player
+1. Sign in through Joy8 or restore the existing guest. Verify the same player
    reaches the running game at zero credit; no test-access grant is required.
 2. Define funded-play limits and the human POINT source before changing the
    identity-only reservation ceiling or authorizing financial backend scopes.

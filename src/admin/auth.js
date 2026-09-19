@@ -65,7 +65,7 @@ export async function requireAdmin(options = {}) {
   }
 
   const { data, error } = await supabase
-    .rpc("is_looty_admin")
+    .rpc("is_joy8_admin")
 
   if (error) {
     showErrorModal({

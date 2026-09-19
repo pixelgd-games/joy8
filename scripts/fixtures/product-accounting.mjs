@@ -17,7 +17,7 @@ export async function loadProductAccounting(db) {
         for item in select value from jsonb_array_elements(reservations) loop
           amount:=(item->>'reserve')::numeric;
           update fixture_product.accounts set locked=locked+amount where ref=item->>'account_ref' and balance-locked>=amount;
-          if not found then raise exception 'LOOTY_ADAPTER_REJECTED'; end if;
+          if not found then raise exception 'JOY8_ADAPTER_REJECTED'; end if;
         end loop;
         insert into fixture_product.matches values(match_id,'open',reservations,null);
       else
@@ -32,7 +32,7 @@ export async function loadProductAccounting(db) {
         end if;
         update fixture_product.matches set state=action,settlement_id=(payload->>'settlement_id')::uuid where id=match_id;
       end if;
-      if payload->'request'->'product_commit'->>'fail'='true' then raise exception 'LOOTY_ADAPTER_REJECTED'; end if;
+      if payload->'request'->'product_commit'->>'fail'='true' then raise exception 'JOY8_ADAPTER_REJECTED'; end if;
       return jsonb_build_object('committed',true);
     end;
     $$;

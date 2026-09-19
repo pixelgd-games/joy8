@@ -1,29 +1,29 @@
 import "../styles/error-modal.css"
 
 export const ERROR_CODES = Object.freeze({
-  LOBBY_GAMES_READ_FAILED: "LOOTY-LOBBY-001",
+  LOBBY_GAMES_READ_FAILED: "JOY8-LOBBY-001",
 
-  GAME_MISSING_SLUG: "LOOTY-GAME-001",
-  GAME_NOT_FOUND: "LOOTY-GAME-002",
-  GAME_URL_MISSING: "LOOTY-GAME-003",
-  GAME_READ_FAILED: "LOOTY-GAME-004",
-  GAME_URL_INVALID: "LOOTY-GAME-005",
-  GAME_LOAD_TIMEOUT: "LOOTY-GAME-006",
+  GAME_MISSING_SLUG: "JOY8-GAME-001",
+  GAME_NOT_FOUND: "JOY8-GAME-002",
+  GAME_URL_MISSING: "JOY8-GAME-003",
+  GAME_READ_FAILED: "JOY8-GAME-004",
+  GAME_URL_INVALID: "JOY8-GAME-005",
+  GAME_LOAD_TIMEOUT: "JOY8-GAME-006",
 
-  ADMIN_AUTH_READ_FAILED: "LOOTY-ADMIN-001",
-  ADMIN_NOT_ALLOWED: "LOOTY-ADMIN-002",
-  ADMIN_GAMES_READ_FAILED: "LOOTY-ADMIN-003",
-  ADMIN_DELETE_FAILED: "LOOTY-ADMIN-004",
-  ADMIN_GAME_READ_FAILED: "LOOTY-ADMIN-005",
-  ADMIN_GAME_NOT_FOUND: "LOOTY-ADMIN-006",
-  ADMIN_GAME_SAVE_FAILED: "LOOTY-ADMIN-007",
-  ADMIN_FORM_INVALID: "LOOTY-ADMIN-008",
-  ADMIN_SIGN_OUT_FAILED: "LOOTY-ADMIN-009",
-  ADMIN_OAUTH_FAILED: "LOOTY-ADMIN-010",
-  ADMIN_GAME_ID_MISSING: "LOOTY-ADMIN-011",
+  ADMIN_AUTH_READ_FAILED: "JOY8-ADMIN-001",
+  ADMIN_NOT_ALLOWED: "JOY8-ADMIN-002",
+  ADMIN_GAMES_READ_FAILED: "JOY8-ADMIN-003",
+  ADMIN_DELETE_FAILED: "JOY8-ADMIN-004",
+  ADMIN_GAME_READ_FAILED: "JOY8-ADMIN-005",
+  ADMIN_GAME_NOT_FOUND: "JOY8-ADMIN-006",
+  ADMIN_GAME_SAVE_FAILED: "JOY8-ADMIN-007",
+  ADMIN_FORM_INVALID: "JOY8-ADMIN-008",
+  ADMIN_SIGN_OUT_FAILED: "JOY8-ADMIN-009",
+  ADMIN_OAUTH_FAILED: "JOY8-ADMIN-010",
+  ADMIN_GAME_ID_MISSING: "JOY8-ADMIN-011",
 })
 
-const MODAL_ID = "looty-error-modal"
+const MODAL_ID = "joy8-error-modal"
 
 let activeCleanup = null
 
@@ -40,36 +40,36 @@ export function showErrorModal(options = {}) {
 
   const modal = document.createElement("section")
   modal.id = MODAL_ID
-  modal.className = "looty-error-modal"
+  modal.className = "joy8-error-modal"
   modal.setAttribute("role", "presentation")
 
   const dialog = document.createElement("div")
-  dialog.className = "looty-error-dialog"
+  dialog.className = "joy8-error-dialog"
   dialog.setAttribute("role", "dialog")
   dialog.setAttribute("aria-modal", "true")
-  dialog.setAttribute("aria-labelledby", "looty-error-title")
-  dialog.setAttribute("aria-describedby", "looty-error-message")
+  dialog.setAttribute("aria-labelledby", "joy8-error-title")
+  dialog.setAttribute("aria-describedby", "joy8-error-message")
 
   const kicker = document.createElement("p")
-  kicker.className = "looty-error-kicker"
+  kicker.className = "joy8-error-kicker"
   kicker.textContent = "ERROR"
 
   const title = document.createElement("h2")
-  title.id = "looty-error-title"
-  title.className = "looty-error-title"
+  title.id = "joy8-error-title"
+  title.className = "joy8-error-title"
   title.textContent = config.title
 
   const message = document.createElement("p")
-  message.id = "looty-error-message"
-  message.className = "looty-error-message"
+  message.id = "joy8-error-message"
+  message.className = "joy8-error-message"
   message.textContent = config.message
 
   const code = document.createElement("p")
-  code.className = "looty-error-code"
+  code.className = "joy8-error-code"
   code.textContent = `Error code: ${config.code}`
 
   const actions = document.createElement("div")
-  actions.className = "looty-error-actions"
+  actions.className = "joy8-error-actions"
 
   if (config.primaryAction) {
     actions.append(createActionButton(config.primaryAction, "primary"))
@@ -85,7 +85,7 @@ export function showErrorModal(options = {}) {
   dialog.append(kicker, title, message, code, actions)
   modal.append(dialog)
   document.body.append(modal)
-  document.body.classList.add("looty-error-modal-open")
+  document.body.classList.add("joy8-error-modal-open")
 
   const handleKeydown = (event) => {
     if (event.key === "Escape") {
@@ -106,7 +106,7 @@ export function showErrorModal(options = {}) {
     document.removeEventListener("keydown", handleKeydown)
     modal.removeEventListener("click", handleOverlayClick)
     modal.remove()
-    document.body.classList.remove("looty-error-modal-open")
+    document.body.classList.remove("joy8-error-modal-open")
     activeCleanup = null
   }
 
@@ -121,7 +121,7 @@ export function closeErrorModal() {
 
 function normalizeOptions(options) {
   return {
-    code: options.code || "LOOTY-UNKNOWN-000",
+    code: options.code || "JOY8-UNKNOWN-000",
     title: options.title || "Something went wrong",
     message: options.message || "The system is having trouble right now. Please try again later.",
     error: options.error,
@@ -133,7 +133,7 @@ function normalizeOptions(options) {
 function createActionButton(action, modifier = "") {
   const button = document.createElement("button")
   button.type = "button"
-  button.className = modifier ? `looty-error-action ${modifier}` : "looty-error-action"
+  button.className = modifier ? `joy8-error-action ${modifier}` : "joy8-error-action"
   button.textContent = action.label || "OK"
   button.addEventListener("click", () => {
     closeErrorModal()

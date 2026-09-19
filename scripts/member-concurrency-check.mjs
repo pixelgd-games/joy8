@@ -5,7 +5,7 @@ import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
 import { loadMemberPlatformDatabase, reserveMemberWallet } from "./fixtures/member-platform.mjs"
 
 const db = await createLocalPostgres()
-const resolveSql = "select * from public.looty_resolve_member($1::uuid, true)"
+const resolveSql = "select * from public.joy8_resolve_member($1::uuid, true)"
 const lockSql = "select pg_advisory_xact_lock(hashtextextended($1::text, 0))"
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 let games
@@ -97,15 +97,15 @@ for (const slug of ["test-game", "independent-game"]) {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
     const policy = slug === "test-game" ? games.platformPolicy : games.gamePolicy
-    await db.query("update public.looty_wallet_policies set initial_credit=1000 where id=$1", [policy])
+    await db.query("update public.joy8_wallet_policies set initial_credit=1000 where id=$1", [policy])
     let session
     try { [session] = await serviceQuery(launchSql, [id]) }
-    finally { await db.query("update public.looty_wallet_policies set initial_credit=0 where id=$1", [policy]) }
+    finally { await db.query("update public.joy8_wallet_policies set initial_credit=0 where id=$1", [policy]) }
     await reserveMemberWallet(db, session, games.keys.get(session.game_id))
     const snapshot = async () => ({
       wallet: await one("select * from public.wallet_accounts where id=$1", [session.wallet_account_id]),
       ledger: (await db.query("select * from public.wallet_transactions where wallet_account_id=$1 order by id", [session.wallet_account_id])).rows,
-      reservation: await one("select * from public.looty_match_participants where wallet_account_id=$1", [session.wallet_account_id]),
+      reservation: await one("select * from public.joy8_match_participants where wallet_account_id=$1", [session.wallet_account_id]),
     })
     const before = await snapshot()
     assert.equal(Number(before.wallet.balance), 1000)

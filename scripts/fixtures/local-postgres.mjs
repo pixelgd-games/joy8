@@ -22,13 +22,13 @@ async function freePort() {
 }
 
 export async function createLocalPostgres() {
-  const bin = process.env.LOOTY_TEST_PG_BIN
-  assert.ok(bin && path.isAbsolute(bin), "Set LOOTY_TEST_PG_BIN to an absolute PostgreSQL 17 bin directory")
+  const bin = process.env.JOY8_TEST_PG_BIN
+  assert.ok(bin && path.isAbsolute(bin), "Set JOY8_TEST_PG_BIN to an absolute PostgreSQL 17 bin directory")
   const executable = (name) => path.join(bin, process.platform === "win32" ? `${name}.exe` : name)
   const command = (name, args) => run(executable(name), args, { windowsHide: true, timeout: 30000, maxBuffer: 2 ** 20 })
   assert.match((await command("postgres", ["--version"])).stdout, /PostgreSQL\) 17\./)
   const tempRoot = await realpath(tmpdir())
-  const directory = await mkdtemp(path.join(tempRoot, "looty-member-pg17-"))
+  const directory = await mkdtemp(path.join(tempRoot, "joy8-member-pg17-"))
   const data = path.join(directory, "data")
   const passwordFile = path.join(directory, "password")
   const password = randomBytes(32).toString("hex")
@@ -45,15 +45,15 @@ export async function createLocalPostgres() {
     const resolved = await realpath(directory)
     assert.equal(path.dirname(resolved), tempRoot)
     assert.equal(resolved, directory)
-    assert.ok(path.basename(resolved).startsWith("looty-member-pg17-"))
+    assert.ok(path.basename(resolved).startsWith("joy8-member-pg17-"))
     await rm(resolved, { recursive: true, force: true })
   }
 
   async function connect() {
     const client = new pg.Client({
-      host: "127.0.0.1", port, database: "postgres", user: "looty_test", password,
+      host: "127.0.0.1", port, database: "postgres", user: "joy8_test", password,
       ssl: false, connectionTimeoutMillis: 5000, statement_timeout: 10000,
-      application_name: "looty-member-sql-test",
+      application_name: "joy8-member-sql-test",
     })
     connections.add(client)
     await client.connect()
@@ -63,7 +63,7 @@ export async function createLocalPostgres() {
 
   try {
     await writeFile(passwordFile, password, { mode: 0o600 })
-    await command("initdb", ["-D", data, "-U", "looty_test", "-A", "scram-sha-256", "--pwfile", passwordFile, "--encoding=UTF8", "--locale=C"])
+    await command("initdb", ["-D", data, "-U", "joy8_test", "-A", "scram-sha-256", "--pwfile", passwordFile, "--encoding=UTF8", "--locale=C"])
     await rm(passwordFile)
     startAttempted = true
     await command("pg_ctl", ["-D", data, "-l", path.join(directory, "server.log"), "-o", `-h 127.0.0.1 -p ${port}`, "-w", "-t", "20", "start"])

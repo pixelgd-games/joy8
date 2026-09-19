@@ -29,14 +29,14 @@ const settle = ref => ({
 })
 
 before(async () => {
-  fixture = await loadMemberPlatformDatabase(db)
+  fixture = await loadMemberPlatformDatabase(db, false)
   key = fixture.keys.get(fixture.game)
   await db.query("update public.looty_wallet_policies set initial_credit=1000 where id=$1", [fixture.platformPolicy])
   await db.query("update public.looty_backend_keys set scopes=array['exchange','open','settle'] where game_id=$1", [fixture.game])
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   await db.query("select public.looty_resolve_member($1,true)", [auth])
   session = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
-  await reserveMemberWallet(db, session, key)
+  await reserveMemberWallet(db, session, key, "looty")
   await call("looty_settle_match_v1", settle(session.session_id))
   beforeRows = await ledger()
   beforeFunction = await definition()
