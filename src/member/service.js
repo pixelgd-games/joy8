@@ -30,31 +30,19 @@ function checked(result) {
 export function memberErrorMessage(error) {
   const code = error?.code
   const messages = {
-    invalid_credentials: "Email 或密碼不正確，請再試一次。",
-    email_not_confirmed: "請先到信箱完成驗證，再回來登入。",
-    weak_password: "密碼強度不足，請使用至少 10 個字元。",
-    identity_already_exists: "這個登入方式已綁定其他帳號。原本的訪客資料會保留，請勿重複註冊。",
-    email_exists: "這個 Email 已有帳號，請改用原帳號登入或找回密碼。",
+    identity_already_exists: "這個 Google 登入已綁定其他帳號。原本的訪客資料會保留，請勿重複綁定。",
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
-    over_email_send_rate_limit: "驗證信寄送太頻繁，請稍後再試。",
     captcha_failed: "安全驗證失敗，請重新驗證後再試。",
     captcha_required: "請先完成安全驗證。",
     captcha_unavailable: "安全驗證暫時無法載入，請稍後再試。",
-    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 或 Email。",
+    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
-    verification_required: "請先完成信箱驗證。",
-    pkce_code_verifier_not_found: "找不到這次驗證的瀏覽器資料，請重新操作並在同一個瀏覽器開啟信件連結。",
     flow_state_not_found: "這個驗證連結已使用或已失效，請重新操作。",
     flow_state_expired: "這個驗證連結已失效，請重新操作。",
-    otp_expired: "這個驗證連結已失效，請重新操作。",
     auth_callback_failed: "驗證連結無法完成，請重新操作。",
   }
   return messages[code] || "目前無法完成操作，請稍後再試。"
-}
-
-export function signupWasVerifiedWithoutSession(error, flow) {
-  return flow === "signup" && error?.code === "pkce_code_verifier_not_found"
 }
 
 export function createMemberService(client, { origin, next = "/", guestLock } = {}) {
@@ -82,14 +70,6 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return member
   }
 
-  async function signIn(email, password, captchaToken) {
-    if ((await session())?.user?.is_anonymous) {
-      throw Object.assign(new Error("Upgrade the guest or sign out explicitly"), { code: "identity_conflict" })
-    }
-    checked(await client.auth.signInWithPassword({ email: email.trim(), password, ...(captchaToken ? { options: { captchaToken } } : {}) }))
-    return membership(true)
-  }
-
   async function guest(captchaToken) {
     if (!guestLock) throw Object.assign(new Error("Web Locks unavailable"), { code: "guest_lock_unavailable" })
     return guestLock(async () => {
@@ -108,22 +88,11 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return { url: data.url, expectedUserId: current?.user?.id ?? null }
   }
 
-  async function register(email, password, captchaToken) {
-    const current = await session()
-    if (current?.user?.is_anonymous) {
-      checked(await client.auth.updateUser({ email: email.trim() }, { emailRedirectTo: callbackUrl("upgrade") }))
-      return { verificationSent: true, expectedUserId: current.user.id }
-    }
-    if (current) throw new Error("Already signed in")
-    checked(await client.auth.signUp({ email: email.trim(), password, options: { emailRedirectTo: callbackUrl("signup"), ...(captchaToken ? { captchaToken } : {}) } }))
-    return { verificationSent: true, expectedUserId: null }
-  }
-
   async function completeCallback(code, expectedUserId, flow) {
-    if (!["signin", "signup", "link", "upgrade", "recovery"].includes(flow)) {
+    if (!["signin", "link"].includes(flow)) {
       throw new Error("Unknown authentication callback")
     }
-    const linking = ["link", "upgrade"].includes(flow)
+    const linking = flow === "link"
     const expected = linking ? expectedUserId || (await session())?.user?.id : null
     if (linking && !expected) {
       throw Object.assign(new Error("Original identity unavailable"), { code: "identity_conflict" })
@@ -136,25 +105,9 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return data
   }
 
-  async function resetPassword(email, captchaToken) {
-    checked(await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: callbackUrl("recovery"), ...(captchaToken ? { captchaToken } : {}) }))
-  }
-
-  async function setPassword(password) {
-    if (password.length < 10 || password.length > 128) {
-      throw Object.assign(new Error("Invalid password length"), { code: "weak_password" })
-    }
-    const user = checked(await client.auth.getUser()).user
-    if (!user?.email_confirmed_at || user.is_anonymous) {
-      throw Object.assign(new Error("Email verification required"), { code: "verification_required" })
-    }
-    checked(await client.auth.updateUser({ password }))
-    return membership(true)
-  }
-
   async function signOut() {
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  return { session, membership, signIn, guest, google, register, completeCallback, resetPassword, setPassword, signOut, returnPath }
+  return { session, membership, guest, google, completeCallback, signOut, returnPath }
 }

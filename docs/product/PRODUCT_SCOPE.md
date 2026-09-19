@@ -93,7 +93,7 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 ### First Release and Entry Models
 
 - First release: H5. Android and iOS are later work, not first-release gates.
-- Sign-in: Google, basic account/password, and persistent guest access.
+- Sign-in: Google and persistent guest access.
   [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns their design.
 - Mahjong Clash is the first adopter, not the architectural center of Joy8.
   Platform capabilities must be reusable by other products.

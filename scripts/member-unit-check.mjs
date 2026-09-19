@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath, signupWasVerifiedWithoutSession } from "../src/member/service.js"
+import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 
 const origin = "https://joy8.example"
@@ -15,24 +15,15 @@ function fixture(initialUser = null) {
   const client = {
     auth: {
       getSession: async () => ok({ session: user ? { user } : null }),
-      getUser: async () => ok({ user }),
       signInAnonymously: async (args) => {
         calls.push(["anonymous", args])
         await new Promise((resolve) => setTimeout(resolve, 5))
         user = guestUser
         return ok({ user })
       },
-      signInWithPassword: async (args) => {
-        calls.push(["password", args])
-        user = registeredUser
-        return ok({ user })
-      },
-      signUp: async (args) => { calls.push(["signup", args]); return ok() },
       signInWithOAuth: async (args) => { calls.push(["oauth", args]); return ok({ url: "https://provider.example" }) },
       linkIdentity: async (args) => { calls.push(["link", args]); return ok({ url: "https://provider.example" }) },
-      updateUser: async (...args) => { calls.push(["update", ...args]); return ok({ user }) },
       exchangeCodeForSession: async (code) => { calls.push(["exchange", code]); user = registeredUser; return ok({ user }) },
-      resetPasswordForEmail: async (...args) => { calls.push(["reset", ...args]); return ok() },
       signOut: async (args) => { calls.push(["signout", args]); user = null; return ok() },
     },
     functions: {
@@ -156,16 +147,6 @@ test("unsupported guest locking and Auth failure stop enrollment", async () => {
   assert.deepEqual(f.calls, [])
 })
 
-test("guest email upgrade changes the same identity without assigning an unverified password", async () => {
-  const f = fixture(guestUser)
-  const result = await f.service.register(" player@example.com ", "not-used")
-  assert.equal(result.expectedUserId, guestUser.id)
-  assert.deepEqual(f.calls[0][1], { email: "player@example.com" })
-  assert.equal(new URL(f.calls[0][2].emailRedirectTo).searchParams.get("flow"), "upgrade")
-  await assert.rejects(f.service.signIn("other@example.com", "password"), { code: "identity_conflict" })
-  assert.equal(f.calls.length, 1)
-})
-
 test("Google upgrades link to the guest and provider conflicts preserve the current session", async () => {
   const f = fixture(guestUser)
   assert.equal((await f.service.google()).expectedUserId, guestUser.id)
@@ -179,13 +160,13 @@ test("Google upgrades link to the guest and provider conflicts preserve the curr
   assert.equal(signedOut.calls[0][0], "oauth")
 })
 
-test("upgrade callbacks require the original identity, including a new email tab", async () => {
+test("Google link callbacks require the original guest identity", async () => {
   const f = fixture(guestUser)
-  assert.equal((await f.service.completeCallback("one-use-code", null, "upgrade")).user.id, guestUser.id)
+  assert.equal((await f.service.completeCallback("one-use-code", null, "link")).user.id, guestUser.id)
   await assert.rejects(f.service.completeCallback("another-code", "wrong-user", "link"), { code: "identity_conflict" })
   assert.equal(await f.service.session(), null)
   const lostGuest = fixture()
-  await assert.rejects(lostGuest.service.completeCallback("code", null, "upgrade"), { code: "identity_conflict" })
+  await assert.rejects(lostGuest.service.completeCallback("code", null, "link"), { code: "identity_conflict" })
   assert.deepEqual(lostGuest.calls, [])
 })
 
@@ -197,51 +178,20 @@ test("invalid or replayed callbacks cannot enroll or fall back to a new guest", 
   assert.deepEqual(f.calls, [])
 })
 
-test("a verified signup with missing browser state falls back to password login", () => {
-  const error = { code: "pkce_code_verifier_not_found" }
-  assert.equal(signupWasVerifiedWithoutSession(error, "signup"), true)
-  assert.equal(signupWasVerifiedWithoutSession(error, "recovery"), false)
-  assert.equal(memberErrorMessage(error), "找不到這次驗證的瀏覽器資料，請重新操作並在同一個瀏覽器開啟信件連結。")
+test("callback and Google-link errors use safe messages", () => {
+  assert.equal(memberErrorMessage({ code: "identity_already_exists" }), "這個 Google 登入已綁定其他帳號。原本的訪客資料會保留，請勿重複綁定。")
   assert.equal(memberErrorMessage({ code: "flow_state_not_found" }), "這個驗證連結已使用或已失效，請重新操作。")
 })
 
-test("email password sign-in enrolls only after successful authentication", async () => {
+test("anonymous entry forwards captcha tokens", async () => {
   const f = fixture()
-  assert.equal((await f.service.signIn(" player@example.com ", "password", "captcha-1" )).player_account_ref, "player-1")
-  assert.deepEqual(f.calls.map(([name]) => name), ["password", "rpc"])
-  assert.deepEqual(f.calls[0][1].options, { captchaToken: "captcha-1" })
-  assert.equal(f.calls[1][1], "joy8-gateway/enroll-member")
-  const rejected = fixture()
-  rejected.client.auth.signInWithPassword = async () => ({ error: { code: "email_not_confirmed" } })
-  await assert.rejects(rejected.service.signIn("player@example.com", "password"), { code: "email_not_confirmed" })
-  assert.deepEqual(rejected.calls, [])
-})
-
-test("email signup, recovery and anonymous entry forward captcha tokens", async () => {
-  const f = fixture()
-  await f.service.register("player@example.com", "long-password", "captcha-signup")
-  await f.service.resetPassword("player@example.com", "captcha-recovery")
   await f.service.guest("captcha-guest")
-  assert.equal(f.calls[0][1].options.captchaToken, "captcha-signup")
-  assert.equal(f.calls[1][2].captchaToken, "captcha-recovery")
-  assert.deepEqual(f.calls[2], ["anonymous", { options: { captchaToken: "captcha-guest" } }])
+  assert.deepEqual(f.calls[0], ["anonymous", { options: { captchaToken: "captcha-guest" } }])
   assert.equal(memberErrorMessage({ code: "captcha_required" }), "請先完成安全驗證。")
 })
 
-test("password setup requires verified nonanonymous identity and minimum strength", async () => {
-  const f = fixture(guestUser)
-  await assert.rejects(f.service.setPassword("long-password"), { code: "verification_required" })
-  const verified = fixture(registeredUser)
-  await assert.rejects(verified.service.setPassword("short"), { code: "weak_password" })
-  await verified.service.setPassword("long-password")
-  assert.deepEqual(verified.calls.map(([name]) => name), ["update", "rpc"])
-})
-
-test("recovery disregards a stale link expectation and sign-out does not auto-create guests", async () => {
-  const f = fixture()
-  await f.service.resetPassword(" player@example.com ")
-  assert.equal(new URL(f.calls[0][2].redirectTo).searchParams.get("flow"), "recovery")
-  await f.service.completeCallback("recovery-code", "stale-user", "recovery")
+test("sign-out does not auto-create guests", async () => {
+  const f = fixture(registeredUser)
   await f.service.signOut()
   assert.equal(await f.service.membership(), null)
   assert.deepEqual(f.calls.at(-1), ["signout", { scope: "local" }])

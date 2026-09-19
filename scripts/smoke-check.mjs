@@ -399,7 +399,7 @@ async function expectErrorPresentation(client) {
 async function expectMemberEntry(client, appPort) {
   await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
     return text.includes("使用 Google 登入") && text.includes("先以訪客遊玩")
-  }, "Standalone callback and recovery entry remains available")
+  }, "Standalone Google callback and guest entry remains available")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `location.pathname === "/account/" && new URLSearchParams(location.search).get("next") === "/game/?slug=test"`,
@@ -408,39 +408,22 @@ async function expectMemberEntry(client, appPort) {
   const controls = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
-      const loginActions = document.getElementById("reset-button").closest("#account-switch")
-        && document.getElementById("account-switch").getBoundingClientRect().top >= document.getElementById("guest-notice").getBoundingClientRect().bottom
-      document.getElementById("register-button").click()
-      const registration = document.getElementById("password").minLength === 10
-        && document.getElementById("password").autocomplete === "new-password"
-        && document.getElementById("account-title").textContent === "建立帳號"
-        && !document.getElementById("confirm-password-field").hidden
-        && document.getElementById("register-confirm-password").required
-        && document.getElementById("provider-options").hidden
-        && document.getElementById("guest-button").hidden
-        && document.getElementById("reset-button").hidden
-      document.getElementById("email").value = "player@example.com"
-      document.getElementById("password").value = "first-password"
-      document.getElementById("register-confirm-password").value = "other-password"
-      document.getElementById("email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-      const mismatch = document.getElementById("account-status").textContent.includes("兩次密碼不相同")
-      document.getElementById("register-button").click()
-      document.getElementById("reset-button").click()
-      const recovery = document.getElementById("password-field").hidden
-        && !document.getElementById("password").required
-        && document.getElementById("account-title").textContent === "找回密碼"
-        && document.getElementById("provider-options").hidden
-      document.getElementById("register-button").click()
-      return loginActions && registration && mismatch && recovery && !document.getElementById("password-field").hidden
-        && document.getElementById("account-title").textContent === "登入"
+      const google = document.getElementById("google-button").getBoundingClientRect()
+      const guest = document.getElementById("guest-button").getBoundingClientRect()
+      return document.getElementById("account-title").textContent === "登入"
+        && guest.top > google.bottom
+        && !document.getElementById("email-form")
+        && !document.getElementById("register-button")
+        && !document.getElementById("reset-button")
+        && !document.getElementById("new-password-form")
     })()`,
   })
-  if (!controls.result.value) throw new Error("Member form modes failed")
+  if (!controls.result.value) throw new Error("Retired email account controls remain visible")
   for (const width of [320, 390, 1280]) {
     await client.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 })
     const layout = await client.send("Runtime.evaluate", {
       returnByValue: true,
-      expression: `document.documentElement.scrollWidth <= innerWidth && getComputedStyle(document.getElementById("new-password-form")).display === "none" && document.getElementById("google-button").getBoundingClientRect().top > document.getElementById("email-submit").getBoundingClientRect().bottom && document.getElementById("guest-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 17`,
+      expression: `document.documentElement.scrollWidth <= innerWidth && document.getElementById("guest-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 9`,
     })
     if (!layout.result.value) throw new Error(`Member layout failed at ${width}px`)
     if (process.env.SMOKE_MEMBER_SCREENSHOT && width === 390) {
@@ -465,10 +448,10 @@ async function expectMemberEntry(client, appPort) {
   await waitForText(client, (text) => text.includes("目前以訪客身分登入") && text.includes("繼續遊玩"), "Persistent guest account UI")
   const guestControls = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `document.getElementById("guest-button").hidden && document.getElementById("password-field").hidden && !document.getElementById("password").required && document.getElementById("google-button").textContent.includes("綁定")`,
+    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-button").textContent.includes("綁定")`,
   })
   if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
-  console.log("OK Member entry, recovery controls, guest upgrade and responsive layout")
+  console.log("OK Google and guest-only member entry, guest upgrade and responsive layout")
 }
 
 async function expectMemberModal(client) {
@@ -496,7 +479,7 @@ async function expectMemberModal(client) {
         const dialog = document.querySelector("#member-dialog")
         const overflow = dialog.scrollHeight - dialog.clientHeight
         dialog.scrollTop = dialog.scrollHeight
-        const footerVisible = dialog.querySelector("#account-switch").getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1
+        const footerVisible = dialog.querySelector("#guest-notice").getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1
         dialog.scrollTop = 0
         return { overflow, horizontal: dialog.scrollWidth > dialog.clientWidth, scrollbar: getComputedStyle(dialog).scrollbarWidth, footerVisible }
       })()`,
@@ -505,19 +488,6 @@ async function expectMemberModal(client) {
     if (layout.horizontal || layout.scrollbar !== "none" || !layout.footerVisible || (height >= 667 && layout.overflow > 1)) throw new Error(`Member dialog scrollbar failed at ${width}x${height}: ${JSON.stringify(layout)}`)
   }
   await client.send("Emulation.clearDeviceMetricsOverride")
-  const switched = await client.send("Runtime.evaluate", {
-    returnByValue: true,
-    expression: `(() => {
-      const dialog = document.querySelector("#member-dialog")
-      dialog.querySelector("#register-button").click()
-      const registration = dialog.open && location.pathname === "/"
-        && dialog.querySelector("#account-title").textContent === "建立帳號"
-        && !dialog.querySelector("#confirm-password-field").hidden
-      dialog.querySelector("#register-button").click()
-      return registration && dialog.open && dialog.querySelector("#account-title").textContent === "登入"
-    })()`,
-  })
-  if (!switched.result.value) throw new Error("Member dialog form switch changed the Lobby")
   await client.send("Runtime.evaluate", { awaitPromise: true, expression: 'new Promise(resolve => { document.querySelector("#member-dialog").addEventListener("close", resolve, { once: true }); document.querySelector(".member-dialog-close").click() })' })
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
   await waitForText(client, (text) => text.includes("使用 Google 登入"), "Member dialog reopens")
@@ -585,17 +555,14 @@ async function expectMemberContinuation(client) {
     returnByValue: true,
     expression: `Promise.all([import("/src/member/page.js"), import("/src/member/template.js"), import("/src/lib/memberClient.js")]).then(async ([{ initMemberPanel }, { memberCardMarkup }, { memberSupabase }]) => {
       const auth = memberSupabase.auth
-      const saved = Object.fromEntries(["getSession", "signInWithPassword", "signInAnonymously", "signUp", "resetPasswordForEmail", "exchangeCodeForSession"].map(key => [key, auth[key]]))
+      const saved = Object.fromEntries(["getSession", "signInAnonymously", "exchangeCodeForSession"].map(key => [key, auth[key]]))
       const descriptor = Object.getOwnPropertyDescriptor(memberSupabase, "functions")
       let user = null
       const paths = []
       const roots = []
       const panels = []
       auth.getSession = async () => ({ data: { session: user ? { user } : null }, error: null })
-      auth.signInWithPassword = async () => { user = { id: "fixture-member", is_anonymous: false }; return { data: { user }, error: null } }
       auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
-      auth.signUp = async () => ({ data: { user: { id: "pending-member" }, session: null }, error: null })
-      auth.resetPasswordForEmail = async () => ({ data: {}, error: null })
       auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
       Object.defineProperty(memberSupabase, "functions", { configurable: true, value: { invoke: async () => ({ data: { member: { player_account_ref: "fixture-player", account_type: user?.is_anonymous ? "guest" : "registered" } }, error: null }) } })
       const mount = (next, extra = {}) => {
@@ -614,57 +581,7 @@ async function expectMemberContinuation(client) {
         panels.push(panel)
         return { root, panel, continued }
       }
-      const submit = root => {
-        root.querySelector("#email").value = "fixture@example.invalid"
-        root.querySelector("#password").value = "fixture-password"
-        root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-      }
       try {
-        const signup = mount("/")
-        await signup.panel.ready
-        signup.root.querySelector("#register-button").click()
-        signup.root.querySelector("#email").value = "fixture@example.invalid"
-        signup.root.querySelector("#password").value = "fixture-password"
-        signup.root.querySelector("#register-confirm-password").value = "fixture-password"
-        signup.root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-        await new Promise(resolve => setTimeout(resolve, 0))
-        const signupComplete = signup.root.querySelector("#account-title").textContent === "請查看信箱"
-          && !signup.root.querySelector("#completion-panel").hidden
-          && signup.root.querySelector("#signin-options").hidden
-          && signup.root.querySelector("#completion-message").textContent.includes("驗證信")
-        signup.root.querySelector("#completion-action").click()
-        const signupReturned = signup.root.querySelector("#account-title").textContent === "登入"
-          && signup.root.querySelector("#completion-panel").hidden
-          && !signup.root.querySelector("#signin-options").hidden
-        signup.panel.dispose()
-        user = null
-        const reset = mount("/")
-        await reset.panel.ready
-        reset.root.querySelector("#reset-button").click()
-        reset.root.querySelector("#email").value = "fixture@example.invalid"
-        reset.root.querySelector("#email-form").dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }))
-        await new Promise(resolve => setTimeout(resolve, 0))
-        const resetComplete = reset.root.querySelector("#account-title").textContent === "請查看信箱"
-          && !reset.root.querySelector("#completion-panel").hidden
-          && reset.root.querySelector("#signin-options").hidden
-          && reset.root.querySelector("#completion-message").textContent.includes("重設密碼信")
-        reset.panel.dispose()
-        user = null
-        auth.exchangeCodeForSession = async () => ({ data: { user: null, session: null }, error: { code: "pkce_code_verifier_not_found" } })
-        const verified = mount("/", { code: "fixture-code", flow: "signup" })
-        await verified.panel.ready
-        const verifiedComplete = verified.root.querySelector("#account-title").textContent === "信箱驗證完成"
-          && !verified.root.querySelector("#completion-panel").hidden
-          && verified.root.querySelector("#signin-options").hidden
-        verified.panel.dispose()
-        auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
-        user = null
-        const password = mount("/game/?slug=password-game")
-        await password.panel.ready
-        submit(password.root)
-        await password.continued
-        password.panel.dispose()
-        user = null
         const guest = mount("/game/?slug=guest-game")
         await guest.panel.ready
         guest.root.querySelector("#guest-button").click()
@@ -674,19 +591,26 @@ async function expectMemberContinuation(client) {
         let release
         let didStart
         const started = new Promise(resolve => { didStart = resolve })
-        auth.signInWithPassword = () => { didStart(); return new Promise(resolve => { release = () => { user = { id: "late-member", is_anonymous: false }; resolve({ data: { user }, error: null }) } }) }
+        auth.signInAnonymously = () => { didStart(); return new Promise(resolve => { release = () => { user = { id: "late-guest", is_anonymous: true }; resolve({ data: { user }, error: null }) } }) }
         const cancelled = mount("/game/?slug=cancelled-game")
         await cancelled.panel.ready
-        submit(cancelled.root)
+        cancelled.root.querySelector("#guest-button").click()
         await started
         cancelled.panel.dispose()
         cancelled.root.remove()
         release()
         await new Promise(resolve => setTimeout(resolve, 0))
+        auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
         user = null
         const callback = mount("/game/?slug=callback-game", { code: "fixture-code", flow: "signin" })
         await callback.panel.ready
-        return { paths, signupComplete, signupReturned, resetComplete, verifiedComplete }
+        user = null
+        const retired = mount("/", { code: "fixture-code", flow: "signup" })
+        await retired.panel.ready
+        const retiredFlowRejected = retired.root.querySelector("#account-status").dataset.error === "true"
+          && retired.root.querySelector("#account-status").textContent.includes("目前無法完成操作")
+        retired.panel.dispose()
+        return { paths, retiredFlowRejected }
       } finally {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
@@ -696,12 +620,12 @@ async function expectMemberContinuation(client) {
       }
     })`,
   })
-  const expectedPaths = ["/game/?slug=password-game", "/game/?slug=guest-game", "/game/?slug=callback-game"]
+  const expectedPaths = ["/game/?slug=guest-game", "/game/?slug=callback-game"]
   const value = result.result.value
-  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.signupComplete || !value?.signupReturned || !value?.resetComplete || !value?.verifiedComplete) {
+  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected) {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
-  console.log("OK Member completion states, password, guest and callback continuation; late completion cannot launch a cancelled game")
+  console.log("OK Guest and Google callback continuation; retired email callbacks fail closed and late completion cannot launch a cancelled game")
 }
 
 async function expectGameIframeSecurity(client) {
