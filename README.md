@@ -219,7 +219,7 @@ not create a replacement guest. Clearing storage can lose guest access.
 `POST /member` resolves existing enrollment; `POST /enroll-member` explicitly
 enrolls the authenticated identity. Both take an empty JSON object, require an
 allowed Origin and server-verified bearer token, and return
-`{ "member": { "player_account_ref": "...", "account_type": "guest|registered" } }`.
+`{ "member": { "player_account_ref": "...", "public_id": "482731", "account_type": "guest|registered" } }`.
 The read route may return `{ "member": null }`. The member migrations preserve player
 IDs, derive guest status from Auth, reject inactive accounts, and grant RPC
 execution only to the service role. Neither member route provisions a wallet.
