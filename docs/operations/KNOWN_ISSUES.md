@@ -167,6 +167,24 @@ Direction when evidence shows scale pressure:
 - Add indexes for the actual cleanup predicates.
 - Measure the cleanup cost before changing the design.
 
+### Shared Addresses Exhaust Normal Traffic Budgets
+
+`npm run test:gateway-rate` reproduces the current behavior through the actual
+Gateway handler and isolated current rate-limit SQL: 30 distinct valid identities
+can enroll from one address, then the 31st receives HTTP 429 before authentication
+or membership creation. The same identity succeeds from a second address. Likewise,
+the 121st settlement request from one server address is rejected before dispatch,
+even when every request names a different match. Auth responses and successful
+accounting responses are stubbed; this establishes the admission ceiling, not
+hosted Auth or actual settlement capacity.
+
+This can reject legitimate players behind a shared network and unrelated tables
+behind one product backend. Passing the diagnostic preserves evidence of the
+limitation; it is not production-capacity acceptance. Before public activation,
+define expected player/table traffic, separate verified identity/product budgets
+from coarse ingress abuse protection, and test that traffic with bounded retry
+bursts. Raising the existing global number alone does not provide that separation.
+
 ### External Monitoring Not Configured
 
 POST /health and its protected dependency RPC are deployed and passed the hosted

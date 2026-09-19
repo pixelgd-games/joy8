@@ -20,6 +20,7 @@ const checks = [
     "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check", "platform-bundle-check", "mahjong-balance-migration-check",
   ].map(name => `scripts/${name}.mjs`)],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/gateway-unit-check.mjs"],
+  ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "--test", "scripts/gateway-rate-limit-check.mjs"],
   ["scripts/smoke-check.mjs"],
 ]
 for (const args of checks) {

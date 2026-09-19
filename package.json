@@ -31,6 +31,7 @@
     "test:continuous-db": "node --test scripts/continuous-settlement-check.mjs",
     "test:continuous-pg": "node scripts/continuous-postgres-check.mjs",
     "test:gateway": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/gateway-unit-check.mjs",
+    "test:gateway-rate": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test scripts/gateway-rate-limit-check.mjs",
     "smoke:gateway": "node scripts/gateway-security-smoke.mjs"
   },
   "devDependencies": {

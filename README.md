@@ -383,6 +383,7 @@ npm audit
 npm run build
 npm run smoke
 npm run test:gateway
+npm run test:gateway-rate
 npm run test:member
 npm run test:captcha
 npm run test:iframe
@@ -399,6 +400,14 @@ npm run test:continuous-db
 node --test scripts/private-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
 ```
+
+`test:gateway-rate` runs the actual Gateway handler against isolated rate-limit
+and membership SQL. It reproduces the shared-address enrollment and settlement
+ceilings, independent-address budgets and fail-closed storage errors. Auth responses
+and the settlement upstream are stubbed; this is a limit-policy diagnostic, not
+hosted authentication or settlement acceptance. It also supports
+`JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN`. The current shared-IP
+limitation is tracked in `docs/operations/KNOWN_ISSUES.md`.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
 hardening, then checks the proposed runtime balance upgrade, restricted checkpoint
