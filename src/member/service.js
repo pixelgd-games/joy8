@@ -67,6 +67,9 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     }
     const member = result.data?.member ?? null
     if (enroll && !member) throw new Error("Enrollment returned no member")
+    if (enroll && member && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: member }))
+    }
     return member
   }
 

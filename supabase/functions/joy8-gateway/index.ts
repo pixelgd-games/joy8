@@ -230,17 +230,17 @@ async function resolveMember(request: Request, headers: HeadersInit, enroll: boo
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   if (Object.keys(body.value).length) return jsonResponse({ error: "Member request must be empty" }, 400, headers)
-  const result = await callRpc("joy8_resolve_member", { p_auth_user_id: auth.userId, p_enroll: enroll })
+  const result = await callRpc("joy8_resolve_member_profile", { p_auth_user_id: auth.userId, p_enroll: enroll })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
-  const row = firstRpcRow<{ player_account_id: string; account_type: string }>(result.body)
+  const row = firstRpcRow<{ player_account_id: string; account_type: string; public_id: string }>(result.body)
   if (!row) {
     if (enroll) return jsonResponse({ error: "Gateway returned an empty member" }, 502, headers)
     return jsonResponse({ member: null }, 200, headers)
   }
-  if (!row.player_account_id || !["guest", "registered"].includes(row.account_type)) {
+  if (!row.player_account_id || !["guest", "registered"].includes(row.account_type) || !/^[1-9][0-9]{5}$/.test(row.public_id)) {
     return jsonResponse({ error: "Gateway returned an invalid member" }, 502, headers)
   }
-  return jsonResponse({ member: { player_account_ref: row.player_account_id, account_type: row.account_type } }, 200, headers)
+  return jsonResponse({ member: { player_account_ref: row.player_account_id, public_id: row.public_id, account_type: row.account_type } }, 200, headers)
 }
 
 async function createPrivateSession(request: Request, headers: HeadersInit): Promise<Response> {

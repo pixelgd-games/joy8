@@ -439,9 +439,10 @@ async function expectMemberEntry(client, appPort) {
     expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
       memberSupabase.auth.getSession = async () => ({ data: { session: { user: { id: "smoke-guest", is_anonymous: true } } }, error: null })
       Object.defineProperty(memberSupabase, "functions", { value: {
-        invoke: async () => ({ data: { member: { player_account_ref: "smoke-player", account_type: "guest" } }, error: null })
+        invoke: async () => ({ data: { member: { player_account_ref: "smoke-player", public_id: "482731", account_type: "guest" } }, error: null })
       } })
       window.dispatchEvent(new Event("focus"))
+      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: { public_id: "482731" } }))
       return true
     })`,
   })
@@ -452,6 +453,7 @@ async function expectMemberEntry(client, appPort) {
     expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
   })
   if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
+  await waitForText(client, (text) => text.includes("Player") && text.includes("482731"), "Public player ID appears in the Lobby header")
   console.log("OK Google and guest-only member entry, guest upgrade and responsive layout")
 }
 

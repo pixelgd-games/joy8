@@ -89,6 +89,24 @@ body{
   touch-action:manipulation;
 }
 
+.member-login-link.is-member{
+  gap:6px;
+  border-color:rgba(255,255,255,.12);
+  background:rgba(255,255,255,.055);
+  color:#f7f9fb;
+}
+
+.member-login-prefix{
+  color:rgba(225,230,238,.7);
+  font-weight:700;
+}
+
+.member-login-id{
+  color:var(--accent);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.06em;
+}
+
 .install-button[hidden],
 .install-help[hidden]{
   display:none;

@@ -96,7 +96,7 @@ try {
     body: [{ result: "ok" }],
   })
 
-  let memberRows = [{ player_account_id: "player-1", account_type: "guest" }]
+  let memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
   let memberError = null
   let sessionError = null
   const rpcCalls = []
@@ -106,7 +106,7 @@ try {
     const args = JSON.parse(options.body)
     rpcCalls.push({ name, args })
     if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
-    if (name === "joy8_resolve_member") {
+    if (name === "joy8_resolve_member" || name === "joy8_resolve_member_profile") {
       return memberError ? Response.json(memberError, { status: 403 }) : Response.json(memberRows)
     }
     if (name === "create_game_session") return sessionError ? Response.json(sessionError, { status: 400 }) : Response.json([{
@@ -130,11 +130,11 @@ try {
     assert.equal((await request(route, {}, "", null)).status, 403)
     for (const token of ["", "anon-key"]) assert.equal((await request(route, {}, token)).status, 401)
   }
-  assert.equal(rpcCalls.some(({ name }) => name === "joy8_resolve_member" || name === "create_game_session"), false)
+  assert.equal(rpcCalls.some(({ name }) => name === "joy8_resolve_member_profile" || name === "joy8_resolve_member" || name === "create_game_session"), false)
   assert.equal((await request("enroll-member", { p_auth_user_id: "victim", account_type: "registered" })).status, 400)
   const memberResponse = await request("member")
-  assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", account_type: "guest" } })
-  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_member", args: { p_auth_user_id: "verified-user", p_enroll: false } })
+  assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", public_id: "482731", account_type: "guest" } })
+  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_member_profile", args: { p_auth_user_id: "verified-user", p_enroll: false } })
   assert.equal((await request("enroll-member")).status, 200)
   assert.equal(rpcCalls.at(-1).args.p_enroll, true)
 
@@ -150,7 +150,7 @@ try {
   memberError = { code: "42501", message: "private database diagnostic" }
   assert.deepEqual(await (await request("member")).json(), { error: "Gateway RPC failed" })
   memberError = null
-  memberRows = [{ player_account_id: "player-1", account_type: "guest" }]
+  memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
   const launched = await request("create-session", { slug: "test", auth_user_id: "victim" })
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")

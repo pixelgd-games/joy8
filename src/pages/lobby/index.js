@@ -58,6 +58,53 @@ export async function initLobbyPage(appRoot) {
 
 function setupMemberEntry(appRoot) {
   const service = createMemberService(memberSupabase, { origin: location.origin })
+  const accountLink = appRoot.querySelector(".member-login-link")
+  let accountRevision = 0
+
+  const renderAccount = (label, publicId = "") => {
+    accountLink.replaceChildren()
+    accountLink.classList.toggle("is-member", Boolean(publicId))
+    accountLink.removeAttribute("aria-busy")
+    if (!publicId) {
+      accountLink.textContent = label
+      accountLink.setAttribute("aria-label", label)
+      return
+    }
+    const prefix = document.createElement("span")
+    prefix.className = "member-login-prefix"
+    prefix.textContent = "Player"
+    const id = document.createElement("span")
+    id.className = "member-login-id"
+    id.textContent = publicId
+    accountLink.append(prefix, id)
+    accountLink.setAttribute("aria-label", `玩家帳號 Player ${publicId}`)
+  }
+
+  const refreshAccount = (session, knownMember = null) => {
+    const revision = ++accountRevision
+    const user = session?.user
+    if (!user) {
+      renderAccount("登入")
+      return
+    }
+    const fallback = user.is_anonymous ? "訪客帳號" : "我的帳號"
+    if (knownMember?.public_id) {
+      renderAccount("", knownMember.public_id)
+      return
+    }
+    renderAccount(fallback)
+    accountLink.setAttribute("aria-busy", "true")
+    setTimeout(async () => {
+      try {
+        const member = await service.membership()
+        if (revision !== accountRevision) return
+        renderAccount(fallback, member?.public_id)
+      } catch {
+        if (revision === accountRevision) renderAccount(fallback)
+      }
+    }, 0)
+  }
+
   const enterGame = createGameEntry({
     origin: location.origin,
     membership: () => service.membership(),
@@ -67,10 +114,11 @@ function setupMemberEntry(appRoot) {
     },
     navigate: (path) => location.assign(path),
   })
-  const accountLink = appRoot.querySelector(".member-login-link")
   memberSupabase.auth.onAuthStateChange((_event, session) => {
-    const user = session?.user
-    accountLink.textContent = user ? user.is_anonymous ? "訪客帳號" : "我的帳號" : "登入"
+    refreshAccount(session)
+  })
+  window.addEventListener("joy8:membership", async (event) => {
+    refreshAccount(await service.session(), event.detail)
   })
 
   const openEntry = async (trigger, next, gameName) => {

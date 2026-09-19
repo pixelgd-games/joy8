@@ -11,6 +11,7 @@
     "test:member": "node --test scripts/member-unit-check.mjs",
     "test:member-db": "node --test scripts/member-database-check.mjs",
     "test:member-pg": "node scripts/member-postgres-check.mjs",
+    "test:public-id": "node --test scripts/public-player-id-check.mjs",
     "test:session-scope": "node --test scripts/session-scope-check.mjs",
     "test:session-scope-pg": "node scripts/session-scope-postgres-check.mjs",
     "test:ledger-cleanup": "node --test scripts/ledger-cleanup-check.mjs",
