@@ -488,19 +488,23 @@ Do not continue if the active CLI state points only to Aura or another project. 
 
 ### Hosted Auth Configuration
 
-Verified in the Joy8 dashboard on 2026-09-17 using the user-authorized Chrome
+Verified in the Joy8 dashboard on 2026-09-19 using the user-authorized Chrome
 session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 `lsazydefvnuqglultqii`:
 
 - Google and Email providers, new-user signup and email confirmation are enabled.
 - Anonymous sign-in and manual identity linking are enabled and saved.
-- Site URL is `https://joy8.pages.dev`.
+- Site URL is `https://joy8.cc`.
+- Admin redirect allowlist entries are `https://joy8.pages.dev/admin/login/`,
+  `https://joy8.cc/admin/login/`, `https://www.joy8.cc/admin/login/`, and
+  `http://localhost:5173/admin/login/`.
 - Member redirect allowlist entries are `https://joy8.pages.dev/account/*`,
+  `https://joy8.cc/account/*`, `https://www.joy8.cc/account/*`,
   `http://127.0.0.1:5173/account/*`, `http://localhost:5173/account/*`,
   `http://127.0.0.1:4173/account/*`, and `http://localhost:4173/account/*`.
   The suffix accommodates the encoded `next` and `flow` query parameters while
-  keeping the host and member route fixed. The three existing admin callback
-  entries remain unchanged, for eight entries total.
+  keeping the host and member route fixed. The allowlist contains 11 entries in
+  total; all former Looty callback URLs have been removed.
 - Email delivery still uses Supabase's built-in testing service. Custom SMTP is
   not configured. CAPTCHA is off. Hosted password policy and real provider,
   linking, verification and recovery behavior remain to be validated.
@@ -514,7 +518,7 @@ It does not establish that the CLI now has configuration read/write access.
 
 - Hosting: Cloudflare Pages.
 - Production branch: `main`.
-- Production hostname: `joy8.pages.dev`.
+- Production hostnames: `joy8.pages.dev`, `joy8.cc`, and `www.joy8.cc`.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
@@ -527,7 +531,10 @@ complete. Godot remains local during development; GCP/VPS selection and payment
 are deferred until external multiplayer testing requires an always-on server.
 SMTP belongs to Joy8/Supabase Auth and does not depend on that server host.
 
-The Supabase Edge Function is deployed separately from Cloudflare Pages.
+The Supabase `joy8-gateway` Edge Function is deployed separately from Cloudflare
+Pages. The former `looty-gateway` function and `looty-git` Pages project were
+removed after the Joy8 production cutover was verified. The production gateway
+smoke test passed without creating an identity, wallet, session, or settlement.
 
 ## Game and Asset Boundaries
 
