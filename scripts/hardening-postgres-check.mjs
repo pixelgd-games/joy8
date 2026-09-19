@@ -10,6 +10,8 @@ runPostgresChecks([
   "scripts/product-registration-check.mjs",
   "scripts/public-id-concurrency-check.mjs",
   "scripts/product-ddl-check.mjs",
+  "scripts/product-ddl-concurrency-check.mjs",
   "scripts/public-id-lock-check.mjs",
   "scripts/player-cleanup-check.mjs",
+  "scripts/platform-bundle-check.mjs",
 ])

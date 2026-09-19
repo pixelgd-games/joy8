@@ -462,6 +462,19 @@ preflight. Runtime isolation checks remain necessary. See the
 [PostgreSQL event-trigger limits](https://www.postgresql.org/docs/17/event-trigger-definition.html)
 and [Supabase event-trigger support](https://supabase.com/docs/guides/database/postgres/event-triggers).
 
+The installed scoped replacement is
+`supabase/migrations/20260920140000_scoped_product_ddl_guard.sql`.
+It skips index/comment maintenance, inspects changed catalog objects and cascaded
+drops, and serializes schema changes with registration using schema-specific locks.
+Only relevant product changes or newly unsafe protected-table privileges enqueue
+the full deferred check. Safe Auth table maintenance does not take the global lock.
+GRANT and REVOKE retain conservative global validation because PostgreSQL omits
+their target object identifiers from event metadata; the guard does not parse SQL
+text. Schema, registration and grant transactions require READ COMMITTED semantics
+so validation sees changes committed while waiting for a lock. REPEATABLE READ and
+SERIALIZABLE are rejected for those changes; comments and index maintenance remain
+unaffected. Role changes still need explicit operator preflight.
+
 Revoke PUBLIC EXECUTE on each product function in its creation transaction.
 Schema-scoped default revocation cannot remove globally granted default PUBLIC
 EXECUTE, and defaults belong to the creating role. See
@@ -476,6 +489,22 @@ permission checks through the Joy8 wrapper. Management API reads run as
 grant it execution to bypass this boundary. Migration/operator transactions run
 the validator directly. Account/catalog/player snapshots must remain unchanged
 when installing platform-only permission changes.
+
+### Platform SQL Fixtures
+
+`scripts/fixtures/platform-sources.json` is the authoritative integration fixture
+inventory. Every active migration must be either ordered runtime input or excluded
+with a reason. New unclassified migrations fail `test:platform-bundle` and `verify`.
+Hosted catalog edits, account cleanup, activation/key data and product-owned schema
+installation are excluded. Each product installs and registers its own schema.
+
+`node scripts/export-platform-fixture.mjs` exports the contract and ordered SQL
+sources with normalized-LF SHA-256 hashes. Consumers must compare the exact ordered
+path list as well as every hash; checkout-based verification must also compare the
+contract and source content to the selected Joy8 checkout. A bundle with drafts is
+a proposed-schema test artifact, not evidence of hosted deployment. The full bundle
+is exercised on PGlite and PostgreSQL 17; focused historical tests may deliberately
+load smaller subsets for migration regressions.
 
 ### Recovery and Errors
 

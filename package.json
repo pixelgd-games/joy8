@@ -19,6 +19,7 @@
     "test:member-product-pg": "node scripts/member-product-postgres-check.mjs",
     "test:hardening-pg": "node scripts/hardening-postgres-check.mjs",
     "test:product-ddl": "node --test scripts/product-ddl-check.mjs",
+    "test:platform-bundle": "node --test scripts/platform-bundle-check.mjs",
     "benchmark:adapter": "node scripts/adapter-benchmark.mjs",
     "test:session-scope": "node --test scripts/session-scope-check.mjs",
     "test:session-scope-pg": "node scripts/session-scope-postgres-check.mjs",

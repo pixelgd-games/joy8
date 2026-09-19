@@ -142,15 +142,14 @@ runtime. Every product schema must be registered before runtime access, includin
 products without an adapter. The registration and DDL contract belongs to
 [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
 
-The current event trigger has no command-tag filter. Every supported database DDL
-queues validation and takes the same advisory lock, including unrelated index or
-comment changes and supported provider maintenance DDL. Concurrent DDL transactions
-therefore serialize; a rejected validation can also roll back maintenance.
-Narrowing this scope requires coverage for ownership, grants, schema moves and
-cascading drops, including changes to protected `public` and `auth` objects.
-Skipping all Auth or extension DDL would leave isolation changes unchecked. The
-[PostgreSQL firing matrix](https://www.postgresql.org/docs/17/event-trigger-matrix.html)
-defines the commands covered by this guard; shared role changes remain excluded.
+The installed guard filters command tags and changed objects. Unrelated indexes,
+comments and safe Auth table maintenance avoid global validation. Schema locks
+serialize registration with relevant DDL, including cascading drops. GRANT and
+REVOKE still use global validation because PostgreSQL event metadata omits their
+target objects. Those grants and guarded schema/registration changes require READ
+COMMITTED semantics; REPEATABLE READ and SERIALIZABLE are rejected to prevent stale
+snapshots after lock waits. Provider changes affecting protected permissions may
+still be rejected deliberately. Shared role changes remain outside event coverage.
 
 ### Synchronous Gateway Runtime Cleanup
 

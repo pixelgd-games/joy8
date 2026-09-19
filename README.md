@@ -320,13 +320,14 @@ and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
 Do not promote them alongside the installed schema; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 46 local and hosted migration records match, including the Joy8 rebrand,
+All 47 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
 cross-product adapter isolation, public player IDs, candidate-scoped ID allocation,
 first-enrollment profile visibility, product-schema registration, automatic DDL
-validation, rejected-candidate lock cleanup, optimized adapter validation and
+validation, rejected-candidate lock cleanup, optimized adapter validation, scoped
+DDL validation and
 the authorized prelaunch player/account cleanup. The cleanup checks verified
 both retained Auth accounts and their login records against the local backup,
 with all eleven catalog/admin/configuration tables unchanged. Its backup remains
@@ -389,6 +390,7 @@ npm run test:member-db
 npm run test:public-id
 npm run test:member-product-db
 npm run test:product-ddl
+npm run test:platform-bundle
 npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:platform-db
@@ -438,6 +440,10 @@ Automatic DDL validation at commit, collision-lock cleanup and the faster runtim
 permission query are installed as incremental migrations. Default member fixtures
 load the current allocator; platform fixtures also load DDL and adapter validation
 through `scripts/fixtures/platform-hardening.mjs` in migration order.
+The fixtures exercise the installed scoped DDL guard in
+`supabase/migrations/20260920140000_scoped_product_ddl_guard.sql`.
+Its integration inventory and bundle export contract
+are defined in [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLATFORM_INTEGRATION.md#platform-sql-fixtures).
 With PostgreSQL 17 configured, `npm run test:hardening-pg` runs member/platform/
 continuous/private acceptance, DDL rollback, competing allocation and prelaunch
 cleanup checks. `player-cleanup-check.mjs` verifies rejection of changed cleanup
