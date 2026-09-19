@@ -23,6 +23,12 @@ export function initMemberPanel(root, options = {}) {
   let disposed = false
 
   if (options.standalone) history.replaceState(null, "", `/account/?next=${encodeURIComponent(service.returnPath)}`)
+  if (authCode || callbackError) {
+    $("account-title").textContent = callbackError ? "登入沒有完成" : "正在完成登入"
+    $("account-description").textContent = callbackError ? "你可以重新選擇登入方式。" : "請稍候，馬上帶你回到 Joy8。"
+    $("account-description").hidden = false
+    status(authCode ? "正在安全地完成 Google 登入…" : "正在處理 Google 回傳結果…")
+  }
 
   function status(message = "", error = false) {
     $("account-status").textContent = message
@@ -54,14 +60,14 @@ export function initMemberPanel(root, options = {}) {
     user = (await service.session())?.user ?? null
     if (disposed) return
     const guest = user?.is_anonymous === true
-    $("account-title").textContent = guest ? "訪客帳號" : user ? "我的帳號" : "登入"
+    $("account-title").textContent = guest ? "訪客帳號" : user ? "我的帳號" : "登入 Joy8"
     $("account-description").textContent = guest ? "綁定 Google 後，可在其他裝置找回進度。" : user ? "" : entryDescription
     $("account-description").hidden = !$("account-description").textContent
     $("identity-summary").hidden = !user
     $("signin-options").hidden = Boolean(user && !guest)
     $("continue-link").hidden = true
     $("enroll-button").hidden = true
-    $("google-button").textContent = guest ? "綁定 Google，保留進度" : "使用 Google 登入"
+    $("google-label").textContent = guest ? "綁定 Google，保留進度" : "使用 Google 登入"
     $("guest-button").hidden = Boolean(user)
     $("guest-notice").hidden = Boolean(user)
     $("identity-label").textContent = guest ? "目前以訪客身分登入" : user?.email || "已使用 Google 登入"

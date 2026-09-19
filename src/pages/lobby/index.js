@@ -24,8 +24,15 @@ export async function initLobbyPage(appRoot) {
   setupInstallButton(appRoot)
   const openEntry = setupMemberEntry(appRoot)
   const entryParams = new URLSearchParams(location.search)
-  const requestedGame = entryParams.get("play")
-  if (entryParams.has("play")) history.replaceState(null, "", "/")
+  const memberMode = ["open", "callback"].includes(entryParams.get("member")) ? entryParams.get("member") : null
+  const memberParams = memberMode ? new URLSearchParams(entryParams) : null
+  const requestedGame = memberMode ? null : entryParams.get("play")
+  if (entryParams.has("play") || memberMode) history.replaceState(null, "", "/")
+
+  if (memberParams) {
+    const { openMemberModal } = await import("../../member/modal.js")
+    void openMemberModal(appRoot.querySelector(".member-login-link"), { params: memberParams })
+  }
 
   const gameGrid = appRoot.querySelector("#gameGrid")
 

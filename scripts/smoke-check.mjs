@@ -399,19 +399,20 @@ async function expectErrorPresentation(client) {
 async function expectMemberEntry(client, appPort) {
   await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
     return text.includes("使用 Google 登入") && text.includes("先以訪客遊玩")
-  }, "Standalone Google callback and guest entry remains available")
+  }, "Account entry returns to the Lobby member dialog")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `location.pathname === "/account/" && new URLSearchParams(location.search).get("next") === "/game/?slug=test"`,
+    expression: `location.pathname === "/" && location.search === "" && document.querySelector("#member-dialog")?.open && document.querySelector(".hero-image")?.isConnected`,
   })
-  if (!returnCheck.result.value) throw new Error("Member return destination was lost")
+  if (!returnCheck.result.value) throw new Error("Account entry left a standalone page behind")
   const controls = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
       const google = document.getElementById("google-button").getBoundingClientRect()
       const guest = document.getElementById("guest-button").getBoundingClientRect()
-      return document.getElementById("account-title").textContent === "登入"
+      return document.getElementById("account-title").textContent === "登入 Joy8"
         && guest.top > google.bottom
+        && document.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
         && !document.getElementById("email-form")
         && !document.getElementById("register-button")
         && !document.getElementById("reset-button")
@@ -448,7 +449,7 @@ async function expectMemberEntry(client, appPort) {
   await waitForText(client, (text) => text.includes("目前以訪客身分登入") && text.includes("繼續遊玩"), "Persistent guest account UI")
   const guestControls = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-button").textContent.includes("綁定")`,
+    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
   })
   if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
   console.log("OK Google and guest-only member entry, guest upgrade and responsive layout")
@@ -464,10 +465,10 @@ async function expectMemberModal(client) {
       const backdrop = getComputedStyle(dialog, "::backdrop")
       return location.pathname === "/" && dialog.open
         && document.querySelector(".hero-image").isConnected
-        && !dialog.querySelector(".account-kicker")
-        && dialog.querySelector("#account-description").hidden
-        && backdrop.backgroundColor === "rgba(0, 0, 0, 0.18)"
-        && backdrop.backdropFilter === "none"
+        && dialog.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
+        && !dialog.querySelector("#account-description").hidden
+        && backdrop.backgroundColor === "rgba(5, 7, 12, 0.72)"
+        && backdrop.backdropFilter.includes("blur(10px)")
     })()`,
   })
   if (!opened.result.value) throw new Error("Member dialog replaces or obscures the Lobby")

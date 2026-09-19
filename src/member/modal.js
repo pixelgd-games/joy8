@@ -5,13 +5,13 @@ let dialog
 let panel
 let returnFocus
 
-export async function openMemberModal(trigger, { next = "/", gameName = "" } = {}) {
+export async function openMemberModal(trigger, { next = "/", gameName = "", params } = {}) {
   if (!dialog) {
     dialog = document.createElement("dialog")
     dialog.id = "member-dialog"
     dialog.className = "member-dialog"
     dialog.setAttribute("aria-labelledby", "account-title")
-    dialog.innerHTML = `<button class="member-dialog-close" type="button" aria-label="關閉登入視窗" autofocus>×</button><div class="member-dialog-content"></div>`
+    dialog.innerHTML = `<button class="member-dialog-close" type="button" aria-label="關閉登入視窗"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg></button><div class="member-dialog-content"></div>`
     document.body.append(dialog)
     dialog.querySelector(".member-dialog-close").addEventListener("click", closeModal)
     dialog.addEventListener("cancel", (event) => {
@@ -30,8 +30,9 @@ export async function openMemberModal(trigger, { next = "/", gameName = "" } = {
   if (gameName) content.querySelector("#account-description").textContent = `遊玩「${gameName}」`
   document.body.classList.add("member-dialog-open")
   dialog.showModal()
+  content.querySelector(".account-card").focus({ preventScroll: true })
   panel = initMemberPanel(content, {
-    params: new URLSearchParams({ next }),
+    params: params ?? new URLSearchParams({ next }),
     onContinue: (path) => {
       closeModal()
       if (path !== "/") location.assign(path)
