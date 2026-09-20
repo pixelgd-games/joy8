@@ -18,8 +18,7 @@ before(async () => {
     create table auth.refresh_tokens(user_id text);
     create table auth.scim_users(user_id uuid references auth.users on delete set null);
     create table public.admin_users(id uuid primary key);
-    create table public.gateway_rate_limits(key text primary key);
-    insert into public.gateway_rate_limits values('cleanup-test');
+    select public.joy8_consume_gateway_rate_limit('cleanup-test',30,60);
     create schema mahjong_clash;
     create table mahjong_clash.matches(id uuid);
     create table mahjong_clash.economy_state(singleton boolean primary key);

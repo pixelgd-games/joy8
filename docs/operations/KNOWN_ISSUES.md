@@ -54,18 +54,14 @@ The three original `2026091609...` Mahjong drafts remain superseded, unapplied
 reference material under `supabase/drafts/mahjong-clash/`; never bulk-apply them
 alongside the installed product schema. The product owns future gameplay SQL.
 
-Mahjong's installed `runtime_balance()` reports the stored wallet balance, while
-the Gateway reports available balance after subtracting locked POINT. The runtime
-value must not be treated as spendable balance during an active hold. Its economy
-operations also lock one singleton `economy_state` row, serializing those
-operations across matches. Correct the balance contract and measure this capacity
-before funded or public activation.
+Mahjong's economy operations lock one singleton `economy_state` row, serializing
+those operations across matches. Measure hosted capacity before funded or public
+activation. The installed runtime distinguishes available funds from the active
+table's reservation and requires readiness version 2.
 
-The Mahjong fixture now consumes the complete 27-source platform export, with
-ordered inventory, migration classification and hash checks. Its native PostgreSQL
-tests cover the current hardening. The revised available/reserved balance contract
-and restricted checkpoint lock pass local upgrade tests; their hosted SQL remains
-in `supabase/drafts/20260920150000_mahjong_runtime_balance.sql` pending approval.
+The Mahjong fixture consumes the complete 28-source platform export, with ordered
+inventory, migration classification and hash checks. Its native PostgreSQL tests
+cover the current hardening, balance contract and restricted checkpoint lock.
 Local accounting measurements and their limits belong in Mahjong's deployment
 document; they do not establish hosted capacity or authorize funded operation.
 
@@ -167,13 +163,11 @@ Direction when evidence shows scale pressure:
 - Add indexes for the actual cleanup predicates.
 - Measure the cleanup cost before changing the design.
 
-### Scoped Limits Await Hosted Rollout
+### Scoped Limit Capacity and Ingress Verification
 
-The Gateway source now separates verified player, Session, table and backend
-identity budgets, retaining only a coarse IP abuse ceiling. The previous shared-IP
-policy remains hosted until the reviewed SQL and matching Edge Function are
-applied together. The prepared migration is
-`supabase/drafts/20260920160000_scoped_gateway_limits.sql`.
+The deployed Gateway separates verified player, Session, table and backend
+identity budgets, retaining only a coarse IP abuse ceiling. Its admission SQL is
+`supabase/migrations/20260920160000_scoped_gateway_limits.sql`.
 
 `test:gateway-rate` exercises the real Gateway handler and SQL, including 100
 independent table budgets and idempotent settlement. It does not prove hosted

@@ -6,7 +6,7 @@ import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
-const migration = await readFile(new URL("../supabase/drafts/20260920150000_mahjong_runtime_balance.sql", import.meta.url), "utf8")
+const migration = await readFile(new URL("../supabase/migrations/20260920150000_mahjong_runtime_balance.sql", import.meta.url), "utf8")
 let player, beforeHash
 const fingerprint = async () => (await one(`select md5(jsonb_build_object(
   'wallets',(select jsonb_agg(to_jsonb(w)) from public.wallet_accounts w),

@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
-import { readFile } from "node:fs/promises"
 import { setTimeout } from "node:timers/promises"
 import { buildPlatformBundle } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
@@ -15,7 +14,6 @@ const admit = (route, request = {}, key = secret, auth = null, client = db) => c
 
 before(async () => {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
-  await db.exec(await readFile(new URL("../supabase/drafts/20260920160000_scoped_gateway_limits.sql", import.meta.url), "utf8"))
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("insert into public.joy8_wallet_policies(game_id,enabled,initial_credit) values($1,true,1000) returning id", [game])).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [game, policy])

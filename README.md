@@ -320,14 +320,14 @@ and cannot reconstruct the full local database alone. Three incomplete Mahjong
 drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
 Do not promote them alongside the installed schema; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 47 local and hosted migration records match, including the Joy8 rebrand,
+All 49 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
 cross-product adapter isolation, public player IDs, candidate-scoped ID allocation,
 first-enrollment profile visibility, product-schema registration, automatic DDL
 validation, rejected-candidate lock cleanup, optimized adapter validation, scoped
-DDL validation and
+DDL validation, Mahjong runtime balance/recovery and scoped Gateway admission, and
 the authorized prelaunch player/account cleanup. The cleanup checks verified
 both retained Auth accounts and their login records against the local backup,
 with all eleven catalog/admin/configuration tables unchanged. Its backup remains
@@ -401,7 +401,7 @@ node --test scripts/private-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
 ```
 
-`test:gateway-rate` installs the current platform bundle and proposed scoped-limit
+`test:gateway-rate` installs the current platform bundle, including deployed scoped-limit
 SQL, then runs the actual Gateway handler against real membership, rate-limit and
 settlement SQL. It verifies 31 players sharing one address, 100 tables each making
 30 settlement/retry requests, Session/player isolation, key/token rotation,
@@ -409,15 +409,16 @@ unknown/cross-product subjects, fail-closed errors and coarse ingress protection
 Auth responses are stubbed; the table fixture uses platform accounting without a
 Mahjong adapter, so this is not hosted Auth or Godot acceptance. Native PostgreSQL
 adds eight competing connections checking the exact 30-request allowance. Use
-`JOY8_TEST_ENGINE=postgres17` and `JOY8_TEST_PG_BIN` for that case. The new SQL
-remains a draft pending approval; deploy it before the matching Gateway function.
+`JOY8_TEST_ENGINE=postgres17` and `JOY8_TEST_PG_BIN` for that case. The scoped-limit
+SQL and matching Gateway function are deployed. Hosted health/rejection checks
+and a verified backend admission counter passed without creating gameplay data.
 The authoritative limits and rollout boundary are in
 `docs/platform/GAME_PLATFORM_INTEGRATION.md`.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
-hardening, then checks the proposed runtime balance upgrade, restricted checkpoint
-lock and unchanged wallet/configuration data. It runs in isolation; the SQL stays
-in `supabase/drafts/` until hosted application is approved.
+hardening, then checks the deployed runtime balance upgrade, restricted checkpoint
+lock and unchanged wallet/configuration data. It runs in isolation against
+`supabase/migrations/20260920150000_mahjong_runtime_balance.sql`.
 
 `test:member-db` loads the member migrations, four platform foundation migrations
 and deployed session-scope correction, member-read hardening, adapter isolation

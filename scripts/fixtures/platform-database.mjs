@@ -4,6 +4,7 @@ import { loadPlatformHardening } from "./platform-hardening.mjs"
 
 export async function loadPlatformDatabase(db, beforeDrafts = async () => {}, rebrand = true) {
   await loadMemberDatabase(db, async () => {}, false)
+  await db.exec(await memberSql("../../supabase/migrations/20260710143000_add_gateway_runtime_limits.sql"))
   await beforeDrafts()
   for (const name of [
     "20260917090000_scoped_wallets.sql",

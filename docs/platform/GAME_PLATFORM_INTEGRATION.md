@@ -549,9 +549,9 @@ Gateway safeguards:
 - An 8-second database RPC timeout.
 - Public error normalization that does not expose internal database detail.
 
-The Gateway source uses verified-subject limits. The hosted Gateway retains the
-previous per-IP policy until `supabase/drafts/20260920160000_scoped_gateway_limits.sql`
-is approved/applied and the matching Edge Function is deployed. Apply SQL first,
+The deployed Gateway uses verified-subject limits from
+`supabase/migrations/20260920160000_scoped_gateway_limits.sql`.
+For changes to this admission contract, apply SQL first,
 verify its restricted grants, then deploy the function; the new Gateway fails
 closed if admission SQL is unavailable. Git upload alone does not deploy it.
 
