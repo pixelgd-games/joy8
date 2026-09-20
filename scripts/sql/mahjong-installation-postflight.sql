@@ -2,7 +2,8 @@ begin read only;
 do $$
 begin
   if not exists(select 1 from public.games g join mahjong_clash.lifecycle_config c on c.game_id=g.id
-    join public.joy8_wallet_policies w on w.game_id=g.id
+    join public.joy8_game_policies p on p.game_id=g.id
+    join public.joy8_wallet_policies w on w.id=p.wallet_policy_id
     where g.slug='mahjong-clash' and not g.published and g.launch_url is null and not w.enabled and w.initial_credit=0)
     or not exists(select 1 from mahjong_clash.economy_state where environment='operational') then
     raise exception 'MAHJONG_DISABLED_REGISTRATION_INVALID';

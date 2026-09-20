@@ -13,7 +13,7 @@ Last reviewed: 2026-09-20.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
-owns release scope, the two product/wallet models, POINT policy, environment
+owns release scope, the shared POINT wallet, POINT policy, environment
 direction, and the platform -> product -> integration delivery order.
 [GAME_PLATFORM_INTEGRATION.md](GAME_PLATFORM_INTEGRATION.md) owns launch,
 authorization, wallet, and settlement contracts. [README.md](../../README.md)
@@ -78,7 +78,7 @@ in the owning repository, not a first-release platform dependency.
   and persistent guests use the same entry without per-player approval. Its SQL
   and Gateway are installed; real game identity acceptance remains pending.
   See the [connection review](../../supabase/drafts/MAHJONG_REVIEW.md).
-- Wallet scope is deployed. Mahjong has zero-credit identity-only activation;
+- Shared-wallet configuration is the approved contract. Mahjong has zero-credit identity-only activation;
   funded gameplay remains pending. Consume the platform wallet work rather than
   introducing wallet logic into login screens.
 
@@ -91,7 +91,7 @@ in the owning repository, not a first-release platform dependency.
   for authentication, authorization, launch, wallet, settlement, or game mapping.
 - Credentials and provider identities belong to Auth. Auth identity, player
   membership, and administrator authorization are separate concepts.
-- Resolve exactly one player and the correct existing wallet scope through
+- Resolve exactly one player and that player's existing shared POINT wallet through
   trusted backend operations. Retries and simultaneous callbacks must not create
   duplicate players, wallets, or initial grants.
 - A provider identity must not silently merge two existing Joy8 players or
@@ -118,7 +118,7 @@ have user IDs and use the `authenticated` role. Classify them using verified
 anonymous status rather than interpreting every Auth ID as a registered member.
 Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
 
-Promotion changes the sign-in method, not the player. Preserve all wallet scopes,
+Promotion changes the sign-in method, not the player. Preserve the shared wallet,
 transactions, and game mappings. If the provider already belongs to another
 Joy8 player, return a recoverable conflict and require verification of that
 account; do not silently transfer assets. Full registered-player merging remains
@@ -199,7 +199,7 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
    Verify game selection, cancellation/reselection, late responses after closing
    a dialog, callback destination preservation, and direct-link entry.
 5. Verify direct and Lobby entries preserve the same player and product progress;
-   test both wallet models through the platform contract and a simulated game.
+   test the shared wallet across multiple simulated games through the platform contract.
 6. Verify that no game receives member credentials or protected table access.
 
 The product stage consumes this tested contract. Real service integration is the

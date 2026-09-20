@@ -39,6 +39,7 @@ before(async () => {
   `)
   await db.exec(await memberSql("../../supabase/migrations/20260920111000_product_schema_registration.sql"))
   await loadPlatformHardening(db)
+  await db.exec(await memberSql("../../supabase/migrations/20260920170000_shared_point_wallet.sql"))
 })
 beforeEach(() => db.exec("begin"))
 afterEach(() => db.exec("rollback"))

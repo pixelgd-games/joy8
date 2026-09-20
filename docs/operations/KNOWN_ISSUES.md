@@ -85,7 +85,7 @@ Current behavior:
 - `/account/` is a callback trampoline back to the Lobby dialog. It is not a
   standalone account, password or recovery page.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
-- Wallet scope is resolved by trusted platform/game policy. Mahjong's enabled
+- The shared wallet is resolved by trusted Joy8 game policy. Mahjong's enabled
   zero-credit identity policy does not establish funded-play readiness.
 
 Risk:
@@ -95,7 +95,7 @@ Risk:
   continuity, Facebook sign-in and real provider promotion remain unverified. Isolated SQL tests, including native
   PostgreSQL 17.6 races, do not prove real provider linking.
 
-The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
+The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not invent a game-specific wallet, guest-retention, or currency-conversion policy in this document.
 
 ## Scale and Operations
 
@@ -239,7 +239,7 @@ key pages, iframe restrictions, credential-free launch URLs, load timeout,
 Joy8-managed cover validation and fallback, error presentation, member service logic, Gateway
 membership authorization, safe return paths, and responsive member UI. The
 isolated member SQL suite loads the current platform migrations and checks roles,
-rollback, zero-POINT provisioning and promotion preserving both wallet scopes,
+rollback, zero-POINT provisioning and promotion preserving the shared wallet,
 ledger and reservations. Its engine and fixture limits are documented in
 [README.md](../../README.md#verification). Native PostgreSQL 17.6 also passes
 15 competing-connection cases against that schema. Hosted guest and Google

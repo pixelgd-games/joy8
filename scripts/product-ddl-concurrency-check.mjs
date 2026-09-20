@@ -11,7 +11,7 @@ before(async () => {
   await loadPlatformDatabase(db)
   await loadProductAccounting(db)
   await db.exec(`
-    insert into public.joy8_wallet_policies(enabled) values(true);
+    update public.joy8_wallet_policies set enabled=true;
     insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount,product_adapter)
     select g.id,w.id,true,1000,'fixture_product.accounting(text,uuid,jsonb)'::regprocedure
     from public.games g cross join public.joy8_wallet_policies w;

@@ -116,8 +116,8 @@ When a non-gambling game ships to both Joy8 and CrazyGames, read both platform i
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
 - Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
-- The wallet model uses game-scoped wallets for independently operated games and one shared platform wallet for Joy8-native games; wallet scope must be resolved by trusted Joy8 configuration, never by a game request.
-- Do not recreate the superseded Demo currency hold migration. Current POINT enforcement belongs to the scoped wallet policies and trusted session protocol.
+- Every enrolled player has one shared POINT wallet across all Joy8-integrated games. Trusted Joy8 configuration resolves that wallet; a game request cannot select a wallet or mutate its balance.
+- Do not recreate the superseded Demo currency hold migration. Current POINT enforcement belongs to the shared wallet policy and trusted session protocol.
 - Do not preserve an old Demo runtime or add old/new compatibility. Historical migration files are deployment history, not an active fallback. Follow `docs/product/PRODUCT_SCOPE.md` for the approved direction and review provisioning/cutover before changing balances or enabling purchases.
 
 ## Change Verification

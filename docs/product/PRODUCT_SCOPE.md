@@ -20,7 +20,7 @@ The product is intentionally small enough for one person to operate:
 Joy8 succeeds when:
 
 - A player can discover a published game and launch it reliably from the Lobby.
-- A direct game entry can eventually use the same Joy8 identity and the correct platform or game-scoped wallet without requiring the public Lobby.
+- A direct game entry can eventually use the same Joy8 identity and shared POINT wallet without requiring the public Lobby.
 - A game integrates once with the documented Joy8 contract instead of implementing platform ownership itself.
 - Administrators can manage catalog metadata without exposing protected platform data.
 - The platform can diagnose launch and wallet failures without storing secrets or sensitive player data.
@@ -29,7 +29,7 @@ Joy8 succeeds when:
 ## Current Implementation
 
 [README.md](../../README.md) owns the implemented feature list and operating
-instructions. Google/guest member entry, stable public player IDs, scoped wallets
+instructions. Google/guest member entry, stable public player IDs, the shared POINT wallet
 and trusted settlement are deployed foundations. Facebook client support is
 implemented in the repository and its Meta app exists in unpublished development
 mode, while Meta verification/review, Supabase configuration, provider linking,
@@ -106,14 +106,14 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 
 | Product model | Entry and release | Wallet | Game data |
 | --- | --- | --- | --- |
-| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Joy8 Lobby | One game-scoped wallet per player and game | Game-owned schema and authoritative backend |
-| Joy8-native shared-economy game, such as a platform slot or compact table game | Operates with the platform and its shared services | One common platform wallet per player | Game-owned or intentionally shared family schema and backend |
+| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Joy8 Lobby | The player's shared Joy8 POINT wallet | Game-owned schema and authoritative backend |
+| Joy8-native game, such as a platform slot or compact table game | Operates with the platform and its shared services | The player's shared Joy8 POINT wallet | Game-owned or intentionally shared family schema and backend |
 
 Both use the same Joy8 membership on Joy8-operated surfaces. Independent
 entry does not create a separate member system. A branded entry may remain
 available after Lobby listing; the player keeps the same identity, wallet,
-and product progress through either entrance. Platform-native products retain
-their shared-entry/shared-wallet model; they need not become standalone games.
+and product progress through either entrance. Wallet sharing does not merge
+product gameplay, progression, ranking, deployment, or release ownership.
 Neither model exempts a game from trusted settlement and security requirements.
 
 External channels such as CrazyGames use their own approved platform identity
@@ -121,12 +121,13 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 
 ## Wallet and POINT Direction
 
-- Joy8 owns human-player wallet authority. Trusted catalog configuration
-  chooses platform or game scope; clients and games cannot choose their scope.
-- Independent-game balances do not affect another game's or the platform's
-  balance. Platform-native games intentionally consume the same balance.
-- Platform initial credit is granted once per player, not once per title.
-  Operational wallets currently start at **0 POINT**, for both wallet models.
+- Joy8 owns human-player wallet authority. Every enrolled player has one POINT
+  wallet shared by all integrated games. Trusted Joy8 backend configuration
+  resolves it; clients and games cannot select a wallet or change balances directly.
+- Points granted, won, reserved, or spent in any integrated game affect that one
+  balance. There is no per-game promotional balance and no cross-game transfer.
+- Initial credit is granted at most once per player, not once per title.
+  Operational wallets currently start at **0 POINT**.
   Any later opening grant or product-specific amount needs a separate decision.
   Existing Demo balances must not be carried into operation. Do not maintain an
   old Demo runtime or an old/new compatibility branch in the replacement platform.
@@ -139,7 +140,7 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   at the first public launch is undecided. No payment provider, purchase price,
   or payment deployment is authorized by this document.
 - No redemption, withdrawal, or prizes of monetary value are included.
-  Cross-wallet conversion and transfer are also outside the current scope.
+  Wallet conversion and transfer are unnecessary because there is only one POINT wallet per player.
   The existing nominal `1:1` reference between units grants none of these rights.
 - Preserve transaction source: initial grant, promotional grant, purchase,
   gameplay, fee, and authorized adjustment. AI funding is distinct from human
@@ -147,9 +148,9 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 - Payment orders, verified payment notifications, duplicate protection, and
   refund/chargeback handling must be designed before purchasing is enabled.
   Purchase timing does not delay the reusable wallet and settlement foundation.
-- Record the originating game on gameplay transactions and the target scope
-  and source reference on grants, purchases, and adjustments. Platform-wide
-  transactions must not invent a game ID.
+- Every POINT transaction records its originating game plus an idempotency key
+  and source reference, including grants, gameplay, purchases, and adjustments.
+  Reporting and reconciliation separate games by this immutable source, not by wallet.
 
 Detailed trust, wallet-lifecycle, and atomic-settlement requirements belong in
 [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md).
@@ -204,7 +205,7 @@ Unless the user changes the product direction, Joy8 does not own:
 - Game-controlled login or balance mutation.
 - A front-end path to service-role database RPCs.
 - A separate member master for a branded game entry.
-- Conversion between independent game wallets and the Joy8 platform wallet in the current phase.
+- A game-specific POINT wallet or cross-game POINT transfer flow.
 - Pre-launch legacy data compatibility.
 - Responsibilities that belong to unrelated Flash products.
 
@@ -212,9 +213,9 @@ Unless the user changes the product direction, Joy8 does not own:
 
 First align the documents and define the versioned platform contract. Then:
 
-1. **Platform:** implement reusable membership, both wallet scopes, launch and
+1. **Platform:** implement reusable membership, the shared POINT wallet, launch and
    server authorization, atomic settlement, and minimal recovery/monitoring.
-   Verify with a simulated game, including independent and shared-wallet cases.
+   Verify with simulated games, including cross-game reservations and settlement retries.
    Do not require Mahjong source code or public Lobby release to finish this stage.
 2. **Product:** in each product repository, implement its rules, authoritative
    state, persistence, economy, and platform adapter against that contract.

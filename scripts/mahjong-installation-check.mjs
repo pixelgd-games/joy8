@@ -21,7 +21,7 @@ try {
   await db.exec(await readFile('supabase/migrations/20260918010700_mahjong_registration.sql', 'utf8'))
   const one = async sql => (await db.query(sql)).rows[0]
   assert.deepEqual(await one("select published,launch_url from public.games where slug='mahjong-clash'"), { published: false, launch_url: null })
-  const wallet = await one("select p.enabled,p.initial_credit from public.joy8_wallet_policies p join public.games g on g.id=p.game_id where g.slug='mahjong-clash'")
+  const wallet = await one("select p.enabled,p.initial_credit from public.joy8_wallet_policies p join public.joy8_game_policies gp on gp.wallet_policy_id=p.id join public.games g on g.id=gp.game_id where g.slug='mahjong-clash'")
   assert.equal(wallet.enabled, false)
   assert.equal(Number(wallet.initial_credit), 0)
   assert.deepEqual(await one("select rolcanlogin,rolsuper,rolbypassrls,rolinherit from pg_roles where rolname='mahjong_clash_runtime'"), { rolcanlogin: false, rolsuper: false, rolbypassrls: false, rolinherit: false })

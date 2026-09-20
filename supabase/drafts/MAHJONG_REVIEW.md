@@ -1,11 +1,12 @@
 # Mahjong database and runtime review
 
-Status: private entry and identity-only connection are installed and verified.
-Hosted play acceptance, publication and funding remain pending.
+Status: private entry, identity-only connection, and the shared POINT wallet
+cutover are installed and verified in the hosted database. Hosted play acceptance,
+publication and funding remain pending.
 
 ## Installed database boundary
 
-The user approved this installation. All eight numbered migrations are applied;
+The user approved this installation. All ten numbered migrations are applied;
 local/hosted history matches. Do not reapply the source candidates. Future changes
 remain incremental migrations through the Joy8 wrapper with project verification.
 
@@ -18,7 +19,9 @@ remain incremental migrations through the Joy8 wrapper with project verification
 | 5 | [product-accounting.sql](../../../../Project-Gaming/production/table/products/mahjong-clash/server/sql/product-accounting.sql) | Restricted atomic platform callback and result/profile records |
 | 6 | [product-lifecycle.sql](../../../../Project-Gaming/production/table/products/mahjong-clash/server/sql/product-lifecycle.sql) | Verified bindings, match/hand preparation and recovery |
 | 7 | [product-runtime.sql](../../../../Project-Gaming/production/table/products/mahjong-clash/server/sql/product-runtime.sql) | Checkpoints, pending HTTP recovery, scoped reads and narrow backend functions |
-| 8 | [Mahjong registration](../migrations/20260918010700_mahjong_registration.sql) | Hidden game, disabled 0-POINT wallet policy, operational configuration and non-login runtime role |
+| 8 | [Mahjong registration](../migrations/20260918010700_mahjong_registration.sql) | Historical hidden-game registration, operational configuration and non-login runtime role; its wallet-policy shape is superseded by the shared-wallet cutover |
+| 9 | [Mahjong shared wallet](../migrations/20260920165000_mahjong_shared_point_wallet.sql) | Resolve Mahjong sessions, available balance and readiness through the platform policy mapping |
+| 10 | [Platform shared wallet](../migrations/20260920170000_shared_point_wallet.sql) | One POINT wallet per player, trusted reservations and mandatory transaction source game |
 
 Mahjong source root:
 `D:/Studio/Project-Gaming/production/table/products/mahjong-clash`.
@@ -26,8 +29,8 @@ The game files remain owned there; applied numbered migrations retain the
 installation snapshots. Installation created no human wallet,
 POINT credit, AI account, backend key, usable database password or public entry.
 The game runtime gets no Auth tables, Joy8 tables, service-role key, callback
-execution, direct AI balance writes or accounting-owner membership. Scoped
-security-definer bridges validate the configured game before accessing a human
+execution, direct AI balance writes or accounting-owner membership. Narrow
+security-definer bridges validate the configured game before accessing the shared human
 balance or binding. Private checkpoint tables allow trusted runtime persistence;
 they are not exposed through PostgREST or browser grants.
 
@@ -43,9 +46,11 @@ The user approved and installed these additions:
   and enabled configuration before creating a wallet/session. Every active enrolled
   guest or registered member can enter without individual approval.
 - [Mahjong identity activation](../migrations/20260918010900_mahjong_identity_activation.sql):
-  enabled game-scoped zero-credit wallet and four-seat policy with a temporary
+  enabled zero-credit game access and a four-seat policy with a temporary
   1-POINT reservation ceiling. This is an identity-stage guard, not a gameplay
-  limit or point grant. Joy8 owns `http://localhost:5173/play-test/?slug=mahjong-clash`;
+  limit or point grant. The historical game-policy column is deployment history,
+  not a supported wallet mode; the cutover maps Mahjong to the one shared POINT policy.
+  Joy8 owns `http://localhost:5173/play-test/?slug=mahjong-clash`;
   Mahjong owns the private frame at `http://localhost:4391/`. Public catalog
   visibility stays false and its public launch URL stays null.
 - Restricted `mahjong_clash_runtime` login and a game-scoped exchange/renew-only
@@ -60,6 +65,40 @@ The user approved and installed these additions:
 The player allowlist is removed. Use normal Joy8 sign-in or persistent guest
 entry; administrator access does not substitute for player enrollment. No human
 wallet, session, match, AI account or point credit was created by these migrations.
+
+## Shared POINT wallet cutover review
+
+The 2026-09-20 read-only hosted preflight found two player accounts and exactly
+one enabled 0-POINT policy mapped to Mahjong. It found zero wallet, transaction,
+session, platform-match, reservation, settlement, fee-account, Mahjong match,
+hand, and uncommitted-accounting rows. Balance and locked totals are both zero.
+The six functions that depend on the retired policy game column are exactly the
+three Joy8 session/open/provision functions and the three Mahjong session/balance/
+readiness functions replaced by the reviewed SQL.
+
+No balance merge, sum, grant, reset, player rewrite, or Auth/login change was
+required or performed. The platform migration rechecked the empty accounting
+set under exclusive locks before changing the wallet identity.
+
+The reviewed SQL was applied in this order:
+
+1. `20260920165000_mahjong_shared_point_wallet.sql` replaces the Mahjong product
+   functions while remaining valid against the current policy table.
+2. `20260920170000_shared_point_wallet.sql` takes exclusive accounting locks,
+   rechecks that the accounting set is empty, maps every game policy to the one
+   POINT policy, removes policy game scope, enforces one player/currency wallet,
+   requires a source game on transactions, and replaces trusted Joy8 functions.
+3. `scripts/sql/shared-point-wallet-postflight.sql` checked the schema, mapping,
+   permissions, source-game constraint, reservation reconciliation, Mahjong
+   readiness, and unchanged business-row totals.
+
+The SQL is atomic. A concurrent old-schema session either completes before the
+lock and makes the guard abort, or waits until the new schema commits. Hosted
+postflight retained two players and found zero wallets, balances, holds,
+transactions, sessions, platform matches, Mahjong matches, or unfinished work;
+the local and remote migration versions match. Rollback after this successful
+cutover requires a new reviewed forward migration; do not restore a game-specific
+wallet mode. Mahjong stays inactive until its remaining release gates are complete.
 
 ## Credentials and connection checks
 
@@ -103,10 +142,9 @@ These synthetic identities do not establish real provider or funded-play accepta
 
 Two installed runtime limits remain relevant before funded or public play:
 
-- `mahjong_clash.runtime_balance()` returns the wallet's stored balance, while
-  the Gateway browser balance reports available balance after subtracting locks.
-  Do not use the runtime value as an available-to-spend check while a match holds
-  POINT.
+- `mahjong_clash.runtime_balance()` separates available, total, locked and this
+  Mahjong table's reserved POINT. A reservation owned by another Joy8 game stays
+  locked and cannot be spent by Mahjong.
 - Economy operations lock the singleton `economy_state` row. This preserves the
   global counters but serializes those operations across matches; measure the
   resulting capacity before public activation.
@@ -114,7 +152,7 @@ Two installed runtime limits remain relevant before funded or public play:
 ## Remaining activation
 
 1. Sign in through Joy8 or restore the existing guest. Verify the same player
-   reaches the running game at zero credit; no test-access grant is required.
+   reaches the running game with the same shared balance; no test-access grant is required.
 2. Define funded-play limits and the human POINT source before changing the
    identity-only reservation ceiling or authorizing financial backend scopes.
 3. Review AI funding and full gameplay acceptance before starting funded play.

@@ -10,7 +10,7 @@ const db = await createTestDatabase()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 const secret = randomBytes(32).toString("hex")
 const otherSecret = randomBytes(32).toString("hex")
-let game, shared, policy, other, otherPolicy, priorDemo, priorPlayer
+let game, shared, policy, other, priorDemo, priorPlayer
 
 before(async () => {
   await loadPlatformDatabase(db, async () => {
@@ -26,10 +26,9 @@ before(async () => {
   game = (await one("select id from public.games where slug='test-game'")).id
   shared = (await one("insert into public.games(name,slug,type,published,launch_url) values('Shared','shared','casual',true,'https://game.example/') returning id")).id
   other = (await one("insert into public.games(name,slug,type,published,launch_url) values('Independent','independent','casual',true,'https://game.example/') returning id")).id
-  policy = (await one("insert into public.joy8_wallet_policies(initial_credit,enabled) values(1000,true) returning id")).id
-  otherPolicy = (await one("insert into public.joy8_wallet_policies(game_id,initial_credit,enabled) values($1,500,true) returning id", [other])).id
-  for (const [id, pid] of [[game, policy], [shared, policy], [other, otherPolicy]]) {
-    await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [id, pid])
+  policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,enabled=true returning id")).id
+  for (const id of [game, shared, other]) {
+    await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [id, policy])
   }
   for (const [id, token] of [[game, secret], [other, otherSecret]]) {
     await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [id, token])
@@ -67,18 +66,23 @@ async function ready(p = null) {
   const session = await launch(p)
   return { player: p, session, access: await exchange(session) }
 }
+async function readyFor(p, slug, key) {
+  const session = await launch(p, slug)
+  return { player: p, session, access: await exchange(session, key) }
+}
 const opening = (members, ref = "match-1") => ({ version: 1, match_ref: ref, rule_version: "rules-1", participants: members.map(m => ({ session_id: m.session.session_id, reserve: "100.00" })) })
 const entry = (p, amount) => ({ kind: "player", account_ref: p.id, amount, source: "gameplay" })
 const settlement = (a, b, ref = "match-1") => ({ version: 1, match_ref: ref, rule_version: "rules-1", operation_key: `settle:${ref}`, entries: [entry(a.player, "-90.00"), entry(b.player, "80.00"), { kind: "fee", account_ref: game, amount: "10.00", source: "fee" }] })
 const wallet = p => one("select * from public.wallet_accounts where player_account_id=$1 and wallet_policy_id=$2", [p.id, policy])
 
-test("platform games share a durable wallet while independent game stays separate", async () => {
+test("all games share one durable player wallet", async () => {
   const p = await player()
   const a = await launch(p)
   const b = await launch(p, "shared")
   const c = await launch(p, "independent")
   assert.equal(a.wallet_account_id, b.wallet_account_id)
-  assert.notEqual(a.wallet_account_id, c.wallet_account_id)
+  assert.equal(a.wallet_account_id, c.wallet_account_id)
+  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [p.id])).n, 1)
   assert.equal((await wallet(p)).balance, "1000.00")
   assert.equal((await one("select count(*)::int n from public.wallet_transactions where wallet_account_id=$1", [a.wallet_account_id])).n, 1)
 })
@@ -124,6 +128,29 @@ test("opening holds funds once and prevents concurrent occupation of shared wall
   assert.equal((await rpc("wallet_get_balance", [a.access.gateway_token])).balance, "900.00")
   await denied(call("joy8_open_match_v1", opening([a], "match-2")), "JOY8_WALLET_OCCUPIED")
   await denied(call("joy8_open_match_v1", { ...request, rule_version: "changed" }), "JOY8_IDEMPOTENCY_CONFLICT")
+})
+
+test("cross-game reservations share occupancy and settlement keeps the source game", async () => {
+  const firstPlayer = await player(), secondPlayer = await player()
+  const firstGame = await readyFor(firstPlayer, "test-game", secret)
+  const otherGameSamePlayer = await readyFor(firstPlayer, "independent", otherSecret)
+  const otherGameSecondPlayer = await readyFor(secondPlayer, "independent", otherSecret)
+  assert.equal(firstGame.session.wallet_account_id, otherGameSamePlayer.session.wallet_account_id)
+  await call("joy8_open_match_v1", opening([firstGame], "first-game"))
+  await denied(call("joy8_open_match_v1", opening([otherGameSamePlayer], "other-game"), otherSecret), "JOY8_WALLET_OCCUPIED")
+  await call("joy8_settle_match_v1", {
+    version: 1, match_ref: "first-game", rule_version: "rules-1",
+    operation_key: "settle:first-game", entries: [],
+  })
+  await call("joy8_open_match_v1", opening([otherGameSamePlayer, otherGameSecondPlayer], "other-game"), otherSecret)
+  const request = {
+    version: 1, match_ref: "other-game", rule_version: "rules-1", operation_key: "settle:other-game",
+    entries: [entry(firstPlayer, "-25.00"), entry(secondPlayer, "25.00")],
+  }
+  const result = await call("joy8_settle_match_v1", request, otherSecret)
+  assert.deepEqual(await call("joy8_settle_match_v1", request, otherSecret), result)
+  const source = await one("select count(*)::int rows,count(distinct game_id)::int games,bool_and(game_id=$2) correct_game from public.wallet_transactions where source_ref=$1", [result.settlement_id, other])
+  assert.deepEqual(source, { rows: 2, games: 1, correct_game: true })
 })
 
 test("atomic settlement preserves conservation, records fees and retries without duplicating", async () => {

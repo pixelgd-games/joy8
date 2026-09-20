@@ -117,7 +117,7 @@ for (const slug of ["test-game", "independent-game"]) {
   test(`${slug}: concurrent promotion preserves the wallet, ledger and reservation`, async () => {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
-    const policy = slug === "test-game" ? games.platformPolicy : games.gamePolicy
+    const policy = games.platformPolicy
     await db.query("update public.joy8_wallet_policies set initial_credit=1000 where id=$1", [policy])
     let session
     try { [session] = await serviceQuery(launchSql, [id]) }
@@ -169,7 +169,7 @@ for (const slug of ["test-game", "independent-game"]) {
   test(`${slug}: a launch committed first lets the waiting freeze finish and blocks later launches`, async () => {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
-    const policy = slug === "test-game" ? games.platformPolicy : games.gamePolicy
+    const policy = games.platformPolicy
     await db.query("insert into public.wallet_accounts (player_account_id,wallet_policy_id) values ($1,$2)", [member.player_account_id, policy])
     successful(await blockedRace({
       hold: launchSql, holdValues: [id], count: 1,
@@ -181,7 +181,7 @@ for (const slug of ["test-game", "independent-game"]) {
   })
 }
 
-test("concurrent launches across three titles create exactly two zero wallet scopes", async () => {
+test("concurrent launches across three titles create exactly one zero wallet", async () => {
   const id = await identity()
   const [member] = await serviceQuery(resolveSql, [id])
   const slugs = ["test-game", "shared-game", "independent-game"]
@@ -190,13 +190,9 @@ test("concurrent launches across three titles create exactly two zero wallet sco
     work: "select * from public.create_game_session($2, 'POINT', 3600, null, $1::uuid)",
     workValues: index => [id, slugs[index % slugs.length]],
   }))
-  const shared = sessions.filter(session => session.game_id !== games.independent)
-  const independent = sessions.filter(session => session.game_id === games.independent)
-  assert.equal(new Set(shared.map(session => session.wallet_account_id)).size, 1)
-  assert.equal(new Set(independent.map(session => session.wallet_account_id)).size, 1)
-  assert.notEqual(shared[0].wallet_account_id, independent[0].wallet_account_id)
+  assert.equal(new Set(sessions.map(session => session.wallet_account_id)).size, 1)
   const wallets = (await db.query("select balance,locked_balance from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).rows
-  assert.equal(wallets.length, 2)
+  assert.equal(wallets.length, 1)
   assert.ok(wallets.every(wallet => Number(wallet.balance) === 0 && Number(wallet.locked_balance) === 0))
 })
 

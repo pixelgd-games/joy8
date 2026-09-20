@@ -9,16 +9,17 @@ export async function loadMemberPlatformDatabase(db, rebrand = true) {
   const shared = (await one("insert into public.games(name,slug,type,published,launch_url) values('Shared','shared-game','casual',true,'https://game.example/') returning id")).id
   const independent = (await one("insert into public.games(name,slug,type,published,launch_url) values('Independent','independent-game','casual',true,'https://game.example/') returning id")).id
   await db.exec("insert into public.games(name,slug,type,published,launch_url) values('Unconfigured','unconfigured-game','casual',true,'https://game.example/')")
-  const platformPolicy = (await one(`insert into public.${namespace}_wallet_policies(enabled) values(true) returning id`)).id
-  const gamePolicy = (await one(`insert into public.${namespace}_wallet_policies(game_id,enabled) values($1,true) returning id`, [independent])).id
+  const platformPolicy = (await one(rebrand
+    ? `update public.${namespace}_wallet_policies set enabled=true returning id`
+    : `insert into public.${namespace}_wallet_policies(game_id,enabled,initial_credit) values(null,true,0) returning id`)).id
   const keys = new Map()
-  for (const [id, policy] of [[game, platformPolicy], [shared, platformPolicy], [independent, gamePolicy]]) {
-    await db.query(`insert into public.${namespace}_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)`, [id, policy])
+  for (const id of [game, shared, independent]) {
+    await db.query(`insert into public.${namespace}_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)`, [id, platformPolicy])
     const key = randomBytes(32).toString("hex")
     await db.query(`insert into public.${namespace}_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.${namespace}_hash_secret($2),array['exchange','open'],now()+interval '1 day')`, [id, key])
     keys.set(id, key)
   }
-  return { game, shared, independent, platformPolicy, gamePolicy, keys }
+  return { game, shared, independent, platformPolicy, keys }
 }
 
 export async function reserveMemberWallet(db, session, key, namespace = "joy8") {

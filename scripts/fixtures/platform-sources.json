@@ -28,7 +28,8 @@
     "20260920121000_public_id_collision_locks.sql",
     "20260920122000_product_adapter_validation.sql",
     "20260920140000_scoped_product_ddl_guard.sql",
-    "20260920160000_scoped_gateway_limits.sql"
+    "20260920160000_scoped_gateway_limits.sql",
+    "20260920170000_shared_point_wallet.sql"
   ],
   "drafts": [],
   "excluded": {
@@ -53,6 +54,7 @@
     "20260918010900_mahjong_identity_activation.sql": "Hosted activation and key configuration must never run in fixtures.",
     "20260919120000_remove_retired_catalog_games.sql": "Guarded cleanup of hosted catalog rows.",
     "20260920130000_clear_prelaunch_player_data.sql": "Guarded deletion of hosted Auth/player rows must never run in fixtures.",
-    "20260920150000_mahjong_runtime_balance.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current runtime SQL."
+    "20260920150000_mahjong_runtime_balance.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current runtime SQL.",
+    "20260920165000_mahjong_shared_point_wallet.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current product SQL."
   }
 }

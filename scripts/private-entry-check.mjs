@@ -38,6 +38,9 @@ before(async () => {
     await db.exec(await readFile(`supabase/migrations/${name}`,'utf8'))
   }
   await loadPlatformHardening(db)
+  await db.exec(await readFile('supabase/migrations/20260920150000_mahjong_runtime_balance.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260920165000_mahjong_shared_point_wallet.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260920170000_shared_point_wallet.sql','utf8'))
   game = (await one("select id from public.games where slug='mahjong-clash'")).id
   user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
   member = (await one('select * from public.joy8_resolve_member($1,true)',[user])).player_account_id
@@ -129,7 +132,7 @@ test('identity-only backend exchanges once, sees zero balance and cannot open a 
 }))
 test('published game keeps the public launch contract', () => isolated(async () => {
   const publicGame=(await one("select id from public.games where slug='test-game'")).id
-  const policy=(await one('insert into public.joy8_wallet_policies(game_id,enabled) values($1,true) returning id',[publicGame])).id
+  const policy=(await one('select id from public.joy8_wallet_policies')).id
   await db.query('insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)',[publicGame,policy])
   const result=await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)",[user])
   assert.equal(result.player_account_id,member)

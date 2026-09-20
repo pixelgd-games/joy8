@@ -15,7 +15,7 @@ const admit = (route, request = {}, key = secret, auth = null, client = db) => c
 before(async () => {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
   game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("insert into public.joy8_wallet_policies(game_id,enabled,initial_credit) values($1,true,1000) returning id", [game])).id
+  const policy = (await one("update public.joy8_wallet_policies set enabled=true,initial_credit=1000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [game, policy])
   for (const key of [secret, rotated]) await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game,key])
   const otherGame = (await one("select id from public.games where slug='hidden-game'")).id

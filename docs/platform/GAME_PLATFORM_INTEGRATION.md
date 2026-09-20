@@ -229,22 +229,22 @@ The launch code is valid for two minutes and can be used once.
 
 Status: base deployed through the platform migrations and the hosted
 `joy8-gateway` using product protocol `server-v1`;
-continuous settlement is installed. This protocol is for both
-wallet models. There is no browser payout or legacy Demo path.
+continuous settlement is installed. Every integrated game uses the player's one
+shared POINT wallet. There is no browser payout or legacy Demo path.
 
 ### Configuration and Credentials
 
-Joy8 selects the wallet from `joy8_game_policies` and `joy8_wallet_policies`.
-A null policy game ID means the shared platform wallet; a game ID means that
-game's independent wallet. A durable wallet cannot be replaced by freezing or
-closing it. A missing or disabled policy denies launch/open. The replacement
+Joy8 selects the shared POINT wallet from trusted `joy8_game_policies` and
+`joy8_wallet_policies` configuration. All enabled games reference the same POINT
+policy, and each player/currency pair has one durable wallet. A wallet cannot be
+replaced by freezing or closing it. A missing or disabled game policy denies launch/open. The replacement
 has one accounting flow; test execution uses isolated local data. Disable a policy
 to pause new activity while retaining durable references for existing matches.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
 hash, game ID, allowed actions, expiry and revocation time for each key. The key
-authorizes one game; no request can select another game or wallet scope. Origin
+authorizes one game; no request can select another game or wallet. Origin
 checks are additional protection, not proof of identity. Products never receive
 the project service-role key or direct platform table grants.
 
@@ -277,7 +277,7 @@ is the sole redeemer through `server-exchange-v1`:
 The backend must validate its configured Joy8 Gateway host and use only the
 exchange result for player/game binding. Return fields are `version`,
 `session_id`, `game_id`, `player_account_ref`, `account_type`, `wallet_scope`
-(`platform` or `game`), `currency` (`POINT`),
+(`platform`), `currency` (`POINT`),
 `gateway_token`, `gateway_token_expires_at`, `expires_at`, and `scopes:["balance"]`.
 The game may receive the short-lived balance token, never the backend key. Keep
 game credentials only in memory. Reject any launch credential found in a URL;
@@ -317,7 +317,8 @@ the combined count must fit the trusted per-game limit (default 16, maximum 64).
 Reserve the maximum authorized loss, not merely the first action's stake.
 The reserve must be positive and within the configured entry limit. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
-wallet can occupy only one open match, including across shared-wallet titles.
+wallet can occupy only one open match across all integrated titles. This prevents
+simultaneous games from spending POINT already reserved elsewhere.
 The opening locks funds without moving the balance. Its response is
 `{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
 current state; changing the opening under the same game/match reference conflicts.
@@ -359,7 +360,9 @@ does not erase the authorized match obligation; trusted settlement may complete.
 Response fields are `version`, `settlement_id`, `match_id`, `state`,
 `settlement_no`, `final`, `request_hash` and `settled_at`.
 Exact retries return the saved response.
-The operation key is unique within a game; changed content conflicts. Another
+Every wallet transaction stores `game_id` from this trusted match configuration,
+so per-game reporting never depends on a game-supplied wallet choice. The operation
+key is unique within a game; changed content conflicts. Another
 operation key cannot settle an already finalized match.
 
 ### Continuous Settlement

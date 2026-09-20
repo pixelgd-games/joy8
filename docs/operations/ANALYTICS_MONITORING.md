@@ -119,7 +119,7 @@ Use one dashboard template with a game variable:
 
 - Game name, type, and published status.
 - Launch sessions and trend.
-- Trusted match settlements and scoped wallet transactions after activation.
+- Trusted match settlements and shared-wallet transactions with source-game attribution after activation.
 - Open sessions and financial matches.
 - Gateway errors when request telemetry exists.
 - Later: active accounts, concurrent users, play time, game-load success, trusted settlements, RTP, and latency.

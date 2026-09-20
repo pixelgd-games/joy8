@@ -32,7 +32,10 @@ continuity remain outstanding.
 Wallet-ledger cleanup, continuous per-hand settlement and the Mahjong private
 schema are installed in Supabase. Mahjong has 22 product tables and a hidden
 catalog entry. The private-entry migrations and identity-only activation are
-installed; the game-scoped wallet opens at 0 POINT. Runtime login and a seven-day
+installed; the zero-credit policy opens no wallet until a player launches. The
+shared POINT wallet cutover is installed and verified in the hosted database.
+Its postflight retained two player accounts with zero wallets, balances, holds,
+transactions, sessions, or unfinished matches. Runtime login and a seven-day
 exchange/renew backend key are configured in the game's ignored local environment.
 TLS certificate/hostname verification and restricted access passed against hosted
 Supabase. No wallet, AI funding or public entry was created by installation.
@@ -64,7 +67,7 @@ Joy8 currently provides:
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
 - CRUD pages for the `games` catalog.
-- A Supabase Edge Function for trusted game backend authorization, scoped wallets, atomic settlement and runtime rate limits.
+- A Supabase Edge Function for trusted game backend authorization, the shared POINT wallet, atomic settlement and runtime rate limits.
 - Cloudflare Pages static deployment from the `main` branch.
 - PWA metadata and install support for the Lobby.
 
@@ -82,7 +85,7 @@ Joy8 does not currently provide:
 
 See [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md) for the H5 release,
 both product models, operational POINT direction, and platform -> product ->
-integration order. The member foundation starts the platform stage; scoped wallets,
+integration order. The member foundation starts the platform stage; the shared wallet,
 trusted settlement and health are deployed. Mahjong has identity-only activation;
 no product has completed hosted gameplay/settlement acceptance. Real product
 integration and Google/Facebook provider-linking acceptance remain outstanding.
@@ -94,7 +97,7 @@ refund/close-round routes, their RPCs, automatic Demo credit and the obsolete
 wallet-mode branch. Tests use isolated local data with the same protocol.
 There is no runtime fallback for an unconfigured game.
 
-It includes both wallet scopes, default 0 POINT provisioning, game-scoped backend
+It includes one shared POINT wallet per player, default 0 POINT provisioning, game-scoped backend
 keys, one-time backend exchange, balance-only client tokens, renewal, reservations,
 atomic settlement, cancellation/status and dependency health. Product policy and
 keys are configured separately; Mahjong currently has an identity-only policy
@@ -235,7 +238,7 @@ offer Email/password signup, sign-in, verification, or recovery. Guest creation
 uses Cloudflare Turnstile and Web Locks across tabs, and fails closed without the
 required browser capability. Logout is local to the selected Auth session and
 does not create a replacement guest. Clearing storage can lose guest access.
-Guest-to-Google linking must preserve the original player and every wallet scope;
+Guest-to-Google linking must preserve the original player and shared wallet;
 hosted linking acceptance is still pending.
 
 The local member client bounds Turnstile script loading to 15 seconds and the
@@ -292,7 +295,7 @@ Current safeguards include:
 - Token scope and session validation.
 - Database-backed runtime rate limits.
 - A 5-second authentication timeout and an 8-second RPC timeout.
-- POINT validation and trusted per-game wallet policy.
+- POINT validation and trusted per-game access to the shared wallet policy.
 - Idempotent atomic match settlement.
 - Game-scoped backend keys and reservation/participant isolation.
 - `Cache-Control: no-store` on every JSON response, including launch and renewed tokens.
@@ -314,18 +317,19 @@ Continuous settlement retains occupancy between hands and releases on final/canc
 Historical single-posting fixtures remain useful for migration regression tests.
 
 Protected tables use RLS and service-only RPCs. Products receive no project-wide
-service-role key. A wallet belongs to one trusted platform/game policy and remains
-unique even if frozen or closed. POINT starts at 0 pending a later grant decision.
+service-role key. Every player/currency pair has one trusted shared wallet that
+remains unique even if frozen or closed. Games never select or mutate it directly.
+POINT starts at 0 pending a later grant decision, and every transaction retains
+its trusted source game for reporting and reconciliation.
 There is no conversion, purchase or withdrawal API. Product gameplay data and any
 AI accounting adapter remain in a permission-separated product schema.
 
-The hosted prelaunch dataset has two retained Auth accounts and no player,
-wallet, game-session, transaction, match or settlement rows. Retained Auth
-identities and login sessions, the administrator allowlist, eight catalog entries
-and system configuration are unchanged. A retained account receives a new player
-profile and public ID on its next explicit enrollment. Mahjong has an identity-only
-policy and expiring exchange/renew key. Before funded product activation, review
-its scope, limits, key and adapter against the integration contract.
+The 2026-09-20 hosted preflight found two player accounts and no wallet,
+game-session, transaction, match, settlement, fee-account, Mahjong hand, or
+uncommitted-accounting rows. The shared-wallet cutover does not modify Auth,
+login accounts, player identities, catalog, or administrator data. Mahjong has
+an identity-only policy and expiring exchange/renew key. Before funded product
+activation, review its limits, key and adapter against the integration contract.
 
 The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
@@ -431,17 +435,17 @@ The authoritative limits and rollout boundary are in
 `docs/platform/GAME_PLATFORM_INTEGRATION.md`.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
-hardening, then checks the deployed runtime balance upgrade, restricted checkpoint
-lock and unchanged wallet/configuration data. It runs in isolation against
-`supabase/migrations/20260920150000_mahjong_runtime_balance.sql`.
+hardening, then applies the product and platform shared-wallet migrations. It verifies
+the empty-accounting guard, unchanged player/product data, one shared policy,
+the platform-only exchange contract and the restricted checkpoint lock.
 
 `test:member-db` loads the member migrations, four platform foundation migrations
 and deployed session-scope correction, member-read hardening, adapter isolation
 and current public-ID allocation and schema-registration migrations in an in-memory PGlite database with pgcrypto
 and a minimal Auth/catalog fixture. It never reads environment credentials or connects to Supabase.
 Its 18 checks cover enrollment without wallet creation, read-only membership
-lookup, zero-POINT launch without automatic grants, shared and independent wallets, guest promotion preserving both
-wallet scopes and actual reservations/ledger, inactive accounts, browser-role denial,
+lookup, zero-POINT launch without automatic grants, one wallet across games, guest promotion preserving the
+shared wallet and actual reservations/ledger, inactive accounts, browser-role denial,
 secret hashing/expiry, uniqueness, transaction rollback and disabled/missing policies.
 It asserts that the obsolete round table, wallet mode and Demo-credit function are absent.
 PGlite 0.5.8 uses PostgreSQL 18.3 and one connection; this is not validation of
@@ -500,10 +504,11 @@ reconciliation anomalies were zero. No business records were created by these
 checks. Real provider entry after this correction remains separate acceptance.
 
 `test:platform-db` uses the same deployed platform schema with its accounting fixtures.
-Its 21 SQL cases cover both wallet models, zero credit, one-time provisioning,
+Its 22 SQL cases cover one wallet across games, zero credit, one-time provisioning,
 server authority, renewal, reservation and available balance, exactly-once
 settlement, draws, fees, frozen wallets, immutable accounting, adapter permissions,
-cross-product adapter isolation and injected product failure with rollback of player/product/fee/commit records.
+cross-game occupancy/source attribution, cross-product adapter isolation and injected
+product failure with rollback of player/product/fee/commit records.
 They also verify reset boundaries, removed legacy RPCs and missing-policy rejection. The simulated product adapter is test-only, not a Mahjong implementation.
 
 The same command runs three cutover guard checks: non-test sessions, outstanding
@@ -539,7 +544,7 @@ against a fresh native PostgreSQL 17 cluster. It has passed on PostgreSQL 17.6.
 The race tests observe actual blocked database connections before releasing the
 held transaction. They also verify that read-only membership lookup does not wait
 on a player-row update. The remaining cases cover simultaneous enrollment, launch/promotion/freeze
-orderings separately for both wallet scopes, mixed shared/independent game launches,
+orderings on the shared wallet, mixed cross-game launches,
 enrollment rollback and independent identities. These are deterministic fixture
 cases, not a load test or proof of hosted Auth behavior. Historical migrations
 remain necessary to construct the fixture and verify cutover; they are not the
