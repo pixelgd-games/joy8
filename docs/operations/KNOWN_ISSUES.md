@@ -167,23 +167,18 @@ Direction when evidence shows scale pressure:
 - Add indexes for the actual cleanup predicates.
 - Measure the cleanup cost before changing the design.
 
-### Shared Addresses Exhaust Normal Traffic Budgets
+### Scoped Limits Await Hosted Rollout
 
-`npm run test:gateway-rate` reproduces the current behavior through the actual
-Gateway handler and isolated current rate-limit SQL: 30 distinct valid identities
-can enroll from one address, then the 31st receives HTTP 429 before authentication
-or membership creation. The same identity succeeds from a second address. Likewise,
-the 121st settlement request from one server address is rejected before dispatch,
-even when every request names a different match. Auth responses and successful
-accounting responses are stubbed; this establishes the admission ceiling, not
-hosted Auth or actual settlement capacity.
+The Gateway source now separates verified player, Session, table and backend
+identity budgets, retaining only a coarse IP abuse ceiling. The previous shared-IP
+policy remains hosted until the reviewed SQL and matching Edge Function are
+applied together. The prepared migration is
+`supabase/drafts/20260920160000_scoped_gateway_limits.sql`.
 
-This can reject legitimate players behind a shared network and unrelated tables
-behind one product backend. Passing the diagnostic preserves evidence of the
-limitation; it is not production-capacity acceptance. Before public activation,
-define expected player/table traffic, separate verified identity/product budgets
-from coarse ingress abuse protection, and test that traffic with bounded retry
-bursts. Raising the existing global number alone does not provide that separation.
+`test:gateway-rate` exercises the real Gateway handler and SQL, including 100
+independent table budgets and idempotent settlement. It does not prove hosted
+header trust, real Auth or production capacity. Limits, fixed-window behavior and
+rollout ordering belong in `../platform/GAME_PLATFORM_INTEGRATION.md`.
 
 ### External Monitoring Not Configured
 

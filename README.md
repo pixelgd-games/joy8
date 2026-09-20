@@ -401,13 +401,18 @@ node --test scripts/private-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
 ```
 
-`test:gateway-rate` runs the actual Gateway handler against isolated rate-limit
-and membership SQL. It reproduces the shared-address enrollment and settlement
-ceilings, independent-address budgets and fail-closed storage errors. Auth responses
-and the settlement upstream are stubbed; this is a limit-policy diagnostic, not
-hosted authentication or settlement acceptance. It also supports
-`JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN`. The current shared-IP
-limitation is tracked in `docs/operations/KNOWN_ISSUES.md`.
+`test:gateway-rate` installs the current platform bundle and proposed scoped-limit
+SQL, then runs the actual Gateway handler against real membership, rate-limit and
+settlement SQL. It verifies 31 players sharing one address, 100 tables each making
+30 settlement/retry requests, Session/player isolation, key/token rotation,
+unknown/cross-product subjects, fail-closed errors and coarse ingress protection.
+Auth responses are stubbed; the table fixture uses platform accounting without a
+Mahjong adapter, so this is not hosted Auth or Godot acceptance. Native PostgreSQL
+adds eight competing connections checking the exact 30-request allowance. Use
+`JOY8_TEST_ENGINE=postgres17` and `JOY8_TEST_PG_BIN` for that case. The new SQL
+remains a draft pending approval; deploy it before the matching Gateway function.
+The authoritative limits and rollout boundary are in
+`docs/platform/GAME_PLATFORM_INTEGRATION.md`.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
 hardening, then checks the proposed runtime balance upgrade, restricted checkpoint

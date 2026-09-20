@@ -255,8 +255,8 @@ provision a replacement with the same reviewed scope, update the backend,
 verify it, then revoke the old key. Revoke a compromised key immediately;
 replacement credentials must retain access to status/retry for existing matches.
 
-All routes below use POST, a 16 KiB body limit and an IP-based limit of 120 calls
-per route per minute. Unknown request fields are rejected. Amounts are decimal
+All routes below use POST and a 16 KiB body limit. Admission limits and their
+deployment boundary are defined in the security section below. Unknown request fields are rejected. Amounts are decimal
 **strings**, such as `"100.00"`, with at most two decimal places; JSON numbers,
 exponents and extra precision are rejected. Player IDs in entries use canonical
 lowercase UUID strings. Request hashes are computed by Joy8 from PostgreSQL
@@ -549,19 +549,52 @@ Gateway safeguards:
 - An 8-second database RPC timeout.
 - Public error normalization that does not expose internal database detail.
 
-Current database-backed limits are keyed by route and client address:
+The Gateway source uses verified-subject limits. The hosted Gateway retains the
+previous per-IP policy until `supabase/drafts/20260920160000_scoped_gateway_limits.sql`
+is approved/applied and the matching Edge Function is deployed. Apply SQL first,
+verify its restricted grants, then deploy the function; the new Gateway fails
+closed if admission SQL is unavailable. Git upload alone does not deploy it.
 
-| Route | Requests | Window |
-| --- | ---: | ---: |
-| `create-session` | 30 | 5 minutes |
-| `private-session` | 30 | 5 minutes |
-| `member` | 120 | 1 minute |
-| `enroll-member` | 30 | 5 minutes |
-| `health` | 30 | 1 minute |
-| Each `server-*-v1` route | 120 | 1 minute |
-| `balance` | 120 | 1 minute |
+| Operation | Verified counting identity | Requests | Fixed window |
+| --- | --- | ---: | ---: |
+| Member lookup | Auth user UUID + route | 120 | 60 seconds |
+| Enroll / create public session / create private session | Auth user UUID + route | 30 | 300 seconds |
+| Balance | Player's Auth user UUID resolved from the active Gateway token | 120 | 60 seconds |
+| Backend exchange and renewal together | Existing game-bound Session UUID | 30 | 60 seconds |
+| Open a table | Verified backend game UUID + open | 120 | 60 seconds |
+| Settle | Existing match UUID belonging to the verified game | 30 | 60 seconds |
+| Cancel | Existing match UUID belonging to the verified game | 30 | 60 seconds |
+| Match status | Existing match UUID belonging to the verified game | 120 | 60 seconds |
+| All backend requests combined | Verified backend game UUID | 6,000 | 60 seconds |
+| Coarse ingress across gameplay/member routes | Client address | 10,000 | 60 seconds |
+| Health monitoring only | Client address | 30 | 60 seconds |
 
-A 429 response includes `Retry-After`. Clients must wait instead of bypassing the limit with repeated retries.
+The 30 settlement requests per table are independent: 100 tables can each issue
+30 requests through one backend/address. The backend and ingress ceilings are
+initial coarse abuse limits, not measured production-capacity guarantees. Backend
+identity is stable across key rotation: multiple valid keys for the same game
+share its backend budget. Other games have independent backend budgets. Creating
+a session is player-limited because no trusted game Session exists yet; exchanging
+or renewing it uses the verified Session limit.
+
+Never use a caller-supplied player ID, random match reference, unverified JWT claim
+or raw API key as a trusted counting identity. The service-role-only admission RPC
+verifies backend key scope/revocation/expiry and resolves existing game-owned
+Sessions/matches. Unknown or other-game resources are rejected. Token/key rotation,
+IP changes and new operation keys cannot reset a subject's budget. Launch-code
+lookup uses the game/hash index without persisting the raw code in a counter.
+
+Admission is committed in its own RPC before business processing, so invalid
+business requests and exact retries consume budget without rolling back the
+counter. Settlement idempotency remains enforced by the settlement RPC. The
+backend counter also counts invalid requests after backend authentication, while
+invalid credentials only reach coarse ingress protection. Counters use the existing
+atomic SQL upsert and fixed wall-clock windows; a boundary can permit a burst across
+two windows, so these are not rolling-window or requests-per-second guarantees.
+
+A 429 response includes `Retry-After`. Clients must wait, preserving the original
+idempotency key. Unavailable or malformed admission results fail closed with 503.
+Do not fall back to the old per-IP policy.
 
 The Gateway is deployed with `verify_jwt=false` because it performs these checks itself. Protected RPCs remain granted only to `service_role`.
 

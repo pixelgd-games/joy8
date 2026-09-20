@@ -35,11 +35,6 @@ type AuthResult =
   | { ok: true; userId: string | null }
   | { ok: false; error: string; status: number }
 
-type RateLimitConfig = {
-  limit: number
-  windowSeconds: number
-}
-
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
@@ -57,21 +52,12 @@ const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4173",
   "http://127.0.0.1:4173",
 ]
-const RATE_LIMITS: Record<string, RateLimitConfig> = {
-  health: { limit: 30, windowSeconds: 60 },
-  "server-exchange-v1": { limit: 120, windowSeconds: 60 },
-  "server-renew-v1": { limit: 120, windowSeconds: 60 },
-  "server-open-v1": { limit: 120, windowSeconds: 60 },
-  "server-settle-v1": { limit: 120, windowSeconds: 60 },
-  "server-status-v1": { limit: 120, windowSeconds: 60 },
-  "server-cancel-v1": { limit: 120, windowSeconds: 60 },
-  member: { limit: 120, windowSeconds: 60 },
-  "enroll-member": { limit: 30, windowSeconds: 300 },
-  "create-session": { limit: 30, windowSeconds: 300 },
-  "private-session": { limit: 30, windowSeconds: 300 },
-  balance: { limit: 120, windowSeconds: 60 },
-}
-const ROUTES = new Set(Object.keys(RATE_LIMITS))
+const INGRESS_LIMIT = { limit: 10000, windowSeconds: 60 }
+const ROUTES = new Set([
+  "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
+  "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
+  "enroll-member", "create-session", "private-session", "balance",
+])
 export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.freeze({
   JOY8_BACKEND_UNAUTHORIZED: 401,
   JOY8_GAME_NOT_READY: 403,
@@ -197,6 +183,8 @@ async function serverOperation(route: string, request: Request, headers: Headers
   if (!match) return jsonResponse({ error: "JOY8_BACKEND_UNAUTHORIZED" }, 401, headers)
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+  const admission = await enforceSubjectRateLimit(route, body.value, headers, match[1])
+  if (admission) return admission
   const action = route.slice(7, -3)
   const args: Record<string, unknown> = { p_secret: match[1], p_request: body.value }
   let name: string
@@ -230,6 +218,8 @@ async function resolveMember(request: Request, headers: HeadersInit, enroll: boo
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   if (Object.keys(body.value).length) return jsonResponse({ error: "Member request must be empty" }, 400, headers)
+  const admission = await enforceSubjectRateLimit(enroll ? "enroll-member" : "member", {}, headers, null, auth.userId)
+  if (admission) return admission
   const result = await callRpc("joy8_resolve_member_profile", { p_auth_user_id: auth.userId, p_enroll: enroll })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
   const row = firstRpcRow<{ player_account_id: string; account_type: string; public_id: string }>(result.body)
@@ -253,6 +243,8 @@ async function createPrivateSession(request: Request, headers: HeadersInit): Pro
   if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
+  const admission = await enforceSubjectRateLimit("private-session", {}, headers, null, auth.userId)
+  if (admission) return admission
   const result = await callRpc("joy8_create_private_session", {
     p_game_slug: slug, p_auth_user_id: auth.userId, p_origin: request.headers.get("origin"),
   })
@@ -310,6 +302,8 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     return jsonResponse({ error: "Display name is too long" }, 400, headers)
   }
 
+  const admission = await enforceSubjectRateLimit("create-session", {}, headers, null, auth.userId)
+  if (admission) return admission
   const memberResult = await callRpc("joy8_resolve_member", { p_auth_user_id: auth.userId, p_enroll: false })
   if (!memberResult.ok) {
     return jsonResponse(toPublicRpcError(memberResult.body), statusFromRpcError(memberResult.body), headers)
@@ -364,6 +358,8 @@ async function getBalance(request: Request, headers: HeadersInit): Promise<Respo
     return jsonResponse({ error: "gateway_token is required" }, 400, headers)
   }
 
+  const admission = await enforceSubjectRateLimit("balance", { gateway_token: gatewayToken }, headers)
+  if (admission) return admission
   const rpcResult = await callRpc("wallet_get_balance", {
     p_gateway_token: gatewayToken,
   })
@@ -444,7 +440,7 @@ async function enforceRateLimit(
   request: Request,
   headers: HeadersInit,
 ): Promise<Response | null> {
-  const config = RATE_LIMITS[route]
+  const config = route === "health" ? { limit: 30, windowSeconds: 60 } : INGRESS_LIMIT
 
   if (!config) {
     return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
@@ -452,7 +448,7 @@ async function enforceRateLimit(
 
   const clientAddress = getClientAddress(request)
   const rpcResult = await callRpc("joy8_consume_gateway_rate_limit", {
-    p_key: `${route}:${clientAddress}`,
+    p_key: `${route === "health" ? "health" : "ingress"}:${clientAddress}`,
     p_limit: config.limit,
     p_window_seconds: config.windowSeconds,
   })
@@ -469,6 +465,29 @@ async function enforceRateLimit(
   }
 
   return null
+}
+
+async function enforceSubjectRateLimit(
+  route: string, request: Record<string, JsonValue>, headers: HeadersInit,
+  secret: string | null = null, authUserId: string | null = null,
+): Promise<Response | null> {
+  const result = await callRpc("joy8_admit_gateway_request", {
+    p_route: route, p_request: request, p_secret: secret, p_auth_user_id: authUserId,
+  })
+  const body = result.body as { allowed?: boolean; error?: string; retry_after?: number } | null
+  if (!result.ok || !body || typeof body !== "object" || Array.isArray(body)) {
+    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (body.error) {
+    return Object.hasOwn(SERVER_ERROR_STATUSES, body.error)
+      ? jsonResponse({ error: body.error }, SERVER_ERROR_STATUSES[body.error], headers)
+      : jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (body.allowed === true) return null
+  if (body.allowed === false && Number.isInteger(body.retry_after) && body.retry_after! > 0 && body.retry_after! <= 86400) {
+    return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": String(body.retry_after) })
+  }
+  return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
 }
 
 export async function callRpc(name: string, args: Record<string, unknown>): Promise<RpcResult> {

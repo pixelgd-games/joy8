@@ -106,6 +106,7 @@ try {
     const args = JSON.parse(options.body)
     rpcCalls.push({ name, args })
     if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
+    if (name === "joy8_admit_gateway_request") return Response.json({ allowed: true })
     if (name === "joy8_resolve_member" || name === "joy8_resolve_member_profile") {
       return memberError ? Response.json(memberError, { status: 403 }) : Response.json(memberRows)
     }
@@ -202,6 +203,7 @@ try {
   globalThis.fetch = async (url, options) => {
     const name = url.split("/").at(-1)
     if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
+    if (name === "joy8_admit_gateway_request") return Response.json({ allowed: true })
     if (name === "joy8_platform_health_v1") return Response.json(health)
     serverCalls.push({ name, args: JSON.parse(options.body) })
     return serverError ? Response.json(serverError, { status: 400 }) : Response.json({ version: 1, state: "open" })
