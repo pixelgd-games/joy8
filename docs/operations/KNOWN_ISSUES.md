@@ -50,10 +50,6 @@ scopes remain incomplete. The test page ships with Joy8, but Mahjong entry is
 configured only for localhost and its public release is not activated.
 See [the activation review](../../supabase/drafts/MAHJONG_REVIEW.md).
 
-The three original `2026091609...` Mahjong drafts remain superseded, unapplied
-reference material under `supabase/drafts/mahjong-clash/`; never bulk-apply them
-alongside the installed product schema. The product owns future gameplay SQL.
-
 Mahjong's economy operations lock one singleton `economy_state` row, serializing
 those operations across matches. Measure hosted capacity before funded or public
 activation. The installed runtime distinguishes available funds from the active

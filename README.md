@@ -316,9 +316,8 @@ policy and expiring exchange/renew key. Before funded product activation, review
 its scope, limits, key and adapter against the integration contract.
 
 The repository has no baseline migration. Existing migrations are incremental
-and cannot reconstruct the full local database alone. Three incomplete Mahjong
-drafts are in `supabase/drafts/mahjong-clash/` and remain superseded and unapplied.
-Do not promote them alongside the installed schema; see the
+and cannot reconstruct the full local database alone. Mahjong changes use the
+installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
 All 49 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
