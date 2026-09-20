@@ -8,7 +8,9 @@ unpublished development mode without a business portfolio; business
 verification/review, hosted Supabase provider configuration and acceptance remain.
 The public Email/password flow and Cloudflare Email Sending are disabled. Stable
 six-digit public player IDs are deployed. Guest-to-Google linking, guest
-continuity and branded handoff remain acceptance or target-design work.
+continuity and end-to-end public branded-entry acceptance remain open. The
+reusable branded H5 shell, Mahjong message contract, service-only resolver and
+Gateway routes are implemented; the current Mahjong binding remains localhost-only.
 Last reviewed: 2026-09-20.
 
 This document owns authentication, persistent guests, account lifecycle, and
@@ -47,8 +49,9 @@ initialize Joy8 identity merely because the game also has a Joy8 build.
 | Game session and launch handoff | Joy8 integration contract |
 | Game-side player mapping, progress and gameplay data | Product backend and schema |
 
-Fix the origin, route, and repository owner of each branded entry before UI
-implementation. Visual placement in a game's lobby does not transfer Auth
+Fix the production origin and hosting owner of each branded entry before
+activation. The reusable H5 route is `/entry/?slug=...`; visual placement in a
+game's login screen does not transfer Auth
 ownership into its gameplay runtime. Native return/storage wiring is later work
 in the owning repository, not a first-release platform dependency.
 
@@ -66,10 +69,13 @@ in the owning repository, not a first-release platform dependency.
   Email Sending is disabled, both SMTP credentials were deleted, and Workers
   Paid was canceled. Re-enabling email authentication requires a new product
   decision and provider configuration review.
-- Deletion requests, cleanup/retention and branded cross-origin entry are not
-  implemented. Same-origin `/account/` is a narrow callback trampoline that
-  returns only to the Lobby, a validated `/game/?slug=...`, or
-  `/play-test/?slug=...` route.
+- Deletion requests and cleanup/retention are not implemented. The repository
+  branded entry accepts only a configured game slug, exact trusted parent/game
+  origins, Google or explicit guest requests, and in-memory launch messages.
+  `/account/` now returns callbacks only to the Lobby or validated `/game/`,
+  `/play-test/`, and `/entry/` routes. The resolver and Gateway are active;
+  public acceptance remains pending a reviewed production Mahjong H5/authority
+  URL and real provider/game testing.
 - The local private-test entry is owned by Joy8 at
   `http://localhost:5173/play-test/?slug=mahjong-clash`; its game frame is owned by
   Mahjong at `http://localhost:4391/`. The implemented shared member callback also
@@ -134,17 +140,18 @@ Successful entry continues to the selected game. Dismissal cancels
 that selection; opening another game or the top-bar account entry must not reuse
 the previous destination. A service failure must not silently create a guest.
 
-Direct game URLs follow the same membership policy and return missing members
+Direct published-game URLs follow the same membership policy and return missing members
 to the Lobby dialog. `/account/` is the callback trampoline, not the default
 platform entrance or a second account page. Callback destinations are validated
-game paths, never arbitrary URLs. A future branded Mahjong H5/App entry should likewise allow its
-home screen before requesting identity at game start; native implementation
-remains deferred.
+game paths, never arbitrary URLs. The implemented branded H5 entry loads the
+game-owned login artwork before identity, accepts only Google or persistent
+guest selection from the trusted iframe, and auto-continues an existing enrolled
+member. Native implementation remains deferred.
 
-The callback passes OAuth parameters through `/account/` to
-`/?member=callback&code=...`. The Lobby captures those parameters and clears the
-visible query using `history.replaceState` before opening the dialog. Never log
-the callback URL or send it to analytics.
+The callback passes OAuth parameters through `/account/`. Lobby flows continue
+to `/?member=callback&code=...`; a validated branded flow returns directly to
+`/entry/?slug=...&code=...`. The receiving page clears the visible callback
+query using `history.replaceState`. Never log the callback URL or send it to analytics.
 
 After successful enrollment, the member service dispatches the window event
 `joy8:membership`. Its `detail` is the Gateway member object containing
@@ -212,7 +219,8 @@ third stage; no product needs a separate temporary membership system.
   real providers before release; separate-player merging remains unsupported.
 - Player nickname rules, moderation and whether or when the six-digit public-ID
   namespace must be extended beyond its 900,000 available values.
-- Branded H5 entry origins, paths, repository ownership, copy, and localization.
+- Production branded H5 origin/hosting assignment, copy/localization and
+  end-to-end acceptance of the active `/entry/?slug=...` implementation.
 - Complete Meta business verification/review, privacy/data-deletion requirements,
   hosted Supabase Facebook provider configuration and real sign-in/linking
   acceptance for the existing unpublished Joy8 Meta app after the operator has

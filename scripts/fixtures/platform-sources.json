@@ -29,7 +29,8 @@
     "20260920122000_product_adapter_validation.sql",
     "20260920140000_scoped_product_ddl_guard.sql",
     "20260920160000_scoped_gateway_limits.sql",
-    "20260920170000_shared_point_wallet.sql"
+    "20260920170000_shared_point_wallet.sql",
+    "20260920180000_branded_game_entry.sql"
   ],
   "drafts": [],
   "excluded": {

@@ -56,7 +56,8 @@ const INGRESS_LIMIT = { limit: 10000, windowSeconds: 60 }
 const ROUTES = new Set([
   "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
   "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
-  "enroll-member", "create-session", "private-session", "balance",
+  "enroll-member", "create-session", "private-session", "branded-entry",
+  "branded-session", "balance",
 ])
 export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.freeze({
   JOY8_BACKEND_UNAUTHORIZED: 401,
@@ -171,6 +172,14 @@ async function dispatchRoute(
     return createPrivateSession(request, headers)
   }
 
+  if (route === "branded-entry") {
+    return resolveBrandedEntry(request, headers)
+  }
+
+  if (route === "branded-session") {
+    return createPrivateSession(request, headers)
+  }
+
   if (route === "balance") {
     return getBalance(request, headers)
   }
@@ -252,6 +261,24 @@ async function createPrivateSession(request: Request, headers: HeadersInit): Pro
   const row = result.body as Record<string, JsonValue> | null
   if (!row || Array.isArray(row) || !row.session_id || !row.launch_code || !row.game_id || !row.launch_url || row.protocol !== "server-v1") {
     return jsonResponse({ error: "Gateway returned an empty session" }, 502, headers)
+  }
+  return jsonResponse(row, 200, headers)
+}
+
+async function resolveBrandedEntry(request: Request, headers: HeadersInit): Promise<Response> {
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  const slug = body.value.slug
+  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
+    return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+  }
+  const result = await callRpc("joy8_resolve_branded_entry", {
+    p_game_slug: slug, p_origin: request.headers.get("origin"),
+  })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  const row = result.body as Record<string, JsonValue> | null
+  if (!row || Array.isArray(row) || !row.game_id || !row.game_name || !row.launch_url || row.protocol !== "server-v1") {
+    return jsonResponse({ error: "Gateway returned an empty entry" }, 502, headers)
   }
   return jsonResponse(row, 200, headers)
 }
@@ -560,7 +587,7 @@ function buildCorsHeaders(
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
   if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
-  if (route === "private-session") return Boolean(origin && allowedOrigins.includes(origin))
+  if (["private-session", "branded-entry", "branded-session"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
   if (!origin) {
     return !memberRoute

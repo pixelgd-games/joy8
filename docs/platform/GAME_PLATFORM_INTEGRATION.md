@@ -6,8 +6,9 @@ It does not own member-entry design, CrazyGames submission rules, repository set
 
 Current source reviewed: 2026-09-20. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
-function `joy8-gateway` includes private entry and the settlement-error mappings;
-the current product protocol is `server-v1`.
+function `joy8-gateway` includes private entry, branded entry and the
+settlement-error mappings; the service-only branded-entry resolver is installed.
+The current product protocol is `server-v1`.
 See [README.md](../../README.md) for verification and product-activation limits.
 There is no
 old/new compatibility path in the replacement. Existing game clients must adopt
@@ -105,6 +106,24 @@ The current local Mahjong binding uses Joy8 `http://localhost:5173` and game
 `http://localhost:4391/`. Entry configuration remains backend-controlled. The
 private entry and Gateway are installed; real game acceptance remains pending.
 See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
+
+### Branded H5 entry
+
+Joy8's `/entry/?slug=...` is a platform-controlled shell with no visible Joy8
+lobby. It loads the game iframe first so the player sees the game's login art.
+The iframe may send only `{type:"joy8-entry-request-v1",method:"google"}` or the
+same message with `method:"guest"`, from the configured frame window and origin.
+Joy8 performs Auth, Turnstile, enrollment and OAuth callback completion in the
+parent. The game never receives provider or member tokens.
+
+`POST /branded-entry` resolves only `game_id`, `game_name`, `launch_url` and
+`protocol` from trusted backend configuration and exact Origin. After verified
+membership, `POST /branded-session` uses the same hidden-game session authority
+as the private entry. The resulting launch is delivered through the normal
+`joy8-launch-v1` message. Both responses are no-store. Migration
+`20260920180000_branded_game_entry.sql` and the matching Gateway routes are
+installed. The exact current origin/launch binding is localhost-only, so this is
+not a public Mahjong deployment or completed provider/game acceptance.
 
 ### Shared launch parameters
 

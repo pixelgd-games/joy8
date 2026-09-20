@@ -156,10 +156,13 @@ Two installed runtime limits remain relevant before funded or public play:
 2. Define funded-play limits and the human POINT source before changing the
    identity-only reservation ceiling or authorizing financial backend scopes.
 3. Review AI funding and full gameplay acceptance before starting funded play.
-4. Public branded origin, Cloudflare game upload, GCP/VPS, production launch,
-   guest-to-Google linking and provider acceptance remain separate from this
-   connection approval. Turnstile is active; public Email/password entry and
-   Cloudflare Email Sending are disabled.
+4. The Joy8-owned `/entry/?slug=mahjong-clash` and Mahjong-side Google/guest
+   message contract are implemented. The service-only resolver and Gateway routes
+   are installed, while the exact entry/launch binding remains localhost-only.
+   Cloudflare game upload, production game URL, GCP/VPS, production launch,
+   guest-to-Google linking and hosted provider acceptance remain separate.
+   Turnstile is active; public Email/password entry and Cloudflare Email Sending
+   are disabled.
 
 ## Verification and recovery
 

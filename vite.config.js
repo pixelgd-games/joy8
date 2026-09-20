@@ -19,6 +19,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "index.html"),
         game: resolve(__dirname, "game/index.html"),
+        brandedEntry: resolve(__dirname, "entry/index.html"),
         privateGame: resolve(__dirname, "play-test/index.html"),
         account: resolve(__dirname, "account/index.html"),
         adminLogin: resolve(__dirname, "admin/login/index.html"),

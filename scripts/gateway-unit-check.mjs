@@ -119,6 +119,9 @@ try {
       session_id: "private-session", game_id: "game-1", launch_code: "private-code", protocol: "server-v1",
       launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", currency: "POINT",
     })
+    if (name === "joy8_resolve_branded_entry") return sessionError ? Response.json(sessionError, { status: 403 }) : Response.json({
+      game_id: "game-1", launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", protocol: "server-v1",
+    })
     throw new Error(`Unexpected RPC ${name}`)
   }
   const request = (route, body = {}, token = "member-token", origin = "https://joy8.pages.dev") => handleRequest(new Request(`https://gateway.example/${route}`, {
@@ -126,7 +129,7 @@ try {
     headers: { "Content-Type": "application/json", apikey: "anon-key", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
   }))
-  for (const route of ["member", "enroll-member", "create-session", "private-session"]) {
+  for (const route of ["member", "enroll-member", "create-session", "private-session", "branded-session"]) {
     assert.equal((await request(route, {}, "", "https://evil.example")).status, 403)
     assert.equal((await request(route, {}, "", null)).status, 403)
     for (const token of ["", "anon-key"]) assert.equal((await request(route, {}, token)).status, 401)
@@ -193,6 +196,19 @@ try {
   assert.equal(privateDenied.status, 403)
   assert.deepEqual(await privateDenied.json(), { error: "JOY8_PRIVATE_ENTRY_DENIED" })
   sessionError = null
+
+  assert.equal((await request("branded-entry", { slug: "mahjong-clash" }, "", "https://evil.example")).status, 403)
+  assert.equal((await request("branded-entry", { slug: "mahjong-clash" }, "", null)).status, 403)
+  assert.equal((await request("branded-entry", { slug: "mahjong-clash", origin: "http://localhost:5173" }, "", "http://localhost:5173")).status, 400)
+  const brandedEntry = await request("branded-entry", { slug: "mahjong-clash" }, "", "http://localhost:5173")
+  assert.equal(brandedEntry.status, 200)
+  assert.equal(brandedEntry.headers.get("cache-control"), "no-store")
+  assert.deepEqual(await brandedEntry.json(), { game_id: "game-1", launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", protocol: "server-v1" })
+  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_branded_entry", args: { p_game_slug: "mahjong-clash", p_origin: "http://localhost:5173" } })
+
+  const brandedSession = await request("branded-session", { slug: "mahjong-clash" }, "member-token", "http://localhost:5173")
+  assert.equal(brandedSession.status, 200)
+  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_create_private_session", args: { p_game_slug: "mahjong-clash", p_auth_user_id: "verified-user", p_origin: "http://localhost:5173" } })
 
   for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
     assert.equal((await request(route, {}, "", null)).status, 404)

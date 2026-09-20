@@ -1,0 +1,7 @@
+* { box-sizing: border-box; }
+html, body, #entry { width: 100%; min-height: 100%; margin: 0; }
+body { background: #071018; color: #f4f7f8; font-family: system-ui, sans-serif; overflow: hidden; }
+#entry { height: 100dvh; display: grid; place-items: center; }
+#entry iframe { width: 100%; height: 100%; border: 0; display: block; }
+#entry-status { padding: 20px; text-align: center; }
+#member-captcha { position: fixed; width: 300px; max-width: calc(100vw - 24px); left: 50%; bottom: 12px; transform: translateX(-50%); z-index: 2; }

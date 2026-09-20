@@ -48,6 +48,14 @@ and identity-key scope checks passed. The test-entry page is part of the standar
 Cloudflare front-end build, but Mahjong's backend entry remains bound to localhost;
 publishing this page does not publish or enable the Mahjong game. See the
 [identity connection review](supabase/drafts/MAHJONG_REVIEW.md#identity-only-connection).
+The repository now also contains a Mahjong-branded `/entry/?slug=mahjong-clash`
+shell. It loads the game-owned login artwork first, keeps Google/guest Auth in
+the Joy8 parent, and delivers only the one-use launch payload to the iframe.
+The service-only resolver migration and matching Gateway routes are installed in
+production. Their hosted security smoke passed without creating an identity,
+wallet, session, or settlement. The current exact binding remains local-only at
+`http://localhost:5173` -> `http://localhost:4391/`; Mahjong has no cloud build,
+authority, or public entry yet.
 The [integration contract](docs/platform/GAME_PLATFORM_INTEGRATION.md#continuous-settlement)
 owns the protocol; [Mahjong activation](supabase/drafts/MAHJONG_REVIEW.md) owns
 the remaining configuration gates.
@@ -59,6 +67,8 @@ Joy8 currently provides:
 - A public mobile-first game Lobby.
 - A database-backed game catalog exposed through `public_games_v1`.
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
+- A reusable branded game-entry shell whose visible login is game artwork while
+  Joy8 retains Auth, enrollment, session issuance, and callback ownership.
 - A reusable Lobby dialog for Google, Facebook and persistent guest entry, with explicit
   player enrollment. `/account/` is a narrow Auth return trampoline back to that
   dialog. Google sign-in and guest entry passed real hosted acceptance;
@@ -77,7 +87,7 @@ Joy8 does not currently provide:
 - Hosted Facebook sign-in; its repository client and unpublished Meta app exist,
   but Meta verification/review, Supabase provider configuration and acceptance
   remain pending.
-- Verified guest-to-provider linking or branded cross-origin handoff.
+- Hosted guest-to-provider linking or end-to-end public branded-entry acceptance.
 - Production money movement.
 - Full analytics, dashboards, or unattended alerting.
 - A game runtime or game-specific business logic.
@@ -122,6 +132,7 @@ Browser
   └─ Game Loader
        ├─ published entry: public_games_v1 + Gateway create-session
        ├─ test entry: Gateway private-session + backend entry configuration
+       ├─ branded entry: Gateway branded-entry/branded-session + backend entry configuration
        └─ game iframe
             ├─ Gateway balance (in-memory balance token, if supplied)
             └─ game backend (one-use launch exchange and financial requests)
@@ -141,8 +152,9 @@ storage does not grant administrator or player eligibility.
 | Route | Entry | Responsibility |
 | --- | --- | --- |
 | `/` | `index.html` | Public Lobby |
-| `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog |
+| `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog or a validated branded entry |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
+| `/entry/` | `entry/index.html` | Joy8-controlled, game-branded Google/guest entry and in-memory launch handoff |
 | `/play-test/` | `play-test/index.html` | Local test entry using normal membership and the shared Loader; no player allowlist |
 | `/admin/login/` | `admin/login/index.html` | Google OAuth entry |
 | `/admin/games/` | `admin/games/index.html` | Game list |
@@ -158,6 +170,7 @@ Vite declares these entries in `vite.config.js`.
 | `src/main.js` | Lobby bootstrap |
 | `src/pages/lobby/` | Lobby data loading, rendering, and layout |
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
+| `src/pages/entry/` | Branded iframe entry, Google/guest orchestration and callback completion |
 | `src/admin/` | Admin authentication and game CRUD |
 | `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
@@ -276,7 +289,8 @@ The front end does not write player, wallet, match, settlement, or session table
 
 The hosted `joy8-gateway` implements these POST routes:
 
-- member, enroll-member, create-session, private-session, balance, health.
+- member, enroll-member, create-session, private-session, branded-entry,
+  branded-session, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1.
 
@@ -335,7 +349,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 49 local and hosted migration records match, including the Joy8 rebrand,
+All 52 local and hosted migration records match, including the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
@@ -343,7 +357,7 @@ cross-product adapter isolation, public player IDs, candidate-scoped ID allocati
 first-enrollment profile visibility, product-schema registration, automatic DDL
 validation, rejected-candidate lock cleanup, optimized adapter validation, scoped
 DDL validation, Mahjong runtime balance/recovery and scoped Gateway admission, and
-the authorized prelaunch player/account cleanup. The cleanup checks verified
+the authorized prelaunch player/account cleanup and branded-entry resolver. The cleanup checks verified
 both retained Auth accounts and their login records against the local backup,
 with all eleven catalog/admin/configuration tables unchanged. Its backup remains
 local and is excluded from Git. Mahjong's private schema and effective permissions
@@ -417,6 +431,7 @@ npm run test:ledger-cleanup
 npm run test:platform-db
 npm run test:continuous-db
 node --test scripts/private-entry-check.mjs
+node --test scripts/branded-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
 ```
 

@@ -29,6 +29,7 @@ test("the complete exported fixture installs current member, session, accounting
   for (const name of ["joy8_product_schemas", "joy8_product_ddl_checks", "joy8_private_entries", "gateway_rate_limits"]) {
     assert.notEqual((await one(`select to_regclass('public.${name}') value`)).value, null)
   }
+  assert.equal((await one("select to_regprocedure('public.joy8_resolve_branded_entry(text,text)') is not null value")).value, true)
   for (const name of ["joy8_product_ddl_guard", "joy8_product_drop_guard"]) {
     assert.equal((await one(`select exists(select 1 from pg_event_trigger where evtname='${name}' and evtenabled='O') value`)).value, true)
   }
