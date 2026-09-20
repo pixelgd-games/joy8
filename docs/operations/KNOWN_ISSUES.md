@@ -66,15 +66,22 @@ document; they do not establish hosted capacity or authorize funded operation.
 Hosted member settings have been inspected and the authorized entry changes are
 recorded in [README.md](../../README.md#hosted-auth-configuration). Google sign-in,
 guest entry and production Turnstile verification passed hosted acceptance.
+Facebook client support exists in the repository. The Joy8 Meta app
+(`1385504273217738`) exists in unpublished development mode without a business
+portfolio, while business verification/review, the hosted Supabase provider and
+acceptance remain incomplete. This is intentionally deferred while the operator
+is an individual without an appropriate registered business; retain the app and
+do not enable the provider or public entry flag. No Meta App Secret is stored in
+the repository or hosted Auth.
 The public Email/password flow is disabled. Cloudflare Email Sending is disabled,
 both SMTP credentials were deleted, and Workers Paid was canceled.
 
 Current behavior:
 
-- Google/guest entry, persistent guest restoration, guest promotion and
+- Google/Facebook/guest entry, persistent guest restoration, guest promotion and
   enrollment checks are implemented. The member migrations and Gateway are
-  active. Guest-to-Google linking still needs real hosted conflict and
-  preservation acceptance.
+  active. Facebook provider configuration and both providers' real hosted
+  conflict/preservation acceptance remain incomplete.
 - `/account/` is a callback trampoline back to the Lobby dialog. It is not a
   standalone account, password or recovery page.
 - Branded cross-origin handoff and account-deletion requests remain unimplemented.
@@ -85,7 +92,7 @@ Risk:
 
 - Hosted guest entry, Google sign-in and the earlier launch flow passed the
   acceptance recorded in [README.md](../../README.md#verification). Cross-browser
-  continuity and real provider promotion remain unverified. Isolated SQL tests, including native
+  continuity, Facebook sign-in and real provider promotion remain unverified. Isolated SQL tests, including native
   PostgreSQL 17.6 races, do not prove real provider linking.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not treat the planned behavior as implemented or invent a wallet classification, guest-retention, or currency-conversion policy in this document.
@@ -238,7 +245,7 @@ ledger and reservations. Its engine and fixture limits are documented in
 15 competing-connection cases against that schema. Hosted guest and Google
 sign-in acceptance and production Turnstile verification are recorded in README.
 Public-ID checks cover stable allocation and service-role-only profile
-resolution. Hosted guest-to-Google linking, cross-browser guest continuity and
+resolution. Hosted guest-to-provider linking, Facebook sign-in, cross-browser guest continuity and
 production load remain unverified.
 
 Not fully automated:

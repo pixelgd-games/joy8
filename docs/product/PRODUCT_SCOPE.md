@@ -30,7 +30,9 @@ Joy8 succeeds when:
 
 [README.md](../../README.md) owns the implemented feature list and operating
 instructions. Google/guest member entry, stable public player IDs, scoped wallets
-and trusted settlement are deployed foundations; guest-to-Google linking,
+and trusted settlement are deployed foundations. Facebook client support is
+implemented in the repository and its Meta app exists in unpublished development
+mode, while Meta verification/review, Supabase configuration, provider linking,
 continuity and product activation remain open.
 Continuous per-hand settlement and the private Mahjong schema are installed;
 product activation remains pending as recorded in README and the integration contract. Target policies below do not imply full acceptance.
@@ -94,8 +96,11 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 ### First Release and Entry Models
 
 - First release: H5. Android and iOS are later work, not first-release gates.
-- Sign-in: Google and persistent guest access.
-  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns their design.
+- Current sign-in: Google and persistent guest access. Facebook is an approved
+  deferred provider whose implementation and unpublished app are retained until
+  the operator can complete legitimate business verification and release review;
+  it is not a current-release gate.
+  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns the identity design.
 - Mahjong Clash is the first adopter, not the architectural center of Joy8.
   Platform capabilities must be reusable by other products.
 

@@ -27,16 +27,28 @@ function checked(result) {
   return result.data
 }
 
-export function memberErrorMessage(error) {
+const oauthProviders = new Set(["google", "facebook"])
+
+export function providerLabel(provider) {
+  return provider === "facebook" ? "Facebook" : provider === "google" ? "Google" : "第三方帳號"
+}
+
+function checkedProvider(provider) {
+  if (!oauthProviders.has(provider)) throw new Error("Unsupported authentication provider")
+  return provider
+}
+
+export function memberErrorMessage(error, provider) {
   const code = error?.code
+  const label = providerLabel(provider)
   const messages = {
-    identity_already_exists: "這個 Google 登入已綁定其他帳號。原本的訪客資料會保留，請勿重複綁定。",
+    identity_already_exists: `這個 ${label} 已綁定其他玩家，不能合併目前的訪客資料。`,
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
     captcha_failed: "安全驗證失敗，請重新驗證後再試。",
     captcha_timeout: "安全驗證逾時，請檢查網路後再試一次。",
     captcha_unavailable: "安全驗證暫時無法載入，請稍後再試。",
     verification_required: "目前的登入身分無法通過驗證，請重新登入。",
-    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google。",
+    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 或 Facebook。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
     flow_state_not_found: "這個驗證連結已使用或已失效，請重新操作。",
@@ -48,7 +60,7 @@ export function memberErrorMessage(error) {
 
 export function createMemberService(client, { origin, next = "/", guestLock } = {}) {
   const returnPath = safeReturnPath(next, origin)
-  const callbackUrl = (flow) => `${origin}${accountPath(returnPath, origin)}&flow=${flow}`
+  const callbackUrl = (flow, provider) => `${origin}${accountPath(returnPath, origin)}&flow=${flow}&provider=${provider}`
 
   async function session() {
     return checked(await client.auth.getSession()).session
@@ -82,14 +94,15 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     })
   }
 
-  async function google() {
+  async function oauth(provider) {
+    checkedProvider(provider)
     const current = await session()
-    const options = { redirectTo: callbackUrl(current ? "link" : "signin"), skipBrowserRedirect: true }
+    const options = { redirectTo: callbackUrl(current ? "link" : "signin", provider), skipBrowserRedirect: true }
     const data = checked(current
-      ? await client.auth.linkIdentity({ provider: "google", options })
-      : await client.auth.signInWithOAuth({ provider: "google", options }))
+      ? await client.auth.linkIdentity({ provider, options })
+      : await client.auth.signInWithOAuth({ provider, options }))
     if (!data?.url) throw new Error("Missing provider redirect")
-    return { url: data.url, expectedUserId: current?.user?.id ?? null }
+    return { url: data.url, expectedUserId: current?.user?.id ?? null, provider }
   }
 
   async function completeCallback(code, expectedUserId, flow) {
@@ -113,5 +126,5 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  return { session, membership, guest, google, completeCallback, signOut, returnPath }
+  return { session, membership, guest, oauth, completeCallback, signOut, returnPath }
 }

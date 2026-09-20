@@ -9,6 +9,15 @@ Last implementation review: 2026-09-20.
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
 server-authorized wallet/settlement flow.
+The repository member client now also implements Facebook sign-in, guest
+linking and conflict-safe switching to an existing Facebook player. The Joy8
+Meta app (`1385504273217738`) exists in unpublished development mode without a
+business portfolio. The hosted Supabase Facebook provider remains disabled, and
+Facebook has not passed hosted acceptance or been released through `main`. The
+button remains hidden unless `VITE_FACEBOOK_AUTH_ENABLED=true` is set for a build.
+The app is intentionally retained for future use; verification and activation
+are deferred until the operator has an appropriate registered business. No Meta
+App Secret has been copied into this repository or configured in hosted Auth.
 The member migrations, four platform foundation migrations, session-scope
 correction, Joy8 object rebrand, read-only member lookup, public-ID allocation
 and product-schema registration are applied; the hosted `joy8-gateway` is active with the `server-v1`
@@ -47,10 +56,10 @@ Joy8 currently provides:
 - A public mobile-first game Lobby.
 - A database-backed game catalog exposed through `public_games_v1`.
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
-- A reusable Lobby dialog for Google and persistent guest entry, with explicit
+- A reusable Lobby dialog for Google, Facebook and persistent guest entry, with explicit
   player enrollment. `/account/` is a narrow Auth return trampoline back to that
   dialog. Google sign-in and guest entry passed real hosted acceptance;
-  guest-to-Google linking remains unverified.
+  Facebook configuration and all provider-linking acceptance remain pending.
 - A stable six-digit public player ID displayed as `Player 123456`, separate
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
@@ -62,7 +71,10 @@ Joy8 currently provides:
 Joy8 does not currently provide:
 
 - Public Email/password signup, sign-in, verification, or recovery.
-- Verified guest-to-Google linking or branded cross-origin handoff.
+- Hosted Facebook sign-in; its repository client and unpublished Meta app exist,
+  but Meta verification/review, Supabase provider configuration and acceptance
+  remain pending.
+- Verified guest-to-provider linking or branded cross-origin handoff.
 - Production money movement.
 - Full analytics, dashboards, or unattended alerting.
 - A game runtime or game-specific business logic.
@@ -73,7 +85,7 @@ both product models, operational POINT direction, and platform -> product ->
 integration order. The member foundation starts the platform stage; scoped wallets,
 trusted settlement and health are deployed. Mahjong has identity-only activation;
 no product has completed hosted gameplay/settlement acceptance. Real product
-integration and guest-to-Google provider-linking acceptance remain outstanding.
+integration and Google/Facebook provider-linking acceptance remain outstanding.
 
 ### Platform Foundation
 
@@ -173,13 +185,13 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    The label follows Auth session changes and does not grant player eligibility.
    The control opens the shared member UI
    in a dismissible dialog; the Lobby remains visible and its URL is unchanged.
-   The dialog offers Google entry and explicit guest play. `/account/` safely
+   The repository dialog offers Google, Facebook and explicit guest entry. `/account/` safely
    returns Auth callbacks to the same Lobby dialog instead of rendering a second
    standalone account page.
 2. Cards are rendered from database metadata.
 3. Selecting a game checks membership. Enrolled registered players and persistent
    guests continue to `/game/?slug=<slug>`. Other visitors see the member dialog
-   over the Lobby, with the chosen game named in the dialog. Google or
+   over the Lobby, with the chosen game named in the dialog. Google, Facebook or
    explicit guest entry preserves that game destination. Closing cancels it;
    another game or the top-bar login starts a new selection.
 4. Missing cover images use the platform fallback behavior.
@@ -345,6 +357,10 @@ Requirements:
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
+
+After Meta business verification/review, Supabase configuration and acceptance, add
+`VITE_FACEBOOK_AUTH_ENABLED=true` to expose Facebook entry. It is hidden by
+default so an unconfigured provider cannot reach players.
 
 Do not commit or quote real credentials. A local Vite server still uses the
 database configured in `.env.local`; localhost alone does not isolate data.
@@ -569,9 +585,9 @@ npm run test:continuous-pg
 ```
 
 Member unit checks use mocked Auth/Gateway services; browser smoke checks cover
-the shared Google/guest member dialog, cancellation/reselection, provider return
+the shared Google/Facebook/guest member dialog, cancellation/reselection, provider return
 destinations, safe direct-link entry, simulated guest controls, public-ID account
-labels, and 320/390/1280 px layouts. They do not verify hosted OAuth, actual
+labels, provider-conflict refusal without guest sign-out, and 320/390/1280 px layouts. They do not verify hosted OAuth, actual
 database concurrency, grants, wallet preservation, or provider linking.
 Private-entry verification additionally covers explicit start, denied access,
 retry and the shared Loader credential boundary. Its eleven isolated SQL tests
@@ -623,6 +639,12 @@ session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 
 - The public member UI uses Google and anonymous Auth only. It exposes no
   Email/password signup, sign-in, verification, or recovery action.
+- Facebook remains disabled in hosted Auth. The unpublished Joy8 Meta app exists,
+  but business verification/review, Supabase provider configuration and real
+  sign-in/linking acceptance remain pending. Repository client support and the
+  Meta app shell do not make the provider operational. Retain the app unpublished;
+  resume setup only after the operator has an appropriate registered business.
+  No Meta App Secret is stored in this repository or hosted Auth.
 - Anonymous sign-in and manual identity linking are enabled and saved.
 - Site URL is `https://joy8.cc`.
 - Admin redirect allowlist entries are `https://joy8.pages.dev/admin/login/`,
@@ -641,8 +663,8 @@ session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 - Cloudflare Turnstile Managed protection is enabled for Auth on `joy8.cc` and
   its subdomains. The public site key is used by the member client; the secret
   exists only in Cloudflare and Supabase. Production Turnstile verification,
-  Google sign-in and guest entry passed. Guest-to-Google linking and
-  cross-browser guest continuity still require end-to-end acceptance.
+  Google sign-in and guest entry passed. Guest-to-provider linking, Facebook
+  sign-in and cross-browser guest continuity still require end-to-end acceptance.
 
 The CLI wrapper still supports project/migration listing and database reads;
 its combined `config diff` read was denied. The authorized dashboard inspection
@@ -659,6 +681,8 @@ It does not establish that the CLI now has configuration read/write access.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- Set `VITE_FACEBOOK_AUTH_ENABLED=true` only after the hosted Facebook provider
+  and its conflict-safe sign-in/linking flow pass acceptance. Omit it otherwise.
 - `public/_headers` denies framing of Joy8 pages and supplies the production
   content-type and referrer protections copied into the Cloudflare Pages build.
 

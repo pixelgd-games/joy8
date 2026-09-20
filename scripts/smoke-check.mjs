@@ -14,6 +14,7 @@ const cdpTimeoutMs = 8000
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
 const viteBin = path.join(cwd, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite")
+const smokeEnv = { ...process.env, VITE_FACEBOOK_AUTH_ENABLED: "true" }
 
 let devServer
 let browser
@@ -79,6 +80,7 @@ try {
 function runBuild() {
   const result = spawnSync(npmCmd, ["run", "build"], {
     cwd,
+    env: smokeEnv,
     stdio: "inherit",
     shell: process.platform === "win32",
   })
@@ -138,6 +140,7 @@ function startDevServer(port) {
     "--strictPort",
   ], {
     cwd,
+    env: smokeEnv,
     stdio: ["ignore", "pipe", "pipe"],
     shell: process.platform === "win32",
   })
@@ -407,7 +410,7 @@ async function expectErrorPresentation(client) {
 
 async function expectMemberEntry(client, appPort) {
   await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
-    return text.includes("使用 Google 登入") && text.includes("先以訪客遊玩")
+    return text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩")
   }, "Account entry returns to the Lobby member dialog")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
@@ -418,9 +421,11 @@ async function expectMemberEntry(client, appPort) {
     returnByValue: true,
     expression: `(() => {
       const google = document.getElementById("google-button").getBoundingClientRect()
+      const facebook = document.getElementById("facebook-button").getBoundingClientRect()
       const guest = document.getElementById("guest-button").getBoundingClientRect()
       return document.getElementById("account-title").textContent === "登入 Joy8"
-        && guest.top > google.bottom
+        && facebook.top > google.bottom
+        && guest.top > facebook.bottom
         && document.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
         && !document.getElementById("email-form")
         && !document.getElementById("register-button")
@@ -433,7 +438,7 @@ async function expectMemberEntry(client, appPort) {
     await client.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 })
     const layout = await client.send("Runtime.evaluate", {
       returnByValue: true,
-      expression: `document.documentElement.scrollWidth <= innerWidth && document.getElementById("guest-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 9`,
+      expression: `document.documentElement.scrollWidth <= innerWidth && document.getElementById("facebook-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 9 && document.getElementById("guest-button").getBoundingClientRect().top > document.getElementById("facebook-button").getBoundingClientRect().bottom`,
     })
     if (!layout.result.value) throw new Error(`Member layout failed at ${width}px`)
     if (process.env.SMOKE_MEMBER_SCREENSHOT && width === 390) {
@@ -447,6 +452,9 @@ async function expectMemberEntry(client, appPort) {
     returnByValue: true,
     expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
       memberSupabase.auth.getSession = async () => ({ data: { session: { user: { id: "smoke-guest", is_anonymous: true } } }, error: null })
+      memberSupabase.auth.linkIdentity = async () => ({ data: null, error: { code: "identity_already_exists" } })
+      memberSupabase.auth.signOut = async () => { window.smokeUnexpectedSignout = true; return { data: {}, error: null } }
+      window.confirm = () => { window.smokeConflictPrompt = true; return false }
       Object.defineProperty(memberSupabase, "functions", { value: {
         invoke: async () => ({ data: { member: { player_account_ref: "smoke-player", public_id: "482731", account_type: "guest" } }, error: null })
       } })
@@ -459,16 +467,20 @@ async function expectMemberEntry(client, appPort) {
   await waitForText(client, (text) => text.includes("目前以訪客身分登入") && text.includes("繼續遊玩"), "Persistent guest account UI")
   const guestControls = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
+    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("facebook-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
   })
   if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
+  await client.send("Runtime.evaluate", { expression: 'document.getElementById("facebook-button").click()' })
+  await waitForText(client, (text) => text.includes("已保留目前的訪客帳號"), "Existing Facebook identity cannot consume a guest")
+  const conflict = await client.send("Runtime.evaluate", { returnByValue: true, expression: "Boolean(window.smokeConflictPrompt) && !window.smokeUnexpectedSignout" })
+  if (!conflict.result.value) throw new Error("Provider conflict did not preserve the guest")
   await waitForText(client, (text) => text.includes("Player") && text.includes("482731"), "Public player ID appears in the Lobby header")
-  console.log("OK Google and guest-only member entry, guest upgrade and responsive layout")
+  console.log("OK Google, Facebook and guest member entry, conflict-safe guest upgrade and responsive layout")
 }
 
 async function expectMemberModal(client) {
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("先以訪客遊玩"), "Member dialog opens on the Lobby")
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Member dialog opens on the Lobby")
   const opened = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
@@ -531,7 +543,8 @@ async function expectGameSelection(client, appPort) {
   await client.send("Runtime.evaluate", {
     awaitPromise: true,
     expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
-      memberSupabase.auth.signInWithOAuth = async ({ options }) => {
+      memberSupabase.auth.signInWithOAuth = async ({ provider, options }) => {
+        window.smokeProvider = provider
         window.smokeCallback = options.redirectTo
         return { error: { code: "smoke_provider_disabled" } }
       }
@@ -539,22 +552,23 @@ async function expectGameSelection(client, appPort) {
   })
   for (let index = 0; index < games.length; index++) {
     await client.send("Runtime.evaluate", { expression: `document.querySelectorAll("#gameGrid .game-tile-poster")[${index}].click()` })
-    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
+    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
     const path = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
     if (path.result.value !== "/") throw new Error("Selecting a game removed the Lobby")
-    await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
+    const provider = index % 2 === 0 ? "google" : "facebook"
+    await client.send("Runtime.evaluate", { expression: `document.getElementById("${provider}-button").click()` })
     await waitForText(client, (text) => text.includes("目前無法完成操作"), "Provider fixture stays offline")
-    const target = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
-    if (target.result.value !== games[index].path) throw new Error("Authentication lost the selected game")
+    const target = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ next: new URL(window.smokeCallback).searchParams.get("next"), provider: new URL(window.smokeCallback).searchParams.get("provider"), attempted: window.smokeProvider })' })
+    if (target.result.value.next !== games[index].path || target.result.value.provider !== provider || target.result.value.attempted !== provider) throw new Error("Authentication lost the selected game or provider")
     await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
   }
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && !text.includes("遊玩「"), "Top-bar entry clears previous game choice")
-  await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && !text.includes("遊玩「"), "Top-bar entry clears previous game choice")
+  await client.send("Runtime.evaluate", { expression: 'document.getElementById("facebook-button").click()' })
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
-  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`遊玩「${games[0].name}」`) && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`遊玩「${games[0].name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
@@ -659,7 +673,7 @@ async function expectMemberContinuation(client) {
   if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.captchaRecovered) {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
-  console.log("OK Guest and Google continuation, captcha timeout unlocks controls and permits retry, invalid callbacks and cancelled entry fail closed")
+  console.log("OK Guest and provider continuation, captcha timeout unlocks controls and permits retry, invalid callbacks and cancelled entry fail closed")
 }
 
 async function expectGameIframeSecurity(client) {

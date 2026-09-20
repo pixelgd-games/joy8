@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
+import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, providerLabel, safeReturnPath } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 
 const origin = "https://joy8.example"
@@ -147,20 +147,28 @@ test("unsupported guest locking and Auth failure stop enrollment", async () => {
   assert.deepEqual(f.calls, [])
 })
 
-test("Google upgrades link to the guest and provider conflicts preserve the current session", async () => {
-  const f = fixture(guestUser)
-  assert.equal((await f.service.google()).expectedUserId, guestUser.id)
-  assert.equal(f.calls[0][0], "link")
-  f.client.auth.linkIdentity = async () => ({ error: { code: "identity_already_exists" } })
-  await assert.rejects(f.service.google(), { code: "identity_already_exists" })
-  assert.equal((await f.service.session()).user.id, guestUser.id)
-  assert.equal(f.calls.some(([name]) => name === "signout"), false)
-  const signedOut = fixture()
-  await signedOut.service.google()
-  assert.equal(signedOut.calls[0][0], "oauth")
+test("Google and Facebook link new identities to guests and never replace conflicts", async () => {
+  for (const provider of ["google", "facebook"]) {
+    const f = fixture(guestUser)
+    assert.equal((await f.service.oauth(provider)).expectedUserId, guestUser.id)
+    assert.equal(f.calls[0][0], "link")
+    assert.equal(f.calls[0][1].provider, provider)
+    const callback = new URL(f.calls[0][1].options.redirectTo)
+    assert.equal(callback.searchParams.get("flow"), "link")
+    assert.equal(callback.searchParams.get("provider"), provider)
+    f.client.auth.linkIdentity = async () => ({ error: { code: "identity_already_exists" } })
+    await assert.rejects(f.service.oauth(provider), { code: "identity_already_exists" })
+    assert.equal((await f.service.session()).user.id, guestUser.id)
+    assert.equal(f.calls.some(([name]) => name === "signout"), false)
+    const signedOut = fixture()
+    await signedOut.service.oauth(provider)
+    assert.equal(signedOut.calls[0][0], "oauth")
+    assert.equal(signedOut.calls[0][1].provider, provider)
+  }
+  await assert.rejects(fixture().service.oauth("unknown"), /Unsupported authentication provider/)
 })
 
-test("Google link callbacks require the original guest identity", async () => {
+test("provider link callbacks require the original guest identity", async () => {
   const f = fixture(guestUser)
   assert.equal((await f.service.completeCallback("one-use-code", null, "link")).user.id, guestUser.id)
   await assert.rejects(f.service.completeCallback("another-code", "wrong-user", "link"), { code: "identity_conflict" })
@@ -178,8 +186,11 @@ test("invalid or replayed callbacks cannot enroll or fall back to a new guest", 
   assert.deepEqual(f.calls, [])
 })
 
-test("callback and Google-link errors use safe messages", () => {
-  assert.equal(memberErrorMessage({ code: "identity_already_exists" }), "這個 Google 登入已綁定其他帳號。原本的訪客資料會保留，請勿重複綁定。")
+test("callback and provider-link errors use safe messages", () => {
+  assert.equal(providerLabel("google"), "Google")
+  assert.equal(providerLabel("facebook"), "Facebook")
+  assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "google"), "這個 Google 已綁定其他玩家，不能合併目前的訪客資料。")
+  assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "facebook"), "這個 Facebook 已綁定其他玩家，不能合併目前的訪客資料。")
   assert.equal(memberErrorMessage({ code: "flow_state_not_found" }), "這個驗證連結已使用或已失效，請重新操作。")
 })
 
