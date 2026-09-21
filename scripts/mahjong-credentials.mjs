@@ -20,7 +20,8 @@ begin
     where g.id='${gameId}' and g.slug='mahjong-clash' and not g.published
       and g.launch_url is null and e.enabled and e.entry_origin='http://localhost:5173'
       and e.launch_url='http://localhost:4391/' and p.enabled and w.enabled
-      and w.initial_credit=0 and p.max_entry_amount=1 and p.max_participants=4;
+      and w.initial_credit=0 and p.max_bet_amount=1 and p.max_payout_amount=1
+      and p.max_participants=4 and p.funding_mode='participants';
   if v_game is null or '${expiresAt}'::timestamptz<=now()
     or exists(select 1 from public.joy8_backend_keys where game_id=v_game and (key_hash<>v_hash or revoked_at is not null))
     or not exists(select 1 from pg_roles where rolname='mahjong_clash_runtime' and not rolsuper and not rolbypassrls and not rolcreaterole and not rolcreatedb and not rolinherit) then

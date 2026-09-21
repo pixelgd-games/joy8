@@ -528,18 +528,38 @@ async function expectMemberModal(client) {
 }
 
 async function expectGameSelection(client, appPort) {
+  let syntheticCatalog = false
   const deadline = Date.now() + 12000
   while (Date.now() < deadline) {
-    const count = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'document.querySelectorAll("#gameGrid .game-tile-poster").length' })
-    if (count.result.value >= 2) break
+    const state = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ games: document.querySelectorAll("#gameGrid .game-tile-poster").length, empty: Boolean(document.querySelector("#gameGrid .empty-state")) })' })
+    if (state.result.value.games >= 2 || state.result.value.empty) break
     await sleep(100)
+  }
+  const catalogState = await client.send("Runtime.evaluate", {
+    returnByValue: true,
+    expression: '({ games: document.querySelectorAll("#gameGrid .game-tile-poster").length, title: document.querySelector("#gameGrid .empty-title")?.textContent || "", copy: document.querySelector("#gameGrid .empty-copy")?.textContent || "", error: document.querySelector("#gameGrid .empty-state")?.classList.contains("is-error") || false })',
+  })
+  if (catalogState.result.value.games < 2) {
+    const state = catalogState.result.value
+    if (state.title !== "No games available" || state.copy !== "Published games will appear here." || state.error) {
+      throw new Error(`Empty catalog state failed: ${JSON.stringify(state)}`)
+    }
+    syntheticCatalog = true
+    await client.send("Runtime.evaluate", {
+      awaitPromise: true,
+      expression: `import("/src/pages/lobby/game-grid.js").then(({ renderGameGrid }) => renderGameGrid(document.querySelector("#gameGrid"), [
+        { name: "Smoke Game One", slug: "smoke-game-one", thumbnail: "", type: "arcade" },
+        { name: "Smoke Game Two", slug: "smoke-game-two", thumbnail: "", type: "card" },
+      ]))`,
+    })
+    console.log("OK Empty public catalog")
   }
   const gameLinks = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `[...document.querySelectorAll("#gameGrid .game-tile-poster")].slice(0, 2).map(link => ({ path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent }))`,
   })
   const games = gameLinks.result.value
-  if (games.length < 2) throw new Error("Game selection smoke needs two published catalog entries")
+  if (games.length < 2) throw new Error("Game selection fixture needs two catalog entries")
   await client.send("Runtime.evaluate", {
     awaitPromise: true,
     expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
@@ -568,6 +588,15 @@ async function expectGameSelection(client, appPort) {
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
+  if (syntheticCatalog) {
+    await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("No games available"), "Empty catalog rejects direct game link")
+    const emptyPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
+    if (emptyPath.result.value !== "/") throw new Error("Rejected direct link did not clear the pending game URL")
+    await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
+    await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
+    console.log("OK Game selection, callback destination, cancellation and empty-catalog direct-link rejection")
+    return
+  }
   await expectPageText(client, appPort, games[0].path, (text) => text.includes(`遊玩「${games[0].name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")

@@ -251,6 +251,12 @@ Status: base deployed through the platform migrations and the hosted
 continuous settlement is installed. Every integrated game uses the player's one
 shared POINT wallet. There is no browser payout or legacy Demo path.
 
+The hosted platform includes the Seamless Wallet settlement extension
+`20260921110000_seamless_wallet_settlement.sql`. It separates the bet limit from
+the payout guard and supports platform-funded games without a game-owned point
+account. The migration is installed and locally verified. Product-specific
+policy, credentials and acceptance are still required before a game can use it.
+
 ### Configuration and Credentials
 
 Joy8 selects the shared POINT wallet from trusted `joy8_game_policies` and
@@ -259,6 +265,27 @@ policy, and each player/currency pair has one durable wallet. A wallet cannot be
 replaced by freezing or closing it. A missing or disabled game policy denies launch/open. The replacement
 has one accounting flow; test execution uses isolated local data. Disable a policy
 to pause new activity while retaining durable references for existing matches.
+
+Joy8's wallet model is **Seamless Wallet**: player POINT never moves into a
+separate game wallet. "Shared POINT wallet" only means that all Joy8 games use
+the same Joy8-owned player balance. The current platform has no Transfer Wallet
+deposit, withdrawal, or game-balance reconciliation flow.
+
+The extension adds two internal settlement modes without changing that
+wallet model:
+
+- `participants`: human, product/AI, and fee entries supplied by the game must
+  balance to zero. A reviewed product adapter commits product-owned accounts.
+- `platform`: intended for slots and other player-versus-platform games. The
+  game supplies only player and optional fee results. Joy8 adds the opposite
+  internal `platform` audit entry itself. This entry has no wallet balance and
+  is not a point pool, banker wallet, or game account.
+
+Trusted game policy has separate `max_bet_amount` and `max_payout_amount`
+values. The first limits each player's opening reserve; the second limits the
+absolute size of any settlement entry. Both values and `funding_mode` are
+snapshotted when a match opens, so a later policy edit cannot change an existing
+match.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
@@ -333,8 +360,9 @@ be called: those routes and their database functions are removed.
 
 `product_participants` is optional. There must be at least one human participant;
 the combined count must fit the trusted per-game limit (default 16, maximum 64).
-Reserve the maximum authorized loss, not merely the first action's stake.
-The reserve must be positive and within the configured entry limit. Joy8 checks
+Reserve the maximum authorized loss. For a single-player slot spin, this is the
+spin's total bet. The reserve must be positive and within the configured
+`max_bet_amount`. Product/AI reserves use `max_payout_amount`. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
 wallet can occupy only one open match across all integrated titles. This prevents
 simultaneous games from spending POINT already reserved elsewhere.
@@ -362,11 +390,39 @@ configuration; the current Mahjong identity-only key cannot settle:
 ```
 
 Entries are signed changes, unique by kind/account, nonzero and limited to 65
-entries. Their exact sum must be zero. Omit participants whose change is zero;
+entries. In `participants` mode their exact sum must be zero. In `platform`
+mode the game cannot submit a `platform` entry; Joy8 creates the exact opposite
+audit entry after validating the request. Omit participants whose change is zero;
 an empty list records a draw; `final` determines reservation release. Players and product
 accounts must belong to the opening. Loss cannot exceed the recorded reserve;
-every absolute entry must fit the opening's snapshotted limit. Fee entries are
+every absolute entry must fit the opening's snapshotted `max_payout_amount`.
+Fee entries are
 positive, game-bound and separate from player or AI funding.
+
+For example, a platform-funded slot sends no `product_participants` when opening:
+
+```json
+{
+  "version":1,"match_ref":"spin-123","rule_version":"rules-v1",
+  "participants":[{"session_id":"<UUID>","reserve":"10000.00"}]
+}
+```
+
+If the player loses 1,000 POINT, the game submits only the player's result:
+
+```json
+{
+  "version":1,"match_ref":"spin-123","rule_version":"rules-v1",
+  "operation_key":"spin-123:1","settlement_no":1,"final":true,
+  "entries":[
+    {"kind":"player","account_ref":"<player UUID>","amount":"-1000.00","source":"gameplay"}
+  ]
+}
+```
+
+Joy8 records the player change and an internal `platform` `+1000.00` audit line.
+A player win reverses those signs. The game never receives a Joy8 balance to
+hold and never submits that internal line.
 
 Joy8 validates authority, rules reference, account binding and accounting;
 the game backend and its adapter validate the actual gameplay result. All human

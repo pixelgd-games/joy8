@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-20.
+Last reviewed: 2026-09-21.
 
 ## Status Summary
 
@@ -19,7 +19,8 @@ each product must still implement and verify authoritative gameplay before activ
 ### Operational Accounting and Cutover
 
 - The deployed foundation implements scope, backend authority, reservation,
-  atomic settlement, product adapters and renewal. Browser amount RPCs are removed.
+  atomic settlement, product adapters, renewal, separate bet/payout limits and
+  participant- or platform-funded accounting. Browser amount RPCs are removed.
   Mahjong has verified identity-only configuration and a restricted hosted
   connection; full gameplay/settlement acceptance remains unverified. Passing
   local fixture tests does not authorize funded operation.

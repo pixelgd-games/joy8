@@ -3,7 +3,8 @@ select jsonb_build_object(
   'entry',(select jsonb_build_object('origin',e.entry_origin,'launch_url',e.launch_url,'enabled',e.enabled)
     from public.joy8_private_entries e join public.games g on g.id=e.game_id where g.slug='mahjong-clash'),
   'policy',(select jsonb_build_object('game_enabled',p.enabled,'wallet_enabled',w.enabled,'initial_credit',w.initial_credit,
-    'max_entry_amount',p.max_entry_amount,'max_participants',p.max_participants,'adapter',p.product_adapter::text)
+    'max_bet_amount',p.max_bet_amount,'max_payout_amount',p.max_payout_amount,'max_participants',p.max_participants,
+    'funding_mode',p.funding_mode,'adapter',p.product_adapter::text)
     from public.joy8_game_policies p join public.games g on g.id=p.game_id join public.joy8_wallet_policies w on w.id=p.wallet_policy_id where g.slug='mahjong-clash'),
   'runtime',(select jsonb_build_object('login',rolcanlogin,'superuser',rolsuper,'bypass_rls',rolbypassrls,'inherit',rolinherit,'expires_at',rolvaliduntil)
     from pg_roles where rolname='mahjong_clash_runtime'),

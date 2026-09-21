@@ -41,6 +41,7 @@ before(async () => {
   await db.exec(await readFile('supabase/migrations/20260920150000_mahjong_runtime_balance.sql','utf8'))
   await db.exec(await readFile('supabase/migrations/20260920165000_mahjong_shared_point_wallet.sql','utf8'))
   await db.exec(await readFile('supabase/migrations/20260920170000_shared_point_wallet.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260921110000_seamless_wallet_settlement.sql','utf8'))
   game = (await one("select id from public.games where slug='mahjong-clash'")).id
   user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
   member = (await one('select * from public.joy8_resolve_member($1,true)',[user])).player_account_id
@@ -52,8 +53,10 @@ test('activation keeps catalog hidden, removes player allowlist and creates no f
   assert.equal((await one("select to_regclass('public.joy8_private_players') table_name")).table_name,null)
   for (const table of ['wallet_accounts','wallet_transactions','game_sessions','joy8_backend_keys']) assert.equal(Number((await one(`select count(*) n from public.${table}`)).n),0)
   assert.equal((await one("select rolcanlogin from pg_roles where rolname='mahjong_clash_runtime'")).rolcanlogin,false)
-  const policy = await one('select max_entry_amount,max_participants from public.joy8_game_policies where game_id=$1',[game])
-  assert.equal(Number(policy.max_entry_amount),1)
+  const policy = await one('select max_bet_amount,max_payout_amount,max_participants,funding_mode from public.joy8_game_policies where game_id=$1',[game])
+  assert.equal(Number(policy.max_bet_amount),1)
+  assert.equal(Number(policy.max_payout_amount),1)
+  assert.equal(policy.funding_mode,'participants')
   assert.equal(policy.max_participants,4)
 })
 test('public launch still rejects a hidden game', () => isolated(async () => {
@@ -133,7 +136,7 @@ test('identity-only backend exchanges once, sees zero balance and cannot open a 
 test('published game keeps the public launch contract', () => isolated(async () => {
   const publicGame=(await one("select id from public.games where slug='test-game'")).id
   const policy=(await one('select id from public.joy8_wallet_policies')).id
-  await db.query('insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)',[publicGame,policy])
+  await db.query('insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)',[publicGame,policy])
   const result=await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)",[user])
   assert.equal(result.player_account_id,member)
   assert.equal(result.protocol,'server-v1')

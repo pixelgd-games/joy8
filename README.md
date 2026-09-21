@@ -4,7 +4,7 @@ Joy8 is a lightweight H5 game platform. This repository contains the public Lobb
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-20.
+Last implementation review: 2026-09-21.
 
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
@@ -59,6 +59,14 @@ authority, or public entry yet.
 The [integration contract](docs/platform/GAME_PLATFORM_INTEGRATION.md#continuous-settlement)
 owns the protocol; [Mahjong activation](supabase/drafts/MAHJONG_REVIEW.md) owns
 the remaining configuration gates.
+The public catalog currently contains no published games or Lobby cover assets.
+Mahjong remains a hidden catalog entry reserved for integration testing.
+
+The hosted platform now includes Joy8's generic Seamless Wallet extension. It
+separates each game's bet limit from its payout guard and supports
+player-versus-platform accounting without a game-owned wallet or adapter. No
+product registration, entry, key, or game-specific limit was included in this
+platform deployment.
 
 ## Current Scope
 
@@ -106,6 +114,12 @@ The platform has one deployed server-authorized accounting flow. It removes brow
 refund/close-round routes, their RPCs, automatic Demo credit and the obsolete
 wallet-mode branch. Tests use isolated local data with the same protocol.
 There is no runtime fallback for an unconfigured game.
+
+Joy8's selected industry model is Seamless Wallet. "Shared POINT wallet" means
+one Joy8 player balance is used across Joy8 games; it is not another wallet mode.
+Transfer Wallet deposit/withdraw APIs are not part of the platform. The deployed
+settlement extension can balance a player-versus-platform result with an internal
+audit line, not a second balance or game point pool.
 
 It includes one shared POINT wallet per player, default 0 POINT provisioning, game-scoped backend
 keys, one-time backend exchange, balance-only client tokens, renewal, reservations,
@@ -349,7 +363,8 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 52 local and hosted migration records match, including the Joy8 rebrand,
+All 54 local and hosted migration records match, including the generic Seamless
+Wallet settlement extension and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and
@@ -553,6 +568,14 @@ set as below, `npm run test:continuous-pg` runs the same cases and seven observe
 lock-contention cases on PostgreSQL 17.6 (25 cases total). These tests neither apply
 hosted SQL nor implement Mahjong's durable adapter; the foundational single-posting
 contract remains separately exercised by `test:platform-db`.
+
+`test:seamless-wallet` loads the complete current platform bundle. Its four cases
+verify separate bet/payout limits,
+10,000 POINT opening enforcement, rejection of game-supplied platform entries,
+automatic internal balancing for player wins and losses, exact retry behavior,
+continuous settlement, a separately configured payout guard, and the absence of a
+game-owned wallet or product adapter. It is isolated local verification and does
+not prove hosted migration or game-backend acceptance.
 
 `test:member-pg` runs the same 18 checks plus 15 competing-connection checks
 against a fresh native PostgreSQL 17 cluster. It has passed on PostgreSQL 17.6.

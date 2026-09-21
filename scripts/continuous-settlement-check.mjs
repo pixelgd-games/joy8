@@ -29,6 +29,7 @@ before(async () => {
   }
   await loadPlatformHardening(db)
   await db.exec(await memberSql("../../supabase/migrations/20260920170000_shared_point_wallet.sql"))
+  await db.exec(await memberSql("../../supabase/migrations/20260921110000_seamless_wallet_settlement.sql"))
   await loadProductAccounting(db)
   await db.exec(`
     set role fixture_product_owner;
@@ -76,7 +77,7 @@ before(async () => {
   `)
   game = (await one("select id from public.games where slug='test-game'")).id
   policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,enabled=true returning id")).id
-  await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,5000)", [game, policy])
+  await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,5000,5000)", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
 })
 after(() => db.close())

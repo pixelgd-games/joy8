@@ -121,6 +121,13 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 
 ## Wallet and POINT Direction
 
+- Joy8 uses the industry **Seamless Wallet** model. A player keeps POINT in Joy8;
+  a game asks the trusted Joy8 backend to reserve and settle that balance. Joy8
+  does not transfer a playable balance into a separate game wallet.
+- "Shared wallet" describes Joy8's product behavior: the same player wallet is
+  shared across integrated Joy8 games. It is not a third industry wallet model.
+  A Transfer Wallet deposit/withdraw flow is not implemented or planned for the
+  current platform contract.
 - Joy8 owns human-player wallet authority. Every enrolled player has one POINT
   wallet shared by all integrated games. Trusted Joy8 backend configuration
   resolves it; clients and games cannot select a wallet or change balances directly.
@@ -145,6 +152,9 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 - Preserve transaction source: initial grant, promotional grant, purchase,
   gameplay, fee, and authorized adjustment. AI funding is distinct from human
   purchases and fee revenue. A POINT fee is not itself a cash-revenue report.
+  Internal product/AI or platform balancing records are accounting evidence;
+  they do not create a second player wallet or turn the integration into a
+  Transfer Wallet model.
 - Payment orders, verified payment notifications, duplicate protection, and
   refund/chargeback handling must be designed before purchasing is enabled.
   Purchase timing does not delay the reusable wallet and settlement foundation.
