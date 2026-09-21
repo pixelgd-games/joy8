@@ -4,7 +4,7 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-20. The server-authorized base and continuous
+Current source reviewed: 2026-09-21. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
 function `joy8-gateway` includes private entry, branded entry and the
 settlement-error mappings; the service-only branded-entry resolver is installed.
@@ -66,6 +66,21 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | Game-specific save data | Provides a platform adapter when applicable | Owns the payload |
 
 Do not modify a game repository from a Joy8 repository task. Switch to the named game repository for game-side changes.
+
+## Official SDK and Provider Kit
+
+Joy8 supplies two maintained integration artifacts in this repository:
+
+- [`@joy8/game-sdk`](../../packages/joy8-game-sdk/README.md), with separate
+  browser and trusted-server entry points.
+- The [third-party integration kit](../../integrations/third-party/README.md),
+  including a non-secret game profile, concise API reference, examples, an
+  acceptance checklist and an independent-AI handoff template.
+
+Until a registry release is approved, Joy8 distributes a versioned npm tarball
+built from this repository. The SDK validates and maps the current contract; it
+does not own gameplay state, invent match references, retry financial requests
+automatically or replace this authoritative wire specification.
 
 ## Joy8 Launch Flow
 
@@ -295,12 +310,20 @@ authorizes one game; no request can select another game or wallet. Origin
 checks are additional protection, not proof of identity. Products never receive
 the project service-role key or direct platform table grants.
 
-Provision keys only during reviewed product activation. Generate them with a
-cryptographically secure random source, deliver the plaintext only to the
-product backend's secret store, and retain only the hash in Joy8. For rotation,
-provision a replacement with the same reviewed scope, update the backend,
-verify it, then revoke the old key. Revoke a compromised key immediately;
-replacement credentials must retain access to status/retry for existing matches.
+Before provider implementation begins, Joy8 creates a hidden integration record
+with its non-secret Game ID and a restricted, expiring test Backend Key. Generate
+the key with a cryptographically secure random source, deliver the plaintext once
+through a secure channel to the provider backend operator, and retain only its
+hash in Joy8. The provider installs it in its own backend secret manager; Joy8
+does not edit or deploy the third party's frontend or backend. No self-service
+credential UI is required for the initial workflow.
+
+A test key enables only the reviewed private integration work. It does not
+publish a catalog entry or authorize public release. Before release, review the
+production URLs, policy, action scope and expiry, then either rotate to a
+production key or explicitly approve the existing key. Revoke every obsolete or
+compromised key. Replacement credentials must retain status/retry access for
+existing matches.
 
 All routes below use POST and a 16 KiB body limit. Admission limits and their
 deployment boundary are defined in the security section below. Unknown request fields are rejected. Amounts are decimal
@@ -727,6 +750,16 @@ Database operation rules and the current schema summary are in `../../README.md`
 
 The platform fixture verifies the protocol, not a product's actual gameplay or
 hosted integration. Complete the owning product's integration before activation.
+
+Before provider implementation:
+
+1. Complete the non-secret game profile, rule version, wallet policy, URLs and
+   exact parent origins.
+2. Create the hidden Game ID and restricted, expiring test Backend Key.
+3. Deliver the Game ID, SDK/contract and Backend Key at integration kickoff;
+   keep the key outside chat, source control and browser code.
+4. The provider implements and tests its own game and backend, then supplies a
+   private build and checklist evidence to Joy8.
 
 Before listing a game through the Joy8 Lobby:
 

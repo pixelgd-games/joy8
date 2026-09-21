@@ -249,6 +249,13 @@ Public-ID checks cover stable allocation and service-role-only profile
 resolution. Hosted guest-to-provider linking, Facebook sign-in, cross-browser guest continuity and
 production load remain unverified.
 
+The repository now has a tested `@joy8/game-sdk` source package and third-party
+handoff kit. The npm registry release, secure delivery of a real provider test
+key and an independently implemented end-to-end game acceptance have not yet
+been completed. The current onboarding process therefore uses a reviewed manual
+one-time secret handoff; a self-service credential portal is not required for
+the initial workflow.
+
 Not fully automated:
 
 - Loader success from session creation through a real game iframe.

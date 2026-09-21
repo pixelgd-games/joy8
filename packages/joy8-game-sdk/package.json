@@ -1,0 +1,35 @@
+{
+  "name": "@joy8/game-sdk",
+  "version": "1.0.0",
+  "description": "Official browser and server SDK for Joy8 server-v1 game integrations.",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js"
+    },
+    "./browser": {
+      "types": "./browser.d.ts",
+      "import": "./browser.js"
+    },
+    "./server": {
+      "types": "./server.d.ts",
+      "import": "./server.js"
+    }
+  },
+  "files": [
+    "*.js",
+    "*.d.ts",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "UNLICENSED"
+}

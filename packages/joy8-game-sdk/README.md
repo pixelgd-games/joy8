@@ -1,0 +1,131 @@
+# @joy8/game-sdk
+
+Official Joy8 SDK for third-party `server-v1` game integrations.
+
+The SDK has two trust boundaries:
+
+- `@joy8/game-sdk/browser` receives the in-memory launch handoff and reads the
+  balance with a short-lived Gateway token.
+- `@joy8/game-sdk/server` uses the game-specific Backend Key for exchange,
+  renewal, match opening, settlement, status and cancellation.
+
+Never import the server client into a browser build. Never expose
+`JOY8_BACKEND_KEY` to the game client, a URL, logs, analytics or source control.
+
+The authoritative protocol is
+[`docs/platform/GAME_PLATFORM_INTEGRATION.md`](../../docs/platform/GAME_PLATFORM_INTEGRATION.md).
+
+## Installation
+
+Until the package is published to a registry, Joy8 supplies a versioned npm
+tarball with the integration kit:
+
+```bash
+npm install ./joy8-game-sdk-1.0.0.tgz
+```
+
+Joy8 builds the tarball with:
+
+```bash
+npm pack ./packages/joy8-game-sdk
+```
+
+## Browser handoff
+
+Install the listener before loading the game runtime. The function rejects
+legacy URL credentials, wildcard parent origins, another Game ID, another
+Gateway URL, malformed launch fields and timeout. It never falls back to Local.
+
+```js
+import { receiveJoy8Launch } from "@joy8/game-sdk/browser"
+
+const launch = await receiveJoy8Launch({
+  parentOrigins: ["https://joy8.cc", "https://www.joy8.cc"],
+  expectedGameId: import.meta.env.VITE_JOY8_GAME_ID,
+  gatewayUrl: import.meta.env.VITE_JOY8_GATEWAY_URL,
+})
+
+const response = await fetch("/api/joy8/exchange", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ launchCode: launch.joy8_launch_code }),
+})
+```
+
+The game must authenticate its own `/api/joy8/exchange` endpoint and return only
+the player session fields needed by its client. Do not return the Backend Key.
+
+To read available POINT after the backend returns the short-lived balance token:
+
+```js
+import { getJoy8Balance } from "@joy8/game-sdk/browser"
+
+const balance = await getJoy8Balance({
+  gatewayUrl: launch.joy8_gateway_url,
+  gatewayToken,
+})
+```
+
+Keep both the launch code and Gateway token in memory only.
+
+## Server client
+
+```js
+import { Joy8ServerClient } from "@joy8/game-sdk/server"
+
+const joy8 = new Joy8ServerClient({
+  gatewayUrl: process.env.JOY8_GATEWAY_URL,
+  gameId: process.env.JOY8_GAME_ID,
+  backendKey: process.env.JOY8_BACKEND_KEY,
+})
+
+const session = await joy8.exchangeLaunchCode({ launchCode })
+```
+
+Open a single-player platform-funded spin:
+
+```js
+await joy8.openMatch({
+  matchRef: spin.id,
+  ruleVersion: process.env.JOY8_RULE_VERSION,
+  participants: [{ sessionId: session.sessionId, reserve: "100.00" }],
+})
+```
+
+Settle a player loss:
+
+```js
+await joy8.settleMatch({
+  matchRef: spin.id,
+  ruleVersion: process.env.JOY8_RULE_VERSION,
+  operationKey: `${spin.id}:settlement:1`,
+  settlementNo: 1,
+  final: true,
+  entries: [{
+    kind: "player",
+    accountRef: session.playerAccountRef,
+    amount: "-100.00",
+    source: "gameplay",
+  }],
+})
+```
+
+The SDK does not generate match references, operation keys or gameplay results.
+Those values must come from the game's durable authoritative backend state.
+It also does not retry financial requests automatically. After an uncertain
+response, call `getMatchStatus` and retry the exact same operation key and body.
+
+Continuous settlement uses increasing `settlementNo` values. Set `final:false`
+until the final result, then use `final:true`. Exact retries keep the same number,
+operation key and request body.
+
+## Errors
+
+`Joy8ApiError` exposes:
+
+- `code`: stable Joy8 error code when available.
+- `status`: HTTP status.
+- `requestId`: `X-Joy8-Request-Id` for support correlation.
+- `retryAfterSeconds`: rate-limit delay when supplied.
+
+The SDK never includes the Backend Key in error messages.

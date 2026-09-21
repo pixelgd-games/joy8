@@ -69,6 +69,14 @@ product registration, entry, key, or game-specific limit was included in this
 platform deployment. A follow-up platform constraint caps every configured game
 at a 10,000 POINT maximum bet while allowing lower per-game limits.
 
+The repository now includes the installable `@joy8/game-sdk` source and a
+third-party integration kit. They separate browser launch/balance handling from
+trusted backend exchange and financial operations, define the secure kickoff
+handoff, and include examples, an API reference, acceptance checks and an AI
+handoff template. Local SDK contract and package-content tests pass. The package
+has not yet been published to a registry, and no independent provider build has
+completed end-to-end private acceptance with it.
+
 ## Current Scope
 
 Joy8 currently provides:
@@ -87,6 +95,8 @@ Joy8 currently provides:
 - Google OAuth for game administration, with server-side administrator verification.
 - CRUD pages for the `games` catalog.
 - A Supabase Edge Function for trusted game backend authorization, the shared POINT wallet, atomic settlement and runtime rate limits.
+- An installable Browser/Server SDK and third-party self-integration kit for the
+  `server-v1` contract.
 - Cloudflare Pages static deployment from the `main` branch.
 - PWA metadata and install support for the Lobby.
 
@@ -101,6 +111,7 @@ Joy8 does not currently provide:
 - Full analytics, dashboards, or unattended alerting.
 - A game runtime or game-specific business logic.
 - CrazyGames integration inside this repository.
+- A published SDK registry release or a completed independent third-party SDK acceptance.
 
 See [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md) for the H5 release,
 both product models, operational POINT direction, and platform -> product ->
@@ -446,6 +457,7 @@ npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:platform-db
 npm run test:continuous-db
+npm run test:sdk
 node --test scripts/private-entry-check.mjs
 node --test scripts/branded-entry-check.mjs
 node --test scripts/player-cleanup-check.mjs
@@ -464,6 +476,13 @@ SQL and matching Gateway function are deployed. Hosted health/rejection checks
 and a verified backend admission counter passed without creating gameplay data.
 The authoritative limits and rollout boundary are in
 `docs/platform/GAME_PLATFORM_INTEGRATION.md`.
+
+`test:sdk` exercises the public Browser and Server SDK surfaces, all six trusted
+backend operations, exact launch validation, safe error handling, Backend Key
+encapsulation, npm package contents and the credential-free third-party kit. It
+uses mocks and a dry-run package build; it does not call the hosted Gateway or
+replace a real provider acceptance. Build a distributable tarball with
+`npm run pack:sdk` only when preparing a reviewed handoff.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
 hardening, then applies the product and platform shared-wallet migrations. It verifies

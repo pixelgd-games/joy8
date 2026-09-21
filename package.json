@@ -30,6 +30,8 @@
     "test:platform-pg": "node scripts/platform-postgres-check.mjs",
     "test:continuous-db": "node --test scripts/continuous-settlement-check.mjs",
     "test:seamless-wallet": "node --test scripts/seamless-wallet-check.mjs",
+    "test:sdk": "node --test scripts/sdk-check.mjs",
+    "pack:sdk": "npm pack ./packages/joy8-game-sdk",
     "test:continuous-pg": "node scripts/continuous-postgres-check.mjs",
     "test:gateway": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/gateway-unit-check.mjs",
     "test:gateway-rate": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test scripts/gateway-rate-limit-check.mjs",
