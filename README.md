@@ -66,7 +66,8 @@ The hosted platform now includes Joy8's generic Seamless Wallet extension. It
 separates each game's bet limit from its payout guard and supports
 player-versus-platform accounting without a game-owned wallet or adapter. No
 product registration, entry, key, or game-specific limit was included in this
-platform deployment.
+platform deployment. A follow-up platform constraint caps every configured game
+at a 10,000 POINT maximum bet while allowing lower per-game limits.
 
 ## Current Scope
 
@@ -363,8 +364,8 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 54 local and hosted migration records match, including the generic Seamless
-Wallet settlement extension and the Joy8 rebrand,
+All 55 local and hosted migration records match, including the generic Seamless
+Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
 the removal of the empty test-player allowlist, read-only membership lookup and

@@ -31,7 +31,8 @@
     "20260920160000_scoped_gateway_limits.sql",
     "20260920170000_shared_point_wallet.sql",
     "20260920180000_branded_game_entry.sql",
-    "20260921110000_seamless_wallet_settlement.sql"
+    "20260921110000_seamless_wallet_settlement.sql",
+    "20260921112000_cap_game_bets_at_10000.sql"
   ],
   "drafts": [],
   "excluded": {

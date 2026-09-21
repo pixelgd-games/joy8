@@ -285,7 +285,8 @@ Trusted game policy has separate `max_bet_amount` and `max_payout_amount`
 values. The first limits each player's opening reserve; the second limits the
 absolute size of any settlement entry. Both values and `funding_mode` are
 snapshotted when a match opens, so a later policy edit cannot change an existing
-match.
+match. Joy8 also enforces a platform-wide maximum bet of **10,000 POINT**;
+individual games may use a lower limit but cannot configure a higher one.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256

@@ -35,6 +35,14 @@ async function rpc(name, body) {
   }
 }
 const denied = (promise, code) => assert.rejects(promise, error => error.message.includes(code))
+async function deniedQuery(sql, values, code) {
+  await db.exec("savepoint denied_query")
+  try {
+    await denied(db.query(sql, values), code)
+  } finally {
+    await db.exec("rollback to savepoint denied_query; release savepoint denied_query")
+  }
+}
 
 async function ready() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
@@ -84,6 +92,7 @@ describe("seamless wallet platform settlement", () => {
     assert.equal(saved.max_payout_amount, "1000000.00")
     assert.equal(saved.funding_mode, "platform")
     assert.deepEqual(saved.product_participants, [])
+    await deniedQuery("update public.joy8_game_policies set max_bet_amount=10000.01 where game_id=$1", [game], "joy8_game_policies_max_bet_cap_check")
   })
 
   test("platform-funded games reject product reserves and game-supplied platform entries", async () => {
