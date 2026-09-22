@@ -311,12 +311,25 @@ checks are additional protection, not proof of identity. Products never receive
 the project service-role key or direct platform table grants.
 
 Before provider implementation begins, Joy8 creates a hidden integration record
-with its non-secret Game ID and a restricted, expiring test Backend Key. Generate
-the key with a cryptographically secure random source, deliver the plaintext once
-through a secure channel to the provider backend operator, and retain only its
-hash in Joy8. The provider installs it in its own backend secret manager; Joy8
-does not edit or deploy the third party's frontend or backend. No self-service
-credential UI is required for the initial workflow.
+with its non-secret Game ID and a restricted, expiring test Backend Key. The
+authoritative operator path is `npm run key:backend`: it uses a cryptographically
+secure random source, registers only the SHA-256 hash in Joy8, and passes the
+plaintext through standard input directly to an explicitly named Cloudflare
+Worker secret. The plaintext is never a command argument, profile value,
+temporary SQL value or terminal result. The command verifies the linked Joy8
+project before each database operation, requires an enabled POINT policy and
+refuses a published game. Cloudflare installation deploys immediately. If
+delivery fails, the new database key is revoked; rotation installs the new key
+before revoking the specifically selected old key.
+
+This direct path is used only when the operator is authorized for the provider
+backend. An external provider receives the same platform-generated value through
+an approved one-time secret channel and installs it in its own secret manager;
+chat, email and source control are not secret channels. A provider-generated
+value is invalid unless Joy8 separately registers its hash, so the normal
+contract keeps key generation under Joy8. Joy8 does not edit the provider's
+frontend or source repository. No self-service credential UI is required for
+the initial workflow.
 
 A test key enables only the reviewed private integration work. It does not
 publish a catalog entry or authorize public release. Before release, review the

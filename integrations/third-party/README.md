@@ -34,10 +34,54 @@ Joy8 records only its hash. The provider stores the plaintext in its own backend
 secret manager under `JOY8_BACKEND_KEY`. No frontend developer, browser bundle,
 URL, repository, log or analytics system receives it.
 
-No credential portal is required for the initial workflow. Joy8 may provision
-the credential manually, but delivery must still be one-time and secure. After
-acceptance, Joy8 either rotates to a production key or explicitly approves the
-existing key and then revokes every obsolete test key.
+No credential portal is required for the initial workflow. The Joy8 operator
+tool generates the credential, registers only its SHA-256 hash in Joy8 and sends
+the plaintext through standard input directly to an authorized Cloudflare
+Worker secret. It never prints the plaintext or writes it to a profile, command
+argument or temporary SQL file. A provider must not invent its own key because
+an unregistered value cannot authenticate. When Joy8 does not control the
+provider's Cloudflare environment, use an approved one-time secret channel
+instead of chat, email or source control. After acceptance, Joy8 either rotates
+to a production key or explicitly approves the existing key and then revokes
+every obsolete test key.
+
+## Platform operator flow
+
+Copy the non-secret examples to ignored local files, fill the reviewed values,
+and keep the game profile separate from the delivery target:
+
+```text
+integrations/third-party/integration-profile.local.json
+integrations/third-party/backend-key-delivery.local.json
+```
+
+Review without creating a key or changing remote state:
+
+```powershell
+npm run key:backend -- plan --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json
+```
+
+After the hidden game, enabled wallet policy, expiry, scope, Worker name and
+Cloudflare account are independently reviewed, perform the operation:
+
+```powershell
+npm run key:backend -- provision --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --apply
+```
+
+The command first verifies that `Joy8 / lsazydefvnuqglultqii` is the linked
+Supabase project. It then registers only the hash and deploys the secret to the
+named Worker. A delivery failure revokes the new database record. Rotation
+installs the replacement before revoking the specifically named old key:
+
+```powershell
+npm run key:backend -- rotate --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --old-key-id 00000000-0000-4000-8000-000000000000 --apply
+npm run key:backend -- status --profile integrations/third-party/integration-profile.local.json
+npm run key:backend -- revoke --profile integrations/third-party/integration-profile.local.json --key-id 00000000-0000-4000-8000-000000000000 --apply
+```
+
+Cloudflare secret installation deploys the Worker immediately. The target
+backend must have its own local Wrangler dependency and an already-authenticated
+operator session. The tool refuses to download or run an unpinned Wrangler.
 
 ## What the provider returns
 
@@ -68,6 +112,8 @@ existing key and then revokes every obsolete test key.
 ## Files
 
 - `integration-profile.example.json`: non-secret configuration template.
+- `profiles/monster-lab.json`: reviewed non-secret Monster Lab profile.
+- `backend-key-delivery.example.json`: non-secret Cloudflare delivery target.
 - `manifest.json`: kit, SDK and protocol versions plus entry documents.
 - `server.env.example`: backend environment-variable names; never add values to Git.
 - `API.md`: concise Browser and Server SDK method reference.

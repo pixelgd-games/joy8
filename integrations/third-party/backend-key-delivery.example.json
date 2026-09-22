@@ -1,0 +1,9 @@
+{
+  "type": "cloudflare-worker",
+  "secretName": "JOY8_BACKEND_KEY",
+  "workerName": "example-game-api",
+  "cwd": "D:/absolute/path/to/provider-backend",
+  "deployMode": "immediate",
+  "environment": null,
+  "config": null
+}

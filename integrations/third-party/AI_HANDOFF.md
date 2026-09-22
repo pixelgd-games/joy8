@@ -34,4 +34,6 @@ configuration.
 
 The provider must replace the example profile with the reviewed non-secret
 `integration-profile.json`. Credential delivery remains a separate secure
-operator action.
+operator action. The game-side AI must not generate a replacement value: Joy8's
+operator tool creates the key, registers its hash and installs the plaintext in
+the authorized backend secret environment before this handoff begins.

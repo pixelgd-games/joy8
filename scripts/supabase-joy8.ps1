@@ -69,18 +69,35 @@ if ($SupabaseArgs.Count -eq 0) {
 $isProjectsList = $SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "projects" -and $SupabaseArgs[1] -eq "list"
 
 if (!$isProjectsList) {
-  $projectList = & npx.cmd supabase --workdir $Root projects list 2>&1
+  $projectList = & npx.cmd supabase --workdir $Root projects list --output json 2>&1
 
   if ($LASTEXITCODE -ne 0) {
     $projectList | Write-Output
     exit $LASTEXITCODE
   }
 
-  $projectListText = $projectList -join "`n"
+  try {
+    $projects = ($projectList -join "`n") | ConvertFrom-Json
+  } catch {
+    Stop-Joy8Supabase "Could not parse the Supabase project list. Stop before running command."
+  }
 
-  if ($projectListText -notmatch [regex]::Escape($ProjectName) -or $projectListText -notmatch [regex]::Escape($ProjectRef)) {
+  $joy8Project = $projects | Where-Object {
+    ($_.id -eq $ProjectRef -or $_.ref -eq $ProjectRef) -and $_.name -eq $ProjectName -and $_.linked -eq $true
+  }
+
+  if ($null -eq $joy8Project) {
     Stop-Joy8Supabase "Supabase token does not show Joy8 / $ProjectRef. Stop before running command."
   }
+}
+
+$isDbQuery = $SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "db" -and $SupabaseArgs[1] -eq "query"
+
+if ($isDbQuery) {
+  if ([string]::IsNullOrWhiteSpace($env:SUPABASE_DB_PASSWORD)) {
+    Stop-Joy8Supabase "Missing SUPABASE_DB_PASSWORD in .env.supabase.local."
+  }
+  $env:PGPASSWORD = $env:SUPABASE_DB_PASSWORD
 }
 
 & npx.cmd supabase --workdir $Root @SupabaseArgs

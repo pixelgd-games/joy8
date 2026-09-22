@@ -4,7 +4,7 @@ Joy8 is a lightweight H5 game platform. This repository contains the public Lobb
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-21.
+Last implementation review: 2026-09-22.
 
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
@@ -60,14 +60,18 @@ The [integration contract](docs/platform/GAME_PLATFORM_INTEGRATION.md#continuous
 owns the protocol; [Mahjong activation](supabase/drafts/MAHJONG_REVIEW.md) owns
 the remaining configuration gates.
 The public catalog currently contains no published games or Lobby cover assets.
-Mahjong remains a hidden catalog entry reserved for integration testing.
+Mahjong and Monster Lab remain hidden catalog entries reserved for integration
+testing.
 
 The hosted platform now includes Joy8's generic Seamless Wallet extension. It
 separates each game's bet limit from its payout guard and supports
-player-versus-platform accounting without a game-owned wallet or adapter. No
-product registration, entry, key, or game-specific limit was included in this
-platform deployment. A follow-up platform constraint caps every configured game
-at a 10,000 POINT maximum bet while allowing lower per-game limits.
+player-versus-platform accounting without a game-owned wallet or adapter. A
+follow-up platform constraint caps every configured game at a 10,000 POINT
+maximum bet while allowing lower game-selected bets. Monster Lab now has the
+hidden Game ID `9f0df218-a0fd-40bc-a018-151fd7a1d996`, an enabled private entry,
+platform funding, one participant, a 10,000 POINT platform bet ceiling and a
+1,000,000 POINT payout guard. It remains unpublished and has no Backend Key;
+its current hosted game build is not a completed Joy8 integration.
 
 The repository now includes the installable `@joy8/game-sdk` source and a
 third-party integration kit. They separate browser launch/balance handling from
@@ -483,6 +487,15 @@ encapsulation, npm package contents and the credential-free third-party kit. It
 uses mocks and a dry-run package build; it does not call the hosted Gateway or
 replace a real provider acceptance. Build a distributable tarball with
 `npm run pack:sdk` only when preparing a reviewed handoff.
+
+`test:backend-key` verifies the platform credential operator without contacting
+Supabase or Cloudflare. `npm run key:backend -- plan ...` validates the non-secret
+profile and Cloudflare target without generating a key or changing remote state.
+The explicit `provision`, `rotate` and `revoke` operations require `--apply`.
+They verify the linked Joy8 project, store only a SHA-256 hash, pipe the plaintext
+only to the target backend's local Wrangler process and never print it. The full
+operator commands and local file names are documented in
+`integrations/third-party/README.md`.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
 hardening, then applies the product and platform shared-wallet migrations. It verifies

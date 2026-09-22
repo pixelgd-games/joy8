@@ -7,6 +7,11 @@
     "version": "1.0.0"
   },
   "startHere": "README.md",
+  "integrationProfile": "integration-profile.example.json",
+  "backendKeyDelivery": "backend-key-delivery.example.json",
+  "profiles": [
+    "profiles/monster-lab.json"
+  ],
   "apiReference": "API.md",
   "acceptanceChecklist": "ACCEPTANCE.md",
   "aiHandoff": "AI_HANDOFF.md"

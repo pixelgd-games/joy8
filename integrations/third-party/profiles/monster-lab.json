@@ -1,27 +1,26 @@
 {
   "game": {
-    "name": "Example Game",
-    "slug": "example-game",
-    "gameId": "00000000-0000-4000-8000-000000000000",
-    "gameUrl": "https://game.example/client/",
-    "backendUrl": "https://api.game.example/"
+    "name": "Monster Lab",
+    "slug": "monster-lab",
+    "gameId": "9f0df218-a0fd-40bc-a018-151fd7a1d996",
+    "gameUrl": "https://monster-lab-7aj.pages.dev/client/",
+    "backendUrl": "https://monster-lab-api.pixelgd-games.workers.dev"
   },
   "platform": {
     "protocol": "server-v1",
     "currency": "POINT",
     "gatewayUrl": "https://lsazydefvnuqglultqii.supabase.co/functions/v1/joy8-gateway",
     "parentOrigins": [
-      "https://joy8.cc",
-      "https://www.joy8.cc"
+      "https://joy8.cc"
     ]
   },
   "rules": {
-    "ruleVersion": "example-rules-v1",
+    "ruleVersion": "monster-lab-rules-v1",
     "fundingMode": "platform",
     "maxBetAmount": "10000.00",
     "maxPayoutAmount": "1000000.00",
     "maxParticipants": 1,
-    "continuousSettlement": false
+    "continuousSettlement": true
   },
   "credential": {
     "purpose": "private-integration",
@@ -35,6 +34,6 @@
       "cancel"
     ],
     "delivery": "secure-one-time",
-    "expiresAt": "YYYY-MM-DDTHH:mm:ssZ"
+    "expiresAt": "2026-10-05T15:59:59Z"
   }
 }
