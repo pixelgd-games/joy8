@@ -33,7 +33,8 @@
     "20260920180000_branded_game_entry.sql",
     "20260921110000_seamless_wallet_settlement.sql",
     "20260921112000_cap_game_bets_at_10000.sql",
-    "20260921120000_register_monster_lab_private_integration.sql"
+    "20260921120000_register_monster_lab_private_integration.sql",
+    "20260923100000_full_balance_reservations.sql"
   ],
   "drafts": [],
   "excluded": {
@@ -60,6 +61,7 @@
     "20260920130000_clear_prelaunch_player_data.sql": "Guarded deletion of hosted Auth/player rows must never run in fixtures.",
     "20260920150000_mahjong_runtime_balance.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current runtime SQL.",
     "20260920165000_mahjong_shared_point_wallet.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current product SQL.",
-    "20260921100000_remove_incompatible_catalog_games.sql": "Guarded cleanup of hosted catalog rows."
+    "20260921100000_remove_incompatible_catalog_games.sql": "Guarded cleanup of hosted catalog rows.",
+    "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games."
   }
 }

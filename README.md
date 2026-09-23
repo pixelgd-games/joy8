@@ -4,7 +4,7 @@ Joy8 is a lightweight H5 game platform. This repository contains the public Lobb
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-22.
+Last implementation review: 2026-09-23.
 
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
@@ -66,9 +66,10 @@ testing.
 The hosted platform now includes Joy8's generic Seamless Wallet extension. It
 separates each game's bet limit from its payout guard and supports
 player-versus-platform accounting without a game-owned wallet or adapter. A
-follow-up platform constraint caps every configured game at a 10,000 POINT
-maximum bet while allowing lower game-selected bets. Monster Lab now has the
-hidden Game ID `9f0df218-a0fd-40bc-a018-151fd7a1d996`, an enabled private entry,
+follow-up platform constraint keeps `max_bet_amount` at or below 10,000 POINT;
+capped openings enforce that bet limit while table reservations use a separate
+mode. Monster Lab now has the hidden Game ID
+`9f0df218-a0fd-40bc-a018-151fd7a1d996`, an enabled private entry,
 platform funding, one participant, a 10,000 POINT platform bet ceiling and a
 1,000,000 POINT payout guard. It remains unpublished and has no Backend Key;
 its current hosted game build is not a completed Joy8 integration.
@@ -80,6 +81,11 @@ handoff, and include examples, an API reference, acceptance checks and an AI
 handoff template. Local SDK contract and package-content tests pass. The package
 has not yet been published to a registry, and no independent provider build has
 completed end-to-end private acceptance with it.
+
+The hosted reservation policy separates a Slot-sized opening bet from a table's
+full-wallet reservation. Capped openings retain the 10,000 POINT limit; Mahjong
+uses full-balance mode with its existing 1-POINT identity-only guard. Its
+financial key scopes and funded-play acceptance remain separate decisions.
 
 ## Current Scope
 
@@ -602,9 +608,10 @@ lock-contention cases on PostgreSQL 17.6 (25 cases total). These tests neither a
 hosted SQL nor implement Mahjong's durable adapter; the foundational single-posting
 contract remains separately exercised by `test:platform-db`.
 
-`test:seamless-wallet` loads the complete current platform bundle. Its four cases
+`test:seamless-wallet` loads the complete current platform bundle. Its five cases
 verify separate bet/payout limits,
-10,000 POINT opening enforcement, rejection of game-supplied platform entries,
+10,000 POINT capped opening enforcement, full-balance table reservation above that
+Slot bet ceiling, rejection of game-supplied platform entries,
 automatic internal balancing for player wins and losses, exact retry behavior,
 continuous settlement, a separately configured payout guard, and the absence of a
 game-owned wallet or product adapter. It is isolated local verification and does

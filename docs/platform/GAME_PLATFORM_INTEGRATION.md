@@ -4,11 +4,12 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-21. The server-authorized base and continuous
+Current source reviewed: 2026-09-23. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
 function `joy8-gateway` includes private entry, branded entry and the
 settlement-error mappings; the service-only branded-entry resolver is installed.
 The current product protocol is `server-v1`.
+The full-balance table reservation policy is installed in the hosted database.
 See [README.md](../../README.md) for verification and product-activation limits.
 There is no
 old/new compatibility path in the replacement. Existing game clients must adopt
@@ -297,11 +298,23 @@ wallet model:
   is not a point pool, banker wallet, or game account.
 
 Trusted game policy has separate `max_bet_amount` and `max_payout_amount`
-values. The first limits each player's opening reserve; the second limits the
+values. The first limits a capped opening reserve; the second limits the
 absolute size of any settlement entry. Both values and `funding_mode` are
 snapshotted when a match opens, so a later policy edit cannot change an existing
-match. Joy8 also enforces a platform-wide maximum bet of **10,000 POINT**;
-individual games may use a lower limit but cannot configure a higher one.
+match. The database constrains
+`max_bet_amount` to **10,000 POINT** for every policy. The product rule assigns
+that single-bet ceiling to Slot games.
+
+The reservation policy separates capped openings from a full-wallet table
+reservation. A trusted game policy may use `reservation_mode='full_balance'`
+only with participant funding and a
+product adapter. Joy8 then requires each human reserve to equal that wallet's
+entire available balance while holding the wallet lock. An optional
+`max_reserve_amount` can retain a temporary product guard. The default `capped`
+mode continues to enforce `max_bet_amount`, including the 10,000 POINT Slot bet
+ceiling. Mahjong selects `full_balance` but retains a 1-POINT reserve guard and
+its exchange/renew-only key; funded play remains
+inactive.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
@@ -398,11 +411,14 @@ be called: those routes and their database functions are removed.
 `product_participants` is optional. There must be at least one human participant;
 the combined count must fit the trusted per-game limit (default 16, maximum 64).
 Reserve the maximum authorized loss. For a single-player slot spin, this is the
-spin's total bet. The reserve must be positive and within the configured
+spin's total bet. A capped reserve must be positive and within the configured
 `max_bet_amount`. Product/AI reserves use `max_payout_amount`. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
 wallet can occupy only one open match across all integrated titles. This prevents
 simultaneous games from spending POINT already reserved elsewhere.
+In full-balance mode, a configured table game instead reserves the exact
+available wallet balance, subject to its separate reserve guard. Slot
+openings continue to use the capped rule.
 The opening locks funds without moving the balance. Its response is
 `{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
 current state; changing the opening under the same game/match reference conflicts.

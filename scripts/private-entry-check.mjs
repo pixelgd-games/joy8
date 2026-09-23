@@ -42,6 +42,9 @@ before(async () => {
   await db.exec(await readFile('supabase/migrations/20260920165000_mahjong_shared_point_wallet.sql','utf8'))
   await db.exec(await readFile('supabase/migrations/20260920170000_shared_point_wallet.sql','utf8'))
   await db.exec(await readFile('supabase/migrations/20260921110000_seamless_wallet_settlement.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260921112000_cap_game_bets_at_10000.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260923100000_full_balance_reservations.sql','utf8'))
+  await db.exec(await readFile('supabase/migrations/20260923101000_mahjong_full_balance_policy.sql','utf8'))
   game = (await one("select id from public.games where slug='mahjong-clash'")).id
   user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
   member = (await one('select * from public.joy8_resolve_member($1,true)',[user])).player_account_id
@@ -53,11 +56,13 @@ test('activation keeps catalog hidden, removes player allowlist and creates no f
   assert.equal((await one("select to_regclass('public.joy8_private_players') table_name")).table_name,null)
   for (const table of ['wallet_accounts','wallet_transactions','game_sessions','joy8_backend_keys']) assert.equal(Number((await one(`select count(*) n from public.${table}`)).n),0)
   assert.equal((await one("select rolcanlogin from pg_roles where rolname='mahjong_clash_runtime'")).rolcanlogin,false)
-  const policy = await one('select max_bet_amount,max_payout_amount,max_participants,funding_mode from public.joy8_game_policies where game_id=$1',[game])
+  const policy = await one('select max_bet_amount,max_payout_amount,max_participants,funding_mode,reservation_mode,max_reserve_amount from public.joy8_game_policies where game_id=$1',[game])
   assert.equal(Number(policy.max_bet_amount),1)
   assert.equal(Number(policy.max_payout_amount),1)
   assert.equal(policy.funding_mode,'participants')
   assert.equal(policy.max_participants,4)
+  assert.equal(policy.reservation_mode,'full_balance')
+  assert.equal(Number(policy.max_reserve_amount),1)
 })
 test('public launch still rejects a hidden game', () => isolated(async () => {
   await denied(()=>one("select * from public.create_game_session('mahjong-clash','POINT',3600,null,$1)",[user]),/game is not available/)

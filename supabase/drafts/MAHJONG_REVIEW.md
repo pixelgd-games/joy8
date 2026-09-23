@@ -66,6 +66,11 @@ The player allowlist is removed. Use normal Joy8 sign-in or persistent guest
 entry; administrator access does not substitute for player enrollment. No human
 wallet, session, match, AI account or point credit was created by these migrations.
 
+The hosted full-balance reservation policy moves this temporary 1-POINT guard
+to a separate `max_reserve_amount` policy field. The Slot 10,000 POINT bet
+ceiling remains separate from Mahjong's table reservation. Funded limits and
+financial key scopes still require another review.
+
 ## Shared POINT wallet cutover review
 
 The 2026-09-20 read-only hosted preflight found two player accounts and exactly

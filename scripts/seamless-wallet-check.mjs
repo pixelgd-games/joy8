@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { after, afterEach, before, beforeEach, describe, test } from "node:test"
 import { buildPlatformBundle } from "./fixtures/platform-bundle.mjs"
+import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -12,6 +13,7 @@ let game
 before(async () => {
   const bundle = await buildPlatformBundle()
   for (const source of bundle.sources) await db.exec(source.sql)
+  await loadProductAccounting(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,enabled=true returning id")).id
   await db.query(`insert into public.joy8_game_policies(
@@ -93,6 +95,28 @@ describe("seamless wallet platform settlement", () => {
     assert.equal(saved.funding_mode, "platform")
     assert.deepEqual(saved.product_participants, [])
     await deniedQuery("update public.joy8_game_policies set max_bet_amount=10000.01 where game_id=$1", [game], "joy8_game_policies_max_bet_cap_check")
+  })
+
+  test("full-balance tables reserve the entire available wallet without the slot bet cap", async () => {
+    await deniedQuery("update public.joy8_game_policies set reservation_mode='full_balance' where game_id=$1", [game], "joy8_game_policies_reservation_config_check")
+    await db.query(`update public.joy8_game_policies
+      set funding_mode='participants',product_adapter='fixture_product.accounting(text,uuid,jsonb)'::regprocedure,
+        reservation_mode='full_balance',max_participants=2
+      where game_id=$1`, [game])
+    const player = await ready()
+    await denied(rpc("joy8_open_match_v1", opening(player, "10000.00")), "JOY8_INVALID_AMOUNT")
+    await denied(rpc("joy8_open_match_v1", opening(player, "20000.01")), "JOY8_INSUFFICIENT_BALANCE")
+    await db.query("update public.joy8_game_policies set max_reserve_amount=1 where game_id=$1", [game])
+    await denied(rpc("joy8_open_match_v1", opening(player, "20000.00")), "JOY8_LIMIT_EXCEEDED")
+    await db.query("update public.joy8_game_policies set max_reserve_amount=null where game_id=$1", [game])
+    const body = opening(player, "20000.00", {
+      product_participants: [{ account_ref: "bot-1", reserve: "100.00" }],
+    })
+    assert.equal((await rpc("joy8_open_match_v1", body)).state, "open")
+    const saved = await one("select reservation_mode,max_reserve_amount from public.joy8_matches where game_id=$1 and match_ref=$2", [game, body.match_ref])
+    assert.deepEqual(saved, { reservation_mode: "full_balance", max_reserve_amount: null })
+    assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [player.wallet_account_id])).locked_balance, "20000.00")
+    await denied(rpc("joy8_open_match_v1", opening(player, "20000.00")), "JOY8_WALLET_OCCUPIED")
   })
 
   test("platform-funded games reject product reserves and game-supplied platform entries", async () => {

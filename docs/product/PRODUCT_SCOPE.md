@@ -2,7 +2,7 @@
 
 This document defines what Joy8 is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-20.
+Last reviewed: 2026-09-23.
 
 ## Product Definition
 
@@ -133,8 +133,10 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   resolves it; clients and games cannot select a wallet or change balances directly.
 - Points granted, won, reserved, or spent in any integrated game affect that one
   balance. There is no per-game promotional balance and no cross-game transfer.
-- The platform-wide maximum bet is **10,000 POINT**. Each game policy may set a
-  lower maximum; payout guards remain separately reviewed per game and rule set.
+- Slot games have a **10,000 POINT** maximum single bet. Each Slot policy may set a
+  lower limit. A table game may reserve a player's available wallet balance for
+  an entire match; that reservation is not a single Slot bet. Table reservation
+  rules and payout guards require separate game-specific review.
 - Initial credit is granted at most once per player, not once per title.
   Operational wallets currently start at **0 POINT**.
   Any later opening grant or product-specific amount needs a separate decision.

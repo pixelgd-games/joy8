@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-21.
+Last reviewed: 2026-09-23.
 
 ## Status Summary
 
@@ -50,6 +50,10 @@ Real sign-in/game acceptance and funded-play policy/key
 scopes remain incomplete. The test page ships with Joy8, but Mahjong entry is
 configured only for localhost and its public release is not activated.
 See [the activation review](../../supabase/drafts/MAHJONG_REVIEW.md).
+
+The hosted opening rule separates the 10,000 POINT capped bet from a table's
+full-wallet reservation. Mahjong selects full-balance mode but retains its
+1-POINT identity-only guard. Funded-play configuration remains pending.
 
 Mahjong's economy operations lock one singleton `economy_state` row, serializing
 those operations across matches. Measure hosted capacity before funded or public
