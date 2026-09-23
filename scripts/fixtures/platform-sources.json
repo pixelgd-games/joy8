@@ -62,6 +62,7 @@
     "20260920150000_mahjong_runtime_balance.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current runtime SQL.",
     "20260920165000_mahjong_shared_point_wallet.sql": "Product-owned forward upgrade; fresh Mahjong fixtures install its current product SQL.",
     "20260921100000_remove_incompatible_catalog_games.sql": "Guarded cleanup of hosted catalog rows.",
-    "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games."
+    "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games.",
+    "20260923110000_mahjong_processed_actions_history_limit.sql": "Product-owned processed-action constraint; retained as applied deployment history and excluded from the platform-only fixture."
   }
 }

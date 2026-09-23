@@ -1,4 +1,3 @@
-const siteKey = "0x4AAAAAAE83bygZg6FXRvCp"
 const SCRIPT_TIMEOUT_MS = 15000
 const CHALLENGE_TIMEOUT_MS = 45000
 
@@ -38,7 +37,7 @@ function loadTurnstile() {
   return scriptPromise
 }
 
-export function createMemberCaptcha(root) {
+export function createMemberCaptcha(root, siteKey = import.meta.env?.VITE_TURNSTILE_SITE_KEY) {
   const container = root.querySelector("#member-captcha")
   let active
   let disposed = false
@@ -61,6 +60,7 @@ export function createMemberCaptcha(root) {
   return {
     token() {
       if (disposed) return Promise.reject(captchaError("captcha_unavailable"))
+      if (!siteKey) return Promise.reject(captchaError("captcha_unavailable"))
       if (active) return active.promise
       const attempt = {}
       attempt.promise = new Promise((resolve, reject) => {

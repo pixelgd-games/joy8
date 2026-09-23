@@ -49,8 +49,8 @@ export async function initLobbyPage(appRoot) {
     renderGameGridError(gameGrid)
     showErrorModal({
       code: ERROR_CODES.LOBBY_GAMES_READ_FAILED,
-      title: "Game list failed to load",
-      message: "We could not load the public games right now. Please try again later or contact an administrator.",
+      title: "遊戲列表讀取失敗",
+      message: "目前無法載入遊戲列表，請稍後再試或聯絡管理員。",
       error,
     })
   }

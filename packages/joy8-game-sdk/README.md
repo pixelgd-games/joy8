@@ -20,6 +20,10 @@ The authoritative protocol is
 Until the package is published to a registry, Joy8 supplies a versioned npm
 tarball with the integration kit:
 
+The package is marked `private: true` to prevent an accidental registry release.
+Local `npm pack` remains supported. Licensing and registry publication require
+an explicit decision; `UNLICENSED` does not grant third-party redistribution rights.
+
 ```bash
 npm install ./joy8-game-sdk-1.0.0.tgz
 ```

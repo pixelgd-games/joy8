@@ -25,77 +25,69 @@ export function createGameIframe({ gameUrl, gameName, onLoad }) {
   return iframe
 }
 
-export function mountGameFrame({
-  gameRoot,
-  gameUrl,
-  gameName,
-  launch,
-  timeoutMs,
-  onLoad,
-  onTimeout,
-}) {
+export function mountGameFrame({ gameRoot, gameUrl, gameName, launch = null, deferredLaunch = false, timeoutMs = 30000, onLoad, onTimeout, onMessage }) {
   let loaded = false
-  let finished = false
-  let timeoutId = 0
-  let launchPayload = launch ? { ...launch } : null
-  const iframe = createGameIframe({
-    gameUrl,
-    gameName,
-    onLoad: () => {
-      if (finished) return
-      loaded = true
-      complete()
-    },
-  })
+  let ready = false
+  let completed = false
+  let stopped = false
+  let delivered = false
+  let launchPayload = launch
+  let timeoutId
+  const iframe = createGameIframe({ gameUrl, gameName, onLoad: () => { loaded = true; complete() } })
   const gameOrigin = new URL(gameUrl, location.origin).origin
-  const expectedMessageOrigin = gameOrigin === location.origin ? "null" : gameOrigin
+  const expectedOrigin = gameOrigin === location.origin ? "null" : gameOrigin
   const targetOrigin = gameOrigin === location.origin ? "*" : gameOrigin
-  const clearLaunch = () => {
+  function dispose() {
+    stopped = true
     launchPayload = null
-    window.removeEventListener("message", deliverLaunch)
-  }
-  const complete = () => {
-    if (finished || !loaded || launchPayload) return
-    finished = true
     window.clearTimeout(timeoutId)
-    onLoad?.()
+    window.removeEventListener("message", receive)
   }
-  const fail = (reason) => {
-    if (finished) return
-    finished = true
-    window.clearTimeout(timeoutId)
-    clearLaunch()
+  function fail(reason) {
+    if (stopped) return
+    dispose()
     iframe.remove()
     onTimeout?.(reason)
   }
-  const deliverLaunch = (event) => {
-    if (!launchPayload
-      || event.source !== iframe.contentWindow
-      || event.origin !== expectedMessageOrigin
-      || event.data?.type !== JOY8_LAUNCH_READY_TYPE
-      || event.data?.protocol !== "server-v1") return
-
+  function complete() {
+    if (stopped || completed || !loaded || !ready || (!deferredLaunch && !delivered)) return
+    completed = true
+    window.clearTimeout(timeoutId)
+    onLoad?.()
+  }
+  function sendMessage(payload) {
+    if (stopped || !iframe.contentWindow) return false
+    iframe.contentWindow.postMessage(payload, targetOrigin)
+    return true
+  }
+  function sendLaunch(payload) {
+    if (stopped || delivered || launchPayload && payload !== launchPayload) return false
+    launchPayload = payload
+    if (!ready) return true
     try {
-      if (!iframe.contentWindow) throw new Error("Game frame is unavailable")
-      iframe.contentWindow.postMessage({
-        type: JOY8_LAUNCH_MESSAGE_TYPE,
-        launch: launchPayload,
-      }, targetOrigin)
+      if (!sendMessage({ type: JOY8_LAUNCH_MESSAGE_TYPE, launch: launchPayload })) throw new Error("Game frame unavailable")
+      delivered = true
+      launchPayload = null
+      window.removeEventListener("message", receive)
+      complete()
+      return true
     } catch {
       fail("handshake")
-      return
+      return false
     }
-    clearLaunch()
-    complete()
   }
-
-  if (launchPayload) {
-    window.addEventListener("message", deliverLaunch)
+  function receive(event) {
+    if (stopped || event.source !== iframe.contentWindow || event.origin !== expectedOrigin) return
+    if (event.data?.type === JOY8_LAUNCH_READY_TYPE && event.data.protocol === "server-v1") {
+      ready = true
+      if (launchPayload) sendLaunch(launchPayload)
+      complete()
+    } else if (deferredLaunch && !delivered) onMessage?.(event.data)
   }
+  window.addEventListener("message", receive)
   timeoutId = window.setTimeout(() => fail(loaded ? "handshake" : "load"), timeoutMs)
-
   gameRoot.append(iframe)
-  return iframe
+  return { iframe, sendLaunch, sendMessage, dispose }
 }
 
 function getSandboxTokens(gameUrl) {

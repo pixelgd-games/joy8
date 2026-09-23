@@ -32,7 +32,7 @@ assert.match(brandedConfig.game_id, /^[0-9a-f-]{36}$/)
 assert.ok(brandedConfig.game_name)
 assert.equal(brandedConfig.launch_url, "http://localhost:4391/")
 assert.equal(brandedConfig.protocol, "server-v1")
-assert.equal((await post("branded-session", { slug: "mahjong-clash" }, "http://localhost:5173")).status, 401)
+assert.equal((await post("branded-session", { slug: "mahjong-clash" }, "http://localhost:5173")).status, 404)
 for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
   assert.equal((await post(route)).status, 404, route + " must be removed")
 }

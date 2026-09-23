@@ -1,3 +1,5 @@
+import { GAME_SLUG_PATTERN, isLoopbackHostname } from "../../packages/joy8-game-sdk/policy.js"
+
 const ROOT_RELATIVE_PATH = /^\/(?!\/)/
 const HTTP_URL = /^https?:\/\//i
 
@@ -31,7 +33,7 @@ export function normalizeLaunchUrl(rawValue) {
 export function normalizeCoverPath(rawValue, slug) {
   const value = String(rawValue || "").trim()
   const normalizedSlug = String(slug || "").trim()
-  if (!value || !/^[a-z0-9-]+$/.test(normalizedSlug)) return ""
+  if (!value || !GAME_SLUG_PATTERN.test(normalizedSlug)) return ""
 
   const expected = `/games/${normalizedSlug}/cover.webp`
   return value === expected ? expected : ""
@@ -50,12 +52,4 @@ function isLocalDevelopmentUrl(url) {
   } catch {
     return false
   }
-}
-
-function isLoopbackHostname(hostname) {
-  return hostname === "localhost"
-    || hostname.endsWith(".localhost")
-    || hostname === "[::1]"
-    || hostname === "::1"
-    || /^127(?:\.\d{1,3}){3}$/.test(hostname)
 }

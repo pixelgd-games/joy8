@@ -13,7 +13,7 @@ export const ERROR_CODES = Object.freeze({
   ADMIN_AUTH_READ_FAILED: "JOY8-ADMIN-001",
   ADMIN_NOT_ALLOWED: "JOY8-ADMIN-002",
   ADMIN_GAMES_READ_FAILED: "JOY8-ADMIN-003",
-  ADMIN_DELETE_FAILED: "JOY8-ADMIN-004",
+  ADMIN_UNPUBLISH_FAILED: "JOY8-ADMIN-004",
   ADMIN_GAME_READ_FAILED: "JOY8-ADMIN-005",
   ADMIN_GAME_NOT_FOUND: "JOY8-ADMIN-006",
   ADMIN_GAME_SAVE_FAILED: "JOY8-ADMIN-007",
@@ -30,11 +30,7 @@ let activeCleanup = null
 export function showErrorModal(options = {}) {
   const config = normalizeOptions(options)
 
-  if (config.error) {
-    console.error(`[${config.code}] ${config.title}`, config.error)
-  } else {
-    console.warn(`[${config.code}] ${config.title}: ${config.message}`)
-  }
+  console.warn(`[${config.code}] ${config.title}`)
 
   closeErrorModal()
 
@@ -52,7 +48,7 @@ export function showErrorModal(options = {}) {
 
   const kicker = document.createElement("p")
   kicker.className = "joy8-error-kicker"
-  kicker.textContent = "ERROR"
+  kicker.textContent = "發生錯誤"
 
   const title = document.createElement("h2")
   title.id = "joy8-error-title"
@@ -66,7 +62,7 @@ export function showErrorModal(options = {}) {
 
   const code = document.createElement("p")
   code.className = "joy8-error-code"
-  code.textContent = `Error code: ${config.code}`
+  code.textContent = `錯誤代碼：${config.code}`
 
   const actions = document.createElement("div")
   actions.className = "joy8-error-actions"
@@ -75,12 +71,12 @@ export function showErrorModal(options = {}) {
     actions.append(createActionButton(config.primaryAction, "primary"))
   } else if (config.reload !== false) {
     actions.append(createActionButton({
-      label: "Reload",
+      label: "重新整理",
       onClick: () => location.reload(),
     }, "primary"))
   }
 
-  actions.append(createActionButton({ label: "Close" }))
+  actions.append(createActionButton({ label: "關閉" }))
 
   dialog.append(kicker, title, message, code, actions)
   modal.append(dialog)
@@ -122,8 +118,8 @@ function closeErrorModal() {
 function normalizeOptions(options) {
   return {
     code: options.code || "JOY8-UNKNOWN-000",
-    title: options.title || "Something went wrong",
-    message: options.message || "The system is having trouble right now. Please try again later.",
+    title: options.title || "目前無法完成操作",
+    message: options.message || "系統暫時無法使用，請稍後再試。",
     error: options.error,
     reload: options.reload,
     primaryAction: options.primaryAction,
@@ -134,7 +130,7 @@ function createActionButton(action, modifier = "") {
   const button = document.createElement("button")
   button.type = "button"
   button.className = modifier ? `joy8-error-action ${modifier}` : "joy8-error-action"
-  button.textContent = action.label || "OK"
+  button.textContent = action.label || "確定"
   button.addEventListener("click", () => {
     closeErrorModal()
     action.onClick?.()

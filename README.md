@@ -6,6 +6,26 @@ This file is the source of truth for the repository's current implementation. Pr
 
 Last implementation review: 2026-09-23.
 
+### Local changes awaiting release
+
+The working implementation shares Auth callbacks/conflict handling and iframe
+handoff across entry surfaces. `/game/` and `/play-test/` have separate bootstraps
+and one Loader; `/entry/` adds game artwork and uses the same `private-session`
+route. The redundant `branded-session` route and route-less session fallback are
+removed. `create-session` accepts only `slug`. Frontend and Gateway must be released
+together; these changes are not yet deployed. No old/new runtime is retained.
+
+Turnstile now requires `VITE_TURNSTILE_SITE_KEY` at build time and fails closed
+when missing. Configure the existing production public site key before release;
+use a separate local/test key for local builds. Never use a test key in production.
+
+Security SQL proposals are in [the release review](supabase/drafts/README.md#release-safety-review).
+They have not been applied. Hosted inspection confirms enabled hidden entries for
+Mahjong (`http://localhost:5173`) and Monster Lab (`https://joy8.cc`), no open
+matches and no active financial backend keys. Hidden status and Origin checks do
+not restrict entry to selected testers. Current deployed admin authorization
+matches JWT email; its replacement is part of the pending review.
+
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
 server-authorized wallet/settlement flow.
@@ -22,9 +42,10 @@ The member migrations, four platform foundation migrations, session-scope
 correction, Joy8 object rebrand, read-only member lookup, public-ID allocation
 and product-schema registration are applied; the hosted `joy8-gateway` is active with the `server-v1`
 product protocol.
-The matching front end is released through main. Cloudflare Turnstile protects
+The earlier member-entry frontend is released through main; the changes listed
+above remain local. Cloudflare Turnstile protects
 anonymous Auth entry; real Google sign-in and guest entry passed hosted
-acceptance. Public Email/password entry is disabled. Cloudflare Email Sending is
+acceptance. Public Email/password UI is absent; the hosted Email provider and API signup are still enabled (see Hosted Auth Configuration). Cloudflare Email Sending is
 disabled, its two SMTP credentials were deleted, and the Workers Paid
 subscription was canceled. Guest-to-Google linking and cross-browser guest
 continuity remain outstanding.
@@ -46,9 +67,10 @@ per-player test allowlist. The hosted `joy8-gateway` is active with the private
 session route and continuous-settlement error mapping. Hosted health, rejection
 and identity-key scope checks passed. The test-entry page is part of the standard
 Cloudflare front-end build, but Mahjong's backend entry remains bound to localhost;
-publishing this page does not publish or enable the Mahjong game. See the
+the page is publicly reachable and a forged Origin can reach the hidden session
+issuer. This is not a tester authorization boundary. See the
 [identity connection review](supabase/drafts/MAHJONG_REVIEW.md#identity-only-connection).
-The repository now also contains a Mahjong-branded `/entry/?slug=mahjong-clash`
+The repository now also contains a generic game-branded `/entry/?slug=mahjong-clash`
 shell. It loads the game-owned login artwork first, keeps Google/guest Auth in
 the Joy8 parent, and delivers only the one-use launch payload to the iframe.
 The service-only resolver migration and matching Gateway routes are installed in
@@ -103,7 +125,7 @@ Joy8 currently provides:
 - A stable six-digit public player ID displayed as `Player 123456`, separate
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
-- CRUD pages for the `games` catalog.
+- Catalog creation, editing, publishing and unpublishing; the UI preserves records instead of hard-deleting games.
 - A Supabase Edge Function for trusted game backend authorization, the shared POINT wallet, atomic settlement and runtime rate limits.
 - An installable Browser/Server SDK and third-party self-integration kit for the
   `server-v1` contract.
@@ -112,7 +134,7 @@ Joy8 currently provides:
 
 Joy8 does not currently provide:
 
-- Public Email/password signup, sign-in, verification, or recovery.
+- Public Email/password UI. Hosted API signup remains enabled until the reviewed Auth configuration change is applied.
 - Hosted Facebook sign-in; its repository client and unpublished Meta app exist,
   but Meta verification/review, Supabase provider configuration and acceptance
   remain pending.
@@ -168,7 +190,7 @@ Browser
   └─ Game Loader
        ├─ published entry: public_games_v1 + Gateway create-session
        ├─ test entry: Gateway private-session + backend entry configuration
-       ├─ branded entry: Gateway branded-entry/branded-session + backend entry configuration
+       ├─ branded entry: Gateway branded-entry/private-session + backend entry configuration
        └─ game iframe
             ├─ Gateway balance (in-memory balance token, if supplied)
             └─ game backend (one-use launch exchange and financial requests)
@@ -177,7 +199,7 @@ Browser
 ```
 
 The front end is a Vite multi-page application written in vanilla JavaScript and
-CSS. Admin/catalog use the existing Supabase client. Member entry and launch use
+CSS. Admin uses its Auth client; public catalog reads use a non-persistent client with no administrator session. Member entry and launch use
 a separate PKCE client with storage key `joy8-member-auth-v1`; Auth session
 storage is platform-owned and never passed into games. The Gateway is the only
 public path to protected player, game-session, and wallet RPCs. Separate browser
@@ -258,7 +280,7 @@ The responsive Lobby uses four columns on touch devices with a low-height landsc
    and opens the member dialog. Backend failures stop launch visibly.
 2. It loads the matching published game from `public_games_v1`.
 3. It normalizes `launch_url` as an HTTPS URL or a root-relative platform path. HTTP is accepted only between loopback hosts during local development.
-4. It calls `joy8-gateway/create-session`.
+4. It calls `joy8-gateway/create-session` with only the game slug.
 5. It creates the iframe from the catalog URL without putting launch credentials in that URL.
 6. The game announces its Joy8 Client from an approved parent origin, then the
    Loader delivers the session parameters once through an origin-checked in-memory message.
@@ -325,8 +347,7 @@ The front end does not write player, wallet, match, settlement, or session table
 
 The hosted `joy8-gateway` implements these POST routes:
 
-- member, enroll-member, create-session, private-session, branded-entry,
-  branded-session, balance, health.
+- member, enroll-member, create-session, private-session, branded-entry, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1.
 
@@ -385,7 +406,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-All 55 local and hosted migration records match, including the generic Seamless
+The 59 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
 Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
@@ -411,6 +432,7 @@ Requirements:
 ```dotenv
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
+VITE_TURNSTILE_SITE_KEY=...
 ```
 
 After Meta business verification/review, Supabase configuration and acceptance, add
@@ -465,6 +487,7 @@ npm run test:platform-bundle
 npm run test:mahjong-balance
 npm run test:session-scope
 npm run test:ledger-cleanup
+npm run test:release-safety
 npm run test:platform-db
 npm run test:continuous-db
 npm run test:sdk
@@ -497,11 +520,20 @@ replace a real provider acceptance. Build a distributable tarball with
 `test:backend-key` verifies the platform credential operator without contacting
 Supabase or Cloudflare. `npm run key:backend -- plan ...` validates the non-secret
 profile and Cloudflare target without generating a key or changing remote state.
-The explicit `provision`, `rotate` and `revoke` operations require `--apply`.
+The explicit `provision`, `rotate` and `revoke` operations require a matching
+`--reviewed-plan` file and `--apply`, after user approval. Published games use
+production rotation; the replacement cannot expand the old key's scopes.
 They verify the linked Joy8 project, store only a SHA-256 hash, pipe the plaintext
 only to the target backend's local Wrangler process and never print it. The full
 operator commands and local file names are documented in
 `integrations/third-party/README.md`.
+
+`test:release-safety` exercises the pending quota, administrator, entry-pause and
+operator-recovery SQL against the current platform bundle. It tests cumulative
+payouts, retries, shared quota reservations, role restrictions, evidence, retained
+settlements, adapter rollback and cleanup without releasing occupied funds.
+PostgreSQL 17 adds competing connections contending for the last payout quota.
+Local cleanup tests do not install pg_cron or prove a hosted job ran.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
 hardening, then applies the product and platform shared-wallet migrations. It verifies
@@ -720,7 +752,7 @@ Verified in the Joy8 dashboard on 2026-09-20 using the user-authorized Chrome
 session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 `lsazydefvnuqglultqii`:
 
-- The public member UI uses Google and anonymous Auth only. It exposes no
+- The public member UI uses Google and anonymous Auth only. A fresh public Auth settings read reports `external.email=true`, `disable_signup=false`, and `mailer_autoconfirm=false`: Email API signup is enabled and requires verification. UI absence and disabled SMTP are not an Auth-provider restriction. The reviewed release action is to disable the Email provider while preserving Google and anonymous signup. It exposes no
   Email/password signup, sign-in, verification, or recovery action.
 - Facebook remains disabled in hosted Auth. The unpublished Joy8 Meta app exists,
   but business verification/review, Supabase provider configuration and real
@@ -763,7 +795,7 @@ It does not establish that the CLI now has configuration read/write access.
   preserving the path, query, and fragment.
 - Build command: `npm run build`.
 - Output directory: `dist`.
-- Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
+- Required production variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY`.
 - Set `VITE_FACEBOOK_AUTH_ENABLED=true` only after the hosted Facebook provider
   and its conflict-safe sign-in/linking flow pass acceptance. Omit it otherwise.
 - `public/_headers` denies framing of Joy8 pages and supplies the production

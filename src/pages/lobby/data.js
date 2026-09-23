@@ -1,4 +1,4 @@
-import { supabase } from "../../lib/supabaseClient.js"
+import { catalogSupabase as supabase } from "../../lib/catalogClient.js"
 
 const PUBLIC_GAME_FIELDS = "slug, name, type, thumbnail"
 

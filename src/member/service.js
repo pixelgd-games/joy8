@@ -1,3 +1,5 @@
+import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/policy.js"
+
 export function safeReturnPath(value, origin) {
   try {
     const url = new URL(value || "/", origin)
@@ -5,7 +7,7 @@ export function safeReturnPath(value, origin) {
     if (url.pathname === "/" && !url.search) return "/"
     if (!["/game/", "/play-test/", "/entry/"].includes(url.pathname)) return "/"
     const slug = url.searchParams.get("slug")
-    if (!/^[a-z0-9-]{1,80}$/.test(slug || "")) return "/"
+    if (!GAME_SLUG_PATTERN.test(slug || "")) return "/"
     return `${url.pathname}?slug=${encodeURIComponent(slug)}`
   } catch {
     return "/"
@@ -50,6 +52,7 @@ export function memberErrorMessage(error, provider) {
     verification_required: "目前的登入身分無法通過驗證，請重新登入。",
     guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 或 Facebook。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
+    registered_session: "目前已登入正式帳號，請使用 Google 繼續啟用玩家身分。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
     flow_state_not_found: "這個驗證連結已使用或已失效，請重新操作。",
     flow_state_expired: "這個驗證連結已失效，請重新操作。",
@@ -70,6 +73,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     if (!(await session())) return null
     const result = await client.functions.invoke(`joy8-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
     if (result.error) {
+      if (result.error.context?.status === 429) throw Object.assign(new Error("Member request rate limited"), { code: "Too many requests", context: result.error.context })
       let code = "member_unavailable"
       try {
         const body = await result.error.context?.json()
@@ -89,7 +93,9 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
   async function guest(captchaToken) {
     if (!guestLock) throw Object.assign(new Error("Web Locks unavailable"), { code: "guest_lock_unavailable" })
     return guestLock(async () => {
-      if (!(await session())) checked(await client.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined))
+      const current = await session()
+      if (current && !current.user?.is_anonymous) throw Object.assign(new Error("Registered session cannot enter as guest"), { code: "registered_session" })
+      if (!current) checked(await client.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined))
       return membership(true)
     })
   }
@@ -126,5 +132,16 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  return { session, membership, guest, oauth, completeCallback, signOut, returnPath }
+  async function switchGuestProvider(provider, expectedUserId, confirmSwitch) {
+    checkedProvider(provider)
+    const current = await session()
+    if (!current?.user?.is_anonymous || !expectedUserId || current.user.id !== expectedUserId) {
+      throw Object.assign(new Error("Original guest identity unavailable"), { code: "identity_conflict" })
+    }
+    if (!await confirmSwitch()) return null
+    await signOut()
+    return oauth(provider)
+  }
+
+  return { session, membership, guest, oauth, completeCallback, signOut, switchGuestProvider, returnPath }
 }

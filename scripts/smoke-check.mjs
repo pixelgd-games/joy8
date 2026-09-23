@@ -14,7 +14,7 @@ const cdpTimeoutMs = 8000
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
 const viteBin = path.join(cwd, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite")
-const smokeEnv = { ...process.env, VITE_FACEBOOK_AUTH_ENABLED: "true" }
+const smokeEnv = { ...process.env, VITE_FACEBOOK_AUTH_ENABLED: "true", VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA" }
 
 let devServer
 let browser
@@ -40,9 +40,9 @@ try {
   await expectPageText(client, appPort, "/", (text) => {
     const normalizedText = text.toLowerCase()
     return normalizedText.includes("joy8")
-      && normalizedText.includes("game list")
-      && normalizedText.includes("featured games")
-      && !normalizedText.includes("game list failed to load")
+      && normalizedText.includes("遊戲列表")
+      && normalizedText.includes("精選遊戲")
+      && !normalizedText.includes("遊戲列表讀取失敗")
   }, "Home loads")
 
   await expectMemberModal(client)
@@ -356,7 +356,7 @@ async function expectPrivateEntry(client, appPort) {
       document.getElementById("private-start").click()
     })`,
   })
-  await waitForText(client, text => text.includes("目前無法進入測試，請稍後再試。"), "Test entry failure remains recoverable")
+  await waitForText(client, text => text.includes("目前無法載入遊戲，請稍後再試。"), "Test entry failure remains recoverable")
   const denied = await client.send("Runtime.evaluate", { returnByValue:true, expression:'document.querySelectorAll("iframe").length===0 && !document.getElementById("private-start").disabled' })
   if (!denied.result.value) throw new Error("Private denial mounted a game or blocked retry")
   await client.send("Runtime.evaluate", { expression:`window.privateTimer=window.setTimeout;
@@ -541,7 +541,7 @@ async function expectGameSelection(client, appPort) {
   })
   if (catalogState.result.value.games < 2) {
     const state = catalogState.result.value
-    if (state.title !== "No games available" || state.copy !== "Published games will appear here." || state.error) {
+    if (state.title !== "目前沒有開放的遊戲" || state.copy !== "遊戲上架後會顯示在這裡。" || state.error) {
       throw new Error(`Empty catalog state failed: ${JSON.stringify(state)}`)
     }
     syntheticCatalog = true
@@ -589,7 +589,7 @@ async function expectGameSelection(client, appPort) {
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
   if (syntheticCatalog) {
-    await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("No games available"), "Empty catalog rejects direct game link")
+    await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("目前沒有開放的遊戲"), "Empty catalog rejects direct game link")
     const emptyPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
     if (emptyPath.result.value !== "/") throw new Error("Rejected direct link did not clear the pending game URL")
     await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })

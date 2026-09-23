@@ -1,62 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>Edit Game</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>編輯遊戲</title>
 </head>
 
 <body>
-
-<h1>Edit Game</h1>
-
-<p id="loading">Loading...</p>
-
-<form id="gameForm">
-
-<input id="name" placeholder="Game Name" required />
-<br><br>
-
-<input id="slug" placeholder="slug (folder name)" required />
-<br><br>
-
-<input id="thumbnail" placeholder="thumbnail url" />
-<br><br>
-
-<select id="type">
-<option value="slot">slot</option>
-<option value="fish">fish</option>
-<option value="card">card</option>
-<option value="arcade">arcade</option>
-<option value="casual">casual</option>
-<option value="adult">adult</option>
-</select>
-
-<br><br>
-
-<input id="launch_url" placeholder="launch url (https://... or /game/...)" />
-<br><br>
-
-<input id="sort_order" type="number" step="1" placeholder="sort order" />
-<br><br>
-
-<label>
-<input type="checkbox" id="supports_live">
-supports live
-</label>
-
-<br><br>
-
-<label>
-<input type="checkbox" id="published">
-published
-</label>
-
-<br><br>
-
-<button type="submit">Update Game</button>
-
-</form>
-
+<div id="admin-form"></div>
 <script type="module" src="/src/admin/game-form.js"></script>
 
 </body>

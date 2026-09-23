@@ -17,6 +17,20 @@ this protocol in their own repositories before activation.
 
 ## Core Rule
 
+Repository entry cleanup removes `branded-session` and route-less session
+creation; both branded and explicit test entry call `private-session`.
+The frontend and Gateway changes await coordinated release. Hosted origin bindings
+and the pending safety migrations are tracked in README and `supabase/drafts/README.md`.
+
+The current `server-v1` contract still asserts `wallet_scope: platform` and the
+read-only `balance` token scope. These are fixed authority checks, not selectable
+wallet modes or fallback behavior. Removing them would change the game-facing
+protocol and requires coordinated game-repository work. The service-only database
+session issuer still has its historical currency, expiry and display-name
+parameters; Gateway supplies fixed POINT, 3600 seconds and null. They are not
+accepted from the browser. Database signature/column removal remains a separate
+reviewed migration; applied SQL history is never rewritten for cleanup.
+
 A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
 
 A game must never:
@@ -118,6 +132,11 @@ one-use launch code. The response additionally includes backend-owned `game_name
 and `launch_url`; the browser cannot select the URL or identity. It uses no-store.
 The public `create-session` path remains restricted to published games.
 
+Here “private” means a hidden catalog integration entry, not tester-only access.
+Any enrolled member or guest can request it when enabled. Origin validation is a
+browser boundary, not unforgeable identity proof; localhost bindings do not isolate
+the hosted database. Public access requires explicit entry activation review.
+
 The current local Mahjong binding uses Joy8 `http://localhost:5173` and game
 `http://localhost:4391/`. Entry configuration remains backend-controlled. The
 private entry and Gateway are installed; real game acceptance remains pending.
@@ -134,7 +153,7 @@ parent. The game never receives provider or member tokens.
 
 `POST /branded-entry` resolves only `game_id`, `game_name`, `launch_url` and
 `protocol` from trusted backend configuration and exact Origin. After verified
-membership, `POST /branded-session` uses the same hidden-game session authority
+membership, `POST /private-session` uses the same hidden-game session authority
 as the private entry. The resulting launch is delivered through the normal
 `joy8-launch-v1` message. Both responses are no-store. Migration
 `20260920180000_branded_game_entry.sql` and the matching Gateway routes are
@@ -221,21 +240,14 @@ Request:
 
 ```json
 {
-  "slug": "game-slug",
-  "currency": "POINT",
-  "expires_in_seconds": 3600,
-  "display_name": "Optional guest display name"
+  "slug": "game-slug"
 }
 ```
 
 Rules:
 
 - `slug` must identify an available published game.
-- `currency` defaults to `POINT`; no other currency is currently supported.
-- `expires_in_seconds` must be from 60 to 86,400.
-- `display_name` is optional and limited to 120 characters.
-- The current Loader omits `display_name`. It remains a supported optional launch
-  field, not an account-editing interface or an authorization input.
+- The browser sends only `slug`; unknown fields are rejected. Currency is fixed to `POINT` and session lifetime to one hour by the Gateway. The internal database issuer remains service-only; its arguments are not browser configuration.
 - A valid Supabase bearer token and explicit player enrollment are required.
 - A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
   user's own verified session is supported and remains a guest. Missing enrollment
@@ -627,7 +639,7 @@ when installing platform-only permission changes.
 inventory. Every active migration must be either ordered runtime input or excluded
 with a reason. New unclassified migrations fail `test:platform-bundle` and `verify`.
 Hosted catalog edits, account cleanup, activation/key data and product-owned schema
-installation are excluded. Each product installs and registers its own schema.
+installation are excluded. Each product owns its schema source and registration contract. In isolated fixtures the consumer installs and registers that schema. In the shared hosted Supabase project, Joy8 applies reviewed product SQL as incremental deployment migrations; this does not transfer gameplay ownership to Joy8.
 
 `node scripts/export-platform-fixture.mjs` exports the contract and ordered SQL
 sources with normalized-LF SHA-256 hashes. Consumers must compare the exact ordered
@@ -638,6 +650,13 @@ is exercised on PGlite and PostgreSQL 17; focused historical tests may deliberat
 load smaller subsets for migration regressions.
 
 ### Recovery and Errors
+
+`JOY8_PAYOUT_BUDGET_EXCEEDED` is reserved for the tested payout-budget proposal;
+the local Gateway maps it to 409, but hosted SQL does not enforce that budget yet.
+The proposal reserves each platform-funded match's maximum cumulative positive
+player/fee payout against an operator-approved per-game issuance quota. Losses
+do not replenish it, exact retries do not spend twice, and final/cancel releases
+unused exposure. It is a risk ceiling, not a game wallet or Transfer Wallet.
 
 `server-status-v1` and `server-cancel-v1` take only
 `{"version":1,"match_ref":"product-match-123"}` and return
@@ -656,7 +675,7 @@ browser disconnection and token expiry do not authorize cancellation.
 | 401 | `JOY8_BACKEND_UNAUTHORIZED` |
 | 403 | `JOY8_GAME_NOT_READY`, `JOY8_PLAYER_INACTIVE`, `JOY8_WALLET_INACTIVE`, `JOY8_SESSION_INVALID` |
 | 404 | `JOY8_MATCH_NOT_FOUND` |
-| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED` |
+| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED`, `JOY8_PAYOUT_BUDGET_EXCEEDED` |
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
 | 502/503 | Invalid/upstream-unavailable response; `JOY8_UPSTREAM_UNAVAILABLE` or `JOY8_ADAPTER_UNAVAILABLE` |
 

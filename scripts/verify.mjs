@@ -17,7 +17,7 @@ const checks = [
     "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
     "public-player-id-check", "public-id-allocation-check", "product-registration-check",
     "platform-database-check", "platform-cutover-check", "continuous-settlement-check", "seamless-wallet-check", "sdk-check", "backend-key-provision-check", "monster-lab-registration-check", "branded-entry-check",
-    "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check", "platform-bundle-check", "mahjong-balance-migration-check",
+    "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check", "platform-bundle-check", "mahjong-balance-migration-check", "release-safety-check",
   ].map(name => `scripts/${name}.mjs`)],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/gateway-unit-check.mjs"],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "--test", "scripts/gateway-rate-limit-check.mjs"],

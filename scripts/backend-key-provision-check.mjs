@@ -6,6 +6,8 @@ import {
   buildStatusSql,
   cloudflareSecretArgs,
   createBackendCredential,
+  credentialPlan,
+  verifyCredentialPlan,
   provisionCredential,
   validateDelivery,
   validateProfile
@@ -40,10 +42,22 @@ const delivery = {
 }
 const fixedCredential = () => ({ id: keyId, secret, hash })
 
+test("review binds credential operation, scope, old key and exact delivery target", () => {
+  const plan = credentialPlan({ operation: "rotate", profile, delivery, keyId: oldKeyId })
+  assert.doesNotThrow(() => verifyCredentialPlan(plan, structuredClone(plan)))
+  for (const changed of [
+    { ...plan, keyId }, { ...plan, scopes: ["exchange"] },
+    { ...plan, target: { ...plan.target, environment: "production" } },
+    { ...plan, operation: "provision" },
+  ]) assert.throws(() => verifyCredentialPlan(plan, changed), /does not match/)
+  assert.equal(JSON.stringify(plan).includes(secret), false)
+  assert.throws(() => credentialPlan({ operation: "rotate", profile, delivery }), /exact key/)
+})
+
 test("validates a restricted non-secret profile and explicit Cloudflare target", () => {
   assert.deepEqual(validateProfile(profile, new Date("2026-01-01T00:00:00Z")).scopes, profile.credential.scopes)
   assert.equal(validateDelivery(delivery).deployMode, "immediate")
-  assert.throws(() => validateProfile({ ...profile, credential: { ...profile.credential, purpose: "production" } }), /private-integration/)
+  assert.throws(() => validateProfile({ ...profile, credential: { ...profile.credential, purpose: "unknown" } }), /purpose/)
   assert.throws(() => validateDelivery({ ...delivery, cwd: "relative/backend" }), /absolute path/)
   assert.doesNotThrow(() => buildStatusSql({ ...profile, credential: { ...profile.credential, expiresAt: "2025-01-01T00:00:00Z" } }))
 })
@@ -80,6 +94,11 @@ test("registers, reports and revokes only non-secret key metadata", async () => 
     assert.equal(status[0].keyId, keyId)
     assert.equal(JSON.stringify(status).includes(hash), false)
     await db.exec(buildRevokeSql(profile, keyId))
+    const production = { ...profile, credential: { ...profile.credential, purpose: "production" } }
+    await db.query("update public.games set published=true where id=$1", [gameId])
+    assert.throws(() => buildRegisterSql(production, { id: oldKeyId, hash }), /rotation/)
+    await db.exec(buildRegisterSql(production, { id: oldKeyId, hash: "ab".repeat(32) }, keyId))
+    assert.equal((await db.query("select game_id from public.joy8_backend_keys where id=$1", [oldKeyId])).rows[0].game_id, gameId)
     assert.ok((await db.query("select revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0].revoked_at)
     await db.exec(buildRevokeSql(profile, keyId))
   } finally {

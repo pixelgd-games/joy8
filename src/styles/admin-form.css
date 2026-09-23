@@ -1,0 +1,4 @@
+body{font-family:system-ui,sans-serif;margin:24px auto;padding:0 16px;max-width:640px;line-height:1.6}
+input:not([type=checkbox]),select,button{box-sizing:border-box;width:100%;max-width:100%;padding:12px;font:inherit}
+input[type=checkbox]{width:20px;height:20px;vertical-align:middle}
+button{cursor:pointer}

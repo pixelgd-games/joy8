@@ -6,8 +6,8 @@ publication and funding remain pending.
 
 ## Installed database boundary
 
-The user approved this installation. All ten numbered migrations are applied;
-local/hosted history matches. Do not reapply the source candidates. Future changes
+The initial installation was approved. The table below describes that boundary;
+it is not a complete migration inventory. README owns the current version check. Do not reapply the source candidates. Future changes
 remain incremental migrations through the Joy8 wrapper with project verification.
 
 | Order | Authoritative SQL | Effect |
@@ -34,6 +34,12 @@ security-definer bridges validate the configured game before accessing the share
 balance or binding. Private checkpoint tables allow trusted runtime persistence;
 they are not exposed through PostgREST or browser grants.
 
+The applied `20260923110000_mahjong_processed_actions_history_limit.sql` is a
+product-owned deployment snapshot in Joy8's hosted migration history. It adds a
+100,000 committed-revision guard. Its content is preserved and its fixture
+classification is explicit; product-authoritative source remains in Mahjong.
+The present task did not verify the earlier approval record for this change.
+
 ## Identity-only connection
 
 The user approved and installed these additions:
@@ -59,8 +65,8 @@ The user approved and installed these additions:
 - The hosted `joy8-gateway` with product protocol `server-v1`, private sessions
   and continuous-settlement error mapping.
   Health/rejection checks and actual identity-key scope checks passed. The local
-  test entry is included in Joy8's standard front-end build, with backend access
-  bound to localhost. Mahjong has no cloud game build, GCP host or public release.
+  test entry is included in Joy8's standard front-end build, with configured browser entry
+  bound to localhost. Origin is not proof of tester authorization. Mahjong has no cloud game build, GCP host or public release.
 
 The player allowlist is removed. Use normal Joy8 sign-in or persistent guest
 entry; administrator access does not substitute for player enrollment. No human
@@ -68,8 +74,9 @@ wallet, session, match, AI account or point credit was created by these migratio
 
 The hosted full-balance reservation policy moves this temporary 1-POINT guard
 to a separate `max_reserve_amount` policy field. The Slot 10,000 POINT bet
-ceiling remains separate from Mahjong's table reservation. Funded limits and
-financial key scopes still require another review.
+ceiling remains separate from Mahjong's table reservation. A player with more than 1 available POINT cannot open under this identity-only
+policy. It is not a funded-play configuration. Funded limits and financial key
+scopes still require another review; this task does not invent credit or limits.
 
 ## Shared POINT wallet cutover review
 
@@ -107,22 +114,16 @@ wallet mode. Mahjong stays inactive until its remaining release gates are comple
 
 ## Credentials and connection checks
 
-[mahjong-credentials.mjs](../../scripts/mahjong-credentials.mjs) prepares ignored
-`.mahjong-provision.sql.local` and `.mahjong-runtime.env.local` files with fresh
-random values. It is offline and refuses overwrites. Its SQL is one atomic DO
-statement, enables only the restricted runtime role and an exchange/renew key,
-and rejects unrelated existing credentials. Do not use it to silently rotate
-working credentials. Existing credential expiry is not permission to reprovision.
+The retired Mahjong credential generator is removed. It wrote plaintext SQL and
+runtime environment files into the Joy8 repository. Its pure SQL builder remains
+only in an isolated historical test fixture; it is not an operator tool.
 
-Use the Joy8 wrapper for application, after checking the linked project. Its
-`db query --linked` Management API path runs as `supabase_read_only_user`; it is
-for inspection. Apply approved single-statement credential SQL with the same
-wrapper's `db query --db-url` using the pinned linked pooler and locally loaded
-administrator password. Capture all output, because a query error can echo SQL.
-Never print credentials, include literal secrets in commands, or place credential
-SQL in committed migration history. Verify remote state before uncertain retries.
-After confirmed installation and transfer to the game environment, remove the
-local preparation files; retain them only while application status is uncertain.
+Use the [shared credential workflow](../../integrations/third-party/README.md#platform-operator-flow)
+for Backend Keys, with a reviewed operation and a supported secure delivery
+target. It does not provision a PostgreSQL runtime login or deliver to a local
+Mahjong environment. A runtime-password rotation requires a separate reviewed
+operator action and secret-manager delivery; never recreate plaintext credential
+files in this repository. Existing credential expiry is not approval to rotate.
 
 The game stores the Supabase CLI's linked CA in ignored `.joy8-db-ca.crt.local`;
 `MAHJONG_DB_CA_FILE` points to that stable copy. Keep TLS verification enabled,
@@ -166,8 +167,9 @@ Two installed runtime limits remain relevant before funded or public play:
    are installed, while the exact entry/launch binding remains localhost-only.
    Cloudflare game upload, production game URL, GCP/VPS, production launch,
    guest-to-Google linking and hosted provider acceptance remain separate.
-   Turnstile is active; public Email/password entry and Cloudflare Email Sending
-   are disabled.
+   Turnstile protects guest Auth; no Email/password UI is exposed, but the hosted
+   Email provider and API signup remain enabled. See the release safety review
+   for the pending provider shutdown. Cloudflare Email Sending is disabled.
 
 ## Verification and recovery
 

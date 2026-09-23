@@ -4,12 +4,12 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
+import { GAME_SLUG_PATTERN } from "../packages/joy8-game-sdk/policy.js"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const projectRef = "lsazydefvnuqglultqii"
 const allowedScopes = ["exchange", "renew", "open", "settle", "status", "cancel"]
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
-const slugPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 function requiredString(value, name) {
   if (typeof value !== "string" || value.trim() !== value || !value) throw new Error(`Invalid ${name}`)
@@ -21,10 +21,10 @@ export function validateProfile(profile, now = new Date(), requireFutureExpiry =
   const gameId = requiredString(profile.game?.gameId, "game.gameId")
   const slug = requiredString(profile.game?.slug, "game.slug")
   if (!uuidPattern.test(gameId)) throw new Error("Invalid game.gameId")
-  if (!slugPattern.test(slug)) throw new Error("Invalid game.slug")
+  if (!GAME_SLUG_PATTERN.test(slug)) throw new Error("Invalid game.slug")
   if (profile.platform?.protocol !== "server-v1") throw new Error("Only server-v1 is supported")
   if (profile.platform?.currency !== "POINT") throw new Error("Only POINT is supported")
-  if (profile.credential?.purpose !== "private-integration") throw new Error("credential.purpose must be private-integration")
+  if (!["private-integration", "production"].includes(profile.credential?.purpose)) throw new Error("credential.purpose must be private-integration or production")
   if (profile.credential?.environmentVariable !== "JOY8_BACKEND_KEY") throw new Error("credential.environmentVariable must be JOY8_BACKEND_KEY")
   if (profile.credential?.delivery !== "secure-one-time") throw new Error("credential.delivery must be secure-one-time")
   const scopes = profile.credential?.scopes
@@ -65,17 +65,21 @@ function quote(value) {
   return `'${String(value).replaceAll("'", "''")}'`
 }
 
-export function buildRegisterSql(profile, credential) {
+export function buildRegisterSql(profile, credential, oldKeyId = null) {
   const { gameId, slug, scopes, expiresAt } = validateProfile(profile)
   if (!credential || !uuidPattern.test(credential.id) || !/^[a-f0-9]{64}$/.test(credential.hash)) throw new Error("Invalid hashed credential")
   const scopeSql = scopes.map(quote).join(",")
+  const production = profile.credential.purpose === "production"
+  if (oldKeyId !== null && !uuidPattern.test(oldKeyId)) throw new Error("Invalid old Backend Key ID")
+  if (production && !oldKeyId) throw new Error("Production credentials require rotation of an existing game key")
   return `do $joy8$
 declare v_game_id uuid;
 begin
   select g.id into v_game_id from public.games g
-  where g.id=${quote(gameId)}::uuid and g.slug=${quote(slug)} and not g.published
+  where g.id=${quote(gameId)}::uuid and g.slug=${quote(slug)} and ${production ? "g.published" : "not g.published"}
   for update;
-  if not found then raise exception 'JOY8_KEY_GAME_NOT_HIDDEN_OR_MISMATCHED'; end if;
+  if not found then raise exception 'JOY8_KEY_GAME_STATE_OR_ID_MISMATCH'; end if;
+  ${oldKeyId ? `if not exists(select 1 from public.joy8_backend_keys where id=${quote(oldKeyId)}::uuid and game_id=v_game_id and scopes @> array[${scopeSql}]::text[]) then raise exception 'JOY8_KEY_ROTATION_SCOPE_OR_GAME_MISMATCH'; end if;` : ""}
   perform 1 from public.joy8_game_policies gp
   join public.joy8_wallet_policies wp on wp.id=gp.wallet_policy_id
   where gp.game_id=v_game_id and gp.enabled and wp.enabled and wp.currency='POINT';
@@ -155,6 +159,7 @@ export async function provisionCredential({ profile, delivery, oldKeyId = null, 
   validateProfile(profile)
   validateDelivery(delivery)
   if (oldKeyId !== null && !uuidPattern.test(oldKeyId)) throw new Error("Invalid old Backend Key ID")
+  if (profile.credential.purpose === "production" && !oldKeyId) throw new Error("Production credentials require rotation of an existing game key")
   const credential = credentialFactory()
   await registerKey({ id: credential.id, hash: credential.hash })
   try {
@@ -237,6 +242,25 @@ function parseArgs(argv) {
   return values
 }
 
+export function credentialPlan({ operation, profile, delivery, keyId = null }) {
+  if (!["provision", "rotate", "revoke"].includes(operation)) throw new Error("Choose --operation provision, rotate or revoke")
+  const checked = validateProfile(profile, new Date(), operation !== "revoke")
+  if (operation !== "provision" && !uuidPattern.test(keyId)) throw new Error("Rotation/revocation requires an exact key ID")
+  if (operation === "provision" && (keyId || profile.credential.purpose === "production")) throw new Error("Production credentials require explicit rotation")
+  return {
+    operation, projectRef, gameId: checked.gameId, slug: checked.slug,
+    purpose: profile.credential.purpose, scopes: checked.scopes, expiresAt: checked.expiresAt,
+    keyId, target: operation === "revoke" ? null : validateDelivery(delivery),
+    databaseChange: operation === "revoke" ? "Revoke the named game key" : "Insert a game-scoped credential hash; revoke it if delivery fails",
+    deliveryChange: operation === "revoke" ? null : "Deploy the named Worker secret immediately",
+    revokeAfterDelivery: operation === "rotate" ? keyId : null,
+  }
+}
+
+export function verifyCredentialPlan(plan, reviewed) {
+  if (JSON.stringify(plan) !== JSON.stringify(reviewed)) throw new Error("Reviewed plan does not match this operation; prepare and review a new plan")
+}
+
 async function readJson(file, name) {
   if (!file) throw new Error(`Missing --${name}`)
   return JSON.parse(await readFile(path.resolve(file), "utf8"))
@@ -248,29 +272,30 @@ async function main() {
     throw new Error("Use plan, provision, rotate, status or revoke")
   }
   const profile = await readJson(args.profile, "profile")
-  const checked = validateProfile(profile, new Date(), !["status", "revoke"].includes(args.command))
   if (args.command === "status") {
     process.stdout.write(await runJoy8Sql(buildStatusSql(profile)))
     return
   }
-  if (args.command === "revoke") {
-    if (!args.apply) throw new Error("Revoke is a remote change; review first, then add --apply")
-    process.stdout.write(await runJoy8Sql(buildRevokeSql(profile, args.key_id)))
-    return
-  }
-  const delivery = await readJson(args.delivery, "delivery")
-  const checkedDelivery = validateDelivery(delivery)
+  const operation = args.command === "plan" ? args.operation : args.command
+  const delivery = operation === "revoke" ? null : await readJson(args.delivery, "delivery")
+  const plan = credentialPlan({ operation, profile, delivery, keyId: args.old_key_id ?? args.key_id ?? null })
   if (args.command === "plan") {
-    console.log(JSON.stringify({ action: "provision", gameId: checked.gameId, slug: checked.slug, scopes: checked.scopes, expiresAt: checked.expiresAt, target: { type: checkedDelivery.type, workerName: checkedDelivery.workerName, secretName: checkedDelivery.secretName, deployMode: checkedDelivery.deployMode }, remoteChanges: false }, null, 2))
+    if (!args.output) throw new Error("Plan requires --output for the non-secret review file")
+    await writeFile(path.resolve(args.output), `${JSON.stringify(plan, null, 2)}\n`, { flag: "wx" })
+    console.log(JSON.stringify(plan, null, 2))
     return
   }
-  if (!args.apply) throw new Error("Provisioning is a remote change; run plan first, then add --apply")
-  if (args.command === "rotate" && !args.old_key_id) throw new Error("Rotate requires --old-key-id")
+  if (!args.apply) throw new Error("Remote changes require a user-reviewed plan and --apply")
+  verifyCredentialPlan(plan, await readJson(args.reviewed_plan, "reviewed-plan"))
+  if (operation === "revoke") {
+    process.stdout.write(await runJoy8Sql(buildRevokeSql(profile, plan.keyId)))
+    return
+  }
   const result = await provisionCredential({
     profile,
     delivery,
-    oldKeyId: args.command === "rotate" ? args.old_key_id : null,
-    registerKey: credential => runJoy8Sql(buildRegisterSql(profile, credential)),
+    oldKeyId: plan.keyId,
+    registerKey: credential => runJoy8Sql(buildRegisterSql(profile, credential, plan.keyId)),
     deliverKey: secret => deliverCloudflareSecret(delivery, secret),
     revokeKey: keyId => runJoy8Sql(buildRevokeSql(profile, keyId))
   })

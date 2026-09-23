@@ -32,6 +32,7 @@
     "test:seamless-wallet": "node --test scripts/seamless-wallet-check.mjs",
     "test:sdk": "node --test scripts/sdk-check.mjs",
     "test:backend-key": "node --test scripts/backend-key-provision-check.mjs",
+    "test:release-safety": "node --test scripts/release-safety-check.mjs",
     "test:monster-lab": "node --test scripts/monster-lab-registration-check.mjs",
     "key:backend": "node scripts/backend-key-provision.mjs",
     "pack:sdk": "npm pack ./packages/joy8-game-sdk",

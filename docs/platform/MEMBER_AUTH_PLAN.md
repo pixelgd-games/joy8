@@ -6,7 +6,7 @@ Facebook sign-in, guest linking and existing-account conflict handling are
 implemented in the repository. The Joy8 Meta app (`1385504273217738`) exists in
 unpublished development mode without a business portfolio; business
 verification/review, hosted Supabase provider configuration and acceptance remain.
-The public Email/password flow and Cloudflare Email Sending are disabled. Stable
+The public Email/password UI is absent and Cloudflare Email Sending is disabled. The hosted Email provider still accepts verified Email API signup; README owns its verified configuration and pending shutdown. Stable
 six-digit public player IDs are deployed. Guest-to-Google linking, guest
 continuity and end-to-end public branded-entry acceptance remain open. The
 reusable branded H5 shell, Mahjong message contract, service-only resolver and
@@ -73,7 +73,7 @@ in the owning repository, not a first-release platform dependency.
   branded entry accepts only a configured game slug, exact trusted parent/game
   origins, Google or explicit guest requests, and in-memory launch messages.
   `/account/` now returns callbacks only to the Lobby or validated `/game/`,
-  `/play-test/`, and `/entry/` routes. The resolver and Gateway are active;
+  `/play-test/`, and `/entry/` routes. The resolver and hosted Gateway are active;
   public acceptance remains pending a reviewed production Mahjong H5/authority
   URL and real provider/game testing.
 - The local private-test entry is owned by Joy8 at

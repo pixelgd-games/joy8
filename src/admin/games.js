@@ -3,7 +3,7 @@ import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
 import { requireAdmin, signOut } from "./auth.js"
 
-const GAME_FIELDS = "id,name,slug,thumbnail,type,supports_live,published,launch_url,sort_order,created_at"
+const GAME_FIELDS = "id,name,slug,thumbnail,type,published,launch_url,sort_order,created_at"
 
 let gameRows = []
 
@@ -67,7 +67,6 @@ function createGamesTable(games) {
       "slug",
       "縮圖",
       "類型",
-      "直播",
       "上架",
       "排序",
       "launch url",
@@ -107,7 +106,6 @@ function createGameRow(game) {
     createTextCell(game.slug),
     createLinkCell(normalizeCoverPath(game.thumbnail, game.slug), "thumbnail", Boolean(game.thumbnail)),
     createTextCell(game.type),
-    createTextCell(game.supports_live ? "是" : "否"),
     createTextCell(game.published ? "是" : "否"),
     createTextCell(game.sort_order ?? ""),
     createLinkCell(game.launch_url, game.launch_url),
@@ -154,7 +152,7 @@ function createActionsCell(game) {
 
   appendSeparated(cell, actions)
   cell.append(document.createTextNode(" | "))
-  cell.append(createDeleteButton(game.id))
+  cell.append(createUnpublishButton(game.id))
 
   return cell
 }
@@ -172,11 +170,12 @@ function createAnchor(href, label, openInNewTab = false) {
   return anchor
 }
 
-function createDeleteButton(id) {
+function createUnpublishButton(id) {
   const button = document.createElement("button")
   button.type = "button"
-  button.dataset.del = id
-  button.textContent = "刪除"
+  button.dataset.unpublish = id
+  button.textContent = "下架"
+  button.disabled = !gameRows.find(game => game.id === id)?.published
   return button
 }
 
@@ -190,29 +189,29 @@ function appendSeparated(parent, nodes) {
 async function handleListClick(event) {
   if (!(event.target instanceof Element)) return
 
-  const button = event.target.closest("button[data-del]")
+  const button = event.target.closest("button[data-unpublish]")
   if (!button) return
 
-  const id = button.dataset.del
+  const id = button.dataset.unpublish
   if (!id) return
 
-  if (!confirm("確定刪除這個遊戲？")) return
+  if (!confirm("確定從大廳下架這個遊戲？遊戲資料與紀錄會保留；此操作不會取消進行中的對局或停用測試入口。")) return
 
-  const { error } = await supabase.from("games").delete().eq("id", id)
+  const { error } = await supabase.from("games").update({ published: false }).eq("id", id)
 
   if (error) {
     showErrorModal({
-      code: ERROR_CODES.ADMIN_DELETE_FAILED,
-      title: "刪除遊戲失敗",
-      message: "目前無法刪除這筆遊戲資料，請稍後再試。",
+      code: ERROR_CODES.ADMIN_UNPUBLISH_FAILED,
+      title: "下架遊戲失敗",
+      message: "目前無法下架這款遊戲，請稍後再試。",
       error,
       reload: false,
     })
     return
   }
 
-  gameRows = gameRows.filter((game) => game.id !== id)
-  button.closest("tr")?.remove()
+  gameRows = gameRows.map(game => game.id === id ? { ...game, published: false } : game)
+  renderGameList()
   updateStatus()
 
   if (gameRows.length === 0) {

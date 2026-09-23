@@ -124,12 +124,12 @@ try {
     })
     throw new Error(`Unexpected RPC ${name}`)
   }
-  const request = (route, body = {}, token = "member-token", origin = "https://joy8.pages.dev") => handleRequest(new Request(`https://gateway.example/${route}`, {
+  const request = (route, body = {}, token = "member-token", origin = "https://joy8.cc") => handleRequest(new Request(`https://gateway.example/${route}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: "anon-key", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
   }))
-  for (const route of ["member", "enroll-member", "create-session", "private-session", "branded-session"]) {
+  for (const route of ["member", "enroll-member", "create-session", "private-session"]) {
     assert.equal((await request(route, {}, "", "https://evil.example")).status, 403)
     assert.equal((await request(route, {}, "", null)).status, 403)
     for (const token of ["", "anon-key"]) assert.equal((await request(route, {}, token)).status, 401)
@@ -155,7 +155,8 @@ try {
   assert.deepEqual(await (await request("member")).json(), { error: "Gateway RPC failed" })
   memberError = null
   memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
-  const launched = await request("create-session", { slug: "test", auth_user_id: "victim" })
+  for (const extra of [{auth_user_id:"victim"},{currency:"POINT"},{expires_in_seconds:3600},{display_name:"unused"}]) assert.equal((await request("create-session", {slug:"test",...extra})).status,400)
+  const launched = await request("create-session", { slug: "test" })
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")
   assert.equal((await launched.json()).account_type, "guest")
@@ -206,9 +207,9 @@ try {
   assert.deepEqual(await brandedEntry.json(), { game_id: "game-1", launch_url: "http://localhost:4391/", game_name: "Mahjong Clash", protocol: "server-v1" })
   assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_branded_entry", args: { p_game_slug: "mahjong-clash", p_origin: "http://localhost:5173" } })
 
-  const brandedSession = await request("branded-session", { slug: "mahjong-clash" }, "member-token", "http://localhost:5173")
-  assert.equal(brandedSession.status, 200)
-  assert.deepEqual(rpcCalls.at(-1), { name: "joy8_create_private_session", args: { p_game_slug: "mahjong-clash", p_auth_user_id: "verified-user", p_origin: "http://localhost:5173" } })
+  assert.equal((await request("branded-session")).status,404)
+  assert.equal((await request("joy8-gateway")).status,404)
+  assert.equal((await request("member", {}, "member-token", "https://joy8.pages.dev")).status,403)
 
   for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {
     assert.equal((await request(route, {}, "", null)).status, 404)

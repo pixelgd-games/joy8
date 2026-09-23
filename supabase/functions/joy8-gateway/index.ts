@@ -1,3 +1,5 @@
+import { GAME_SLUG_PATTERN, isLoopbackHostname } from "../../../packages/joy8-game-sdk/policy.js"
+
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 type CreateSessionRow = {
@@ -38,13 +40,11 @@ type AuthResult =
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? ""
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
 const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? ""
-const POINT_CURRENCY = "POINT"
 const MAX_BODY_BYTES = 16 * 1024
 const AUTH_REQUEST_TIMEOUT_MS = 5000
 const RPC_REQUEST_TIMEOUT_MS = 8000
 const UPSTREAM_UNAVAILABLE_CODE = "JOY8_UPSTREAM_UNAVAILABLE"
 const DEFAULT_ALLOWED_ORIGINS = [
-  "https://joy8.pages.dev",
   "https://joy8.cc",
   "https://www.joy8.cc",
   "http://localhost:5173",
@@ -57,7 +57,7 @@ const ROUTES = new Set([
   "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
   "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
   "enroll-member", "create-session", "private-session", "branded-entry",
-  "branded-session", "balance",
+  "balance",
 ])
 export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.freeze({
   JOY8_BACKEND_UNAUTHORIZED: 401,
@@ -80,6 +80,8 @@ export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.fr
   JOY8_INSUFFICIENT_BALANCE: 409,
   JOY8_SETTLEMENT_SEQUENCE: 409,
   JOY8_UPSTREAM_UNAVAILABLE: 503,
+  JOY8_PAYOUT_BUDGET_EXCEEDED: 409,
+  JOY8_PAYOUT_BUDGET_EXCEEDED: 409,
 })
 const PUBLIC_RPC_MESSAGES = new Set([
   "game is not available", "game session is not active", "player account is not active",
@@ -176,11 +178,7 @@ async function dispatchRoute(
     return resolveBrandedEntry(request, headers)
   }
 
-  if (route === "branded-session") {
-    return createPrivateSession(request, headers)
-  }
-
-  if (route === "balance") {
+if (route === "balance") {
     return getBalance(request, headers)
   }
 
@@ -249,7 +247,7 @@ async function createPrivateSession(request: Request, headers: HeadersInit): Pro
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   const slug = body.value.slug
-  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
+  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !GAME_SLUG_PATTERN.test(slug)) {
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
   const admission = await enforceSubjectRateLimit("private-session", {}, headers, null, auth.userId)
@@ -269,7 +267,7 @@ async function resolveBrandedEntry(request: Request, headers: HeadersInit): Prom
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   const slug = body.value.slug
-  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !/^[a-z0-9-]{1,80}$/.test(slug)) {
+  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !GAME_SLUG_PATTERN.test(slug)) {
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
   const result = await callRpc("joy8_resolve_branded_entry", {
@@ -284,10 +282,6 @@ async function resolveBrandedEntry(request: Request, headers: HeadersInit): Prom
 }
 
 async function createSession(request: Request, headers: HeadersInit): Promise<Response> {
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    return jsonResponse({ error: "Gateway is not configured" }, 500, headers)
-  }
-
   const auth = await resolveAuthUser(request)
 
   if (!auth.ok) {
@@ -304,29 +298,9 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
     return jsonResponse({ error: body.error }, 400, headers)
   }
 
-  const slug = typeof body.value.slug === "string" ? body.value.slug.trim() : ""
-  const currency = typeof body.value.currency === "string" ? body.value.currency.trim().toUpperCase() : "POINT"
-  const expiresInSeconds = normalizeInteger(body.value.expires_in_seconds, 3600)
-  const displayName = typeof body.value.display_name === "string" ? body.value.display_name.trim() : ""
-
-  if (!/^[a-z0-9-]{1,80}$/.test(slug)) {
-    return jsonResponse({ error: "Invalid game slug" }, 400, headers)
-  }
-
-  if (!/^[A-Z0-9_]{1,16}$/.test(currency)) {
-    return jsonResponse({ error: "Invalid currency" }, 400, headers)
-  }
-
-  if (currency !== POINT_CURRENCY) {
-    return jsonResponse({ error: "Wallet only supports POINT" }, 400, headers)
-  }
-
-  if (expiresInSeconds < 60 || expiresInSeconds > 86400) {
-    return jsonResponse({ error: "Invalid session expiry" }, 400, headers)
-  }
-
-  if (displayName.length > 120) {
-    return jsonResponse({ error: "Display name is too long" }, 400, headers)
+  const slug = body.value.slug
+  if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !GAME_SLUG_PATTERN.test(slug)) {
+    return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
 
   const admission = await enforceSubjectRateLimit("create-session", {}, headers, null, auth.userId)
@@ -341,9 +315,9 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
 
   const rpcResult = await callRpc("create_game_session", {
     p_game_slug: slug,
-    p_currency: currency,
-    p_expires_in_seconds: expiresInSeconds,
-    p_display_name: displayName || null,
+    p_currency: "POINT",
+    p_expires_in_seconds: 3600,
+    p_display_name: null,
     p_auth_user_id: auth.userId,
   })
 
@@ -469,10 +443,6 @@ async function enforceRateLimit(
 ): Promise<Response | null> {
   const config = route === "health" ? { limit: 30, windowSeconds: 60 } : INGRESS_LIMIT
 
-  if (!config) {
-    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
-  }
-
   const clientAddress = getClientAddress(request)
   const rpcResult = await callRpc("joy8_consume_gateway_rate_limit", {
     p_key: `${route === "health" ? "health" : "ingress"}:${clientAddress}`,
@@ -557,10 +527,6 @@ function getRoute(url: string): string {
   const parts = pathname.split("/").filter(Boolean)
   const last = parts[parts.length - 1] ?? ""
 
-  if (last === "joy8-gateway") {
-    return "create-session"
-  }
-
   return last
 }
 
@@ -587,7 +553,7 @@ function buildCorsHeaders(
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
   if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
-  if (["private-session", "branded-entry", "branded-session"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
+  if (["private-session", "branded-entry"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
   if (!origin) {
     return !memberRoute
@@ -600,7 +566,7 @@ function isCorsOriginAllowed(origin: string | null, route: string): boolean {
   try {
     const url = new URL(origin)
     return url.protocol === "https:"
-      || (url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))
+      || (url.protocol === "http:" && isLoopbackHostname(url.hostname))
   } catch {
     return false
   }
@@ -675,18 +641,6 @@ async function readJsonBody(request: Request): Promise<BodyResult> {
   } catch {
     return { ok: false, error: "Invalid JSON body" }
   }
-}
-
-function normalizeInteger(value: unknown, fallback: number): number {
-  if (typeof value === "number" && Number.isInteger(value)) {
-    return value
-  }
-
-  if (typeof value === "string" && /^\d+$/.test(value)) {
-    return Number(value)
-  }
-
-  return fallback
 }
 
 function normalizeRequiredText(value: unknown, maxLength: number): string {

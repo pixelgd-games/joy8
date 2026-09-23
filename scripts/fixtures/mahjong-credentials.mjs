@@ -1,10 +1,4 @@
-import { randomBytes } from 'node:crypto'
-import { writeFile, unlink, readFile } from 'node:fs/promises'
-import { fileURLToPath } from 'node:url'
-import path from 'node:path'
-
 const project = 'lsazydefvnuqglultqii'
-const root = fileURLToPath(new URL('..', import.meta.url))
 
 export function credentialBundle({ gameId, dbHost, backendKey, password, expiresAt }) {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(gameId) || !/^[0-9a-f]{64}$/.test(backendKey) || !/^[0-9a-f]{64}$/.test(password)
@@ -44,22 +38,4 @@ $$;
 `
   const env = `MAHJONG_DB_HOST=${dbHost}\nMAHJONG_DB_PASSWORD=${password}\nMAHJONG_JOY8_GAME_ID=${gameId}\nMAHJONG_JOY8_BACKEND_KEY=${backendKey}\nMAHJONG_CONTINUOUS_READY=1\n`
   return { sql, env }
-}
-
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try {
-    const [mode, gameId] = process.argv.slice(2)
-    if (mode !== '--prepare' || !gameId) throw new Error('Use --prepare with the verified Mahjong game UUID')
-    const pooler = new URL((await readFile(path.join(root,'supabase/.temp/pooler-url'),'utf8')).trim())
-    if (!decodeURIComponent(pooler.username).endsWith(`.${project}`)) throw new Error('Wrong linked project')
-    const bundle = credentialBundle({ gameId, dbHost:pooler.hostname, backendKey:randomBytes(32).toString('hex'), password:randomBytes(32).toString('hex'), expiresAt:new Date(Date.now()+7*86400000).toISOString() })
-    const envPath = path.join(root,'.mahjong-runtime.env.local')
-    await writeFile(envPath,bundle.env,{flag:'wx',mode:0o600})
-    try { await writeFile(path.join(root,'.mahjong-provision.sql.local'),bundle.sql,{flag:'wx',mode:0o600}) }
-    catch { await unlink(envPath); throw new Error('Pending SQL already exists') }
-    console.log('Prepared ignored local credentials and SQL. No hosted change. Apply only after reviewed approval; never print these files.')
-  } catch {
-    console.error('Credential preparation stopped. Verify the game UUID, linked pooler and absence of existing pending files. No hosted change was made.')
-    process.exitCode=1
-  }
 }

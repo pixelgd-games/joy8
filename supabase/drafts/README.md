@@ -1,8 +1,8 @@
 # Review-only SQL
 
 This directory holds review documents and any future unapproved SQL. SQL here is
-excluded from active migration discovery. There is currently no pending SQL
-migration in this directory.
+excluded from active migration discovery. The release-safety SQL below is pending
+review and must not enter active migrations or be applied without approval.
 
 [MAHJONG_REVIEW.md](MAHJONG_REVIEW.md) owns the installed Mahjong boundary and
 remaining activation decisions. It does not authorize publication, keys or
@@ -51,3 +51,51 @@ Both migrations are applied to hosted Joy8. The linked project and Mahjong polic
 were verified with `scripts/supabase-joy8.cmd projects list` and
 `scripts/sql/mahjong-identity-postflight.sql`. Funded play still requires a
 separate review of POINT source, limits, backend scopes and the game.
+
+## Release safety review
+
+These are independent forward-change proposals, not deployment history or an
+old/new runtime. `scripts/release-safety-check.mjs` installs the current platform
+bundle and explicitly exercises the proposals in isolated test data. No budget,
+credit, key, production game activation or data reset is authorized by these files.
+
+| Proposal | Concrete effect | Release/rollback boundary |
+| --- | --- | --- |
+| [private-entry-pause.sql](private-entry-pause.sql) | Disable the two hidden Mahjong/Monster Lab entries; require no open matches or active financial keys | Re-enabling requires reviewed audience, origin and activation; no identity or balance deletion |
+| [admin-identity.sql](admin-identity.sql) | Resolve the allowlisted email from `auth.uid()` and a verified, active Google identity; require Google session provider; revoke catalog DELETE from browser administrators | Verify the retained administrator's Google identity before applying; do not restore email-only authorization |
+| [platform-payout-budget.sql](platform-payout-budget.sql) | Reserve per-match maximum payout against a per-game approved issuance quota; consume positive player/fee payouts cumulatively; preserve usage across sessions/keys; release unused liability on close | Reject installation with open platform-funded matches; no quotas are automatically granted, so platform-funded opening is disabled until a reviewed quota row exists |
+| [operator-match-recovery.sql](operator-match-recovery.sql) | Operator-only cancellation with reason, evidence reference and exact settlement count; atomic adapter cancellation and reservation release; preserve prior settlements | Use only after authoritative product evidence establishes the unfinished match is void; an adapter failure rolls back; no timeout-only cancellation or browser access |
+| [runtime-maintenance.sql](runtime-maintenance.sql) | Install pg_cron and schedule fixed-search-path cleanup every ten minutes, independent of game launches | Extension installation and scheduling must succeed atomically; expires sessions and removes expired rate counters, never players, wallets, financial history or reservations |
+
+The current preflight finds one verified Google administrator and no installed
+pg_cron extension. The maintenance proposal includes installation using the
+[Supabase Cron installation procedure](https://supabase.com/docs/guides/cron/install).
+The local tests exercise cleanup semantics; actual scheduler execution must be
+verified after approved hosted application.
+
+Before every hosted database operation, verify Joy8 with the wrapper. Rerun
+[`release-safety-preflight.sql`](../../scripts/sql/release-safety-preflight.sql)
+immediately before review/application. Apply only approved proposals as new
+timestamped migrations, preserving applied files. Verify effective grants,
+administrator access, entry rejection, unchanged player/wallet/transaction totals,
+the installed quota/recovery functions and the scheduled job. Do not deploy the
+Gateway/frontend until the coordinated route and Turnstile configuration is ready.
+
+After recovery installation, the operator prepares a reviewed single transaction
+calling `public.joy8_operator_cancel_match(game_uuid, match_ref,
+expected_settlement_count, reason, evidence_reference)` through the Joy8 wrapper.
+Inspect the match and product state first. Never supply the project administrator
+password or evidence containing player credentials in command arguments or chat.
+The function is not granted to anon, authenticated, service_role or game runtimes.
+
+Separate hosted Auth change: disable the Email provider, preserving Google and
+anonymous signups. Verify public settings afterward and confirm real Google admin
+and member login. Do not set the global `disable_signup` flag to true. Configure
+`VITE_TURNSTILE_SITE_KEY` before the next frontend build; no source-code key fallback
+exists. Neither Auth settings nor Cloudflare deployment changes are performed by
+these SQL files.
+
+Remaining product decisions: six-digit ID capacity/guest retention and abuse
+limits, future approved payout quota amounts, funded Mahjong limits, and any
+Facebook identity without email. Those are not solved by deleting users,
+recycling IDs, inventing credit or weakening identity verification.

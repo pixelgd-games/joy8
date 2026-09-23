@@ -55,29 +55,33 @@ integrations/third-party/integration-profile.local.json
 integrations/third-party/backend-key-delivery.local.json
 ```
 
-Review without creating a key or changing remote state:
+Prepare a non-secret operation file without creating a key or changing remote
+state. Review this file with the user before execution:
 
 ```powershell
-npm run key:backend -- plan --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json
+npm run key:backend -- plan --operation provision --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --output integrations/third-party/key-plan.local.json
+npm run key:backend -- provision --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --reviewed-plan integrations/third-party/key-plan.local.json --apply
 ```
 
-After the hidden game, enabled wallet policy, expiry, scope, Worker name and
-Cloudflare account are independently reviewed, perform the operation:
+The operation file binds the game, purpose, scopes, expiry, exact Worker target,
+environment and configuration path. Changed arguments require a new review file.
+The file records intent; possession of it or `--apply` is not user approval.
+Credential operations are reviewed operational DML, not schema migrations; no
+plaintext secret belongs in migration history. Review the SQL builders in
+`scripts/backend-key-provision.mjs` as part of operator approval.
 
-```powershell
-npm run key:backend -- provision --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --apply
-```
+Initial provision requires a hidden game and `purpose: private-integration`.
+For a published game, use `purpose: production` and `rotate`, naming the old key.
+Rotation permits the same or fewer scopes, registers the replacement, deploys it,
+and only then revokes the old key. Failed delivery revokes the replacement.
+An expired or revoked old key may be used to establish its game/scope boundary.
 
-The command first verifies that `Joy8 / lsazydefvnuqglultqii` is the linked
-Supabase project. It then registers only the hash and deploys the secret to the
-named Worker. A delivery failure revokes the new database record. Rotation
-installs the replacement before revoking the specifically named old key:
-
-```powershell
-npm run key:backend -- rotate --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --old-key-id 00000000-0000-4000-8000-000000000000 --apply
-npm run key:backend -- status --profile integrations/third-party/integration-profile.local.json
-npm run key:backend -- revoke --profile integrations/third-party/integration-profile.local.json --key-id 00000000-0000-4000-8000-000000000000 --apply
-```
+Use `plan --operation rotate` and `rotate` with the same `--old-key-id`, profile,
+delivery and reviewed-plan arguments. Use `plan --operation revoke` and `revoke`
+with the same `--key-id` and profile; revocation needs no delivery target. Each
+operation needs its own reviewed file. `status --profile ...` remains read-only.
+The tool verifies `Joy8 / lsazydefvnuqglultqii / linked: true` before every database
+operation. No secret is printed or written into the reviewed file.
 
 Cloudflare secret installation deploys the Worker immediately. The target
 backend must have its own local Wrangler dependency and an already-authenticated

@@ -24,7 +24,7 @@ function fixture(t, options = {}) {
     removeEventListener: event => listeners.delete(event),
   }
   t.after(() => Object.assign(globalThis, prior))
-  mountGameFrame({
+  const controller = mountGameFrame({
     gameRoot: { append() {} }, gameUrl: "https://game.example/", timeoutMs: 30000,
     launch: { joy8_launch_code: "test-only-code" },
     onLoad: () => loads++, onTimeout: reason => failures.push(reason), ...options,
@@ -33,7 +33,7 @@ function fixture(t, options = {}) {
     source: frame.contentWindow, origin: "https://game.example",
     data: { type: "joy8-launch-ready-v1", protocol: "server-v1" }, ...overrides,
   })
-  return { frame, messages, failures, listeners, ready, load: () => frameLoad(), loads: () => loads }
+  return { controller, frame, messages, failures, listeners, ready, load: () => frameLoad(), loads: () => loads }
 }
 
 for (const loaded of [false, true]) test(`missing handshake fails visibly with document loaded=${loaded}`, t => {
@@ -131,11 +131,16 @@ test("opaque same-host frame accepts only its own null-origin readiness", t => {
   assert.equal(f.loads(), 1)
 })
 
-test("a frame without credentials completes on load", t => {
-  const f = fixture(t, { launch: null })
+test("branded entry waits for document and readiness, then delivers one deferred credential", t => {
+  const f = fixture(t, { launch: null, deferredLaunch: true })
   f.load()
+  assert.equal(f.loads(), 0)
+  f.ready()
   t.mock.timers.tick(30000)
   assert.equal(f.loads(), 1)
+  assert.equal(f.controller.sendLaunch({ joy8_launch_code: "later" }), true)
+  assert.equal(f.controller.sendLaunch({ joy8_launch_code: "again" }), false)
+  assert.equal(f.messages.length, 1)
   assert.equal(f.listeners.size, 0)
   assert.deepEqual(f.failures, [])
 })

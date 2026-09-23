@@ -2,11 +2,11 @@ import { buildGameUrl, getGameTypeLabel } from "./utils.js"
 import { normalizeCoverPath } from "../../lib/urls.js"
 
 const TEXT = {
-  openGame: "Open game",
-  emptyTitle: "No games available",
-  emptyCopy: "Published games will appear here.",
-  errorTitle: "Game list failed to load",
-  errorCopy: "Please try again later or contact an administrator.",
+  openGame: "開啟遊戲",
+  emptyTitle: "目前沒有開放的遊戲",
+  emptyCopy: "遊戲上架後會顯示在這裡。",
+  errorTitle: "遊戲列表讀取失敗",
+  errorCopy: "請稍後再試，或聯絡管理員。",
 }
 
 export function renderGameGrid(gridElement, games) {
@@ -136,5 +136,5 @@ function getDisplayName(game) {
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ")
 
-  return slugName || "Untitled Game"
+  return slugName || "未命名遊戲"
 }

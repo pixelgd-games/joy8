@@ -3,7 +3,7 @@ export function renderLobby() {
     <div class="shell">
       <main class="lobby-page">
         <header class="site-header">
-          <a class="brand-link" href="/" aria-label="Joy8 lobby">
+          <a class="brand-link" href="/" aria-label="Joy8 大廳">
             <span class="brand-mark">Joy8</span>
           </a>
           <div class="header-actions">
@@ -21,9 +21,9 @@ export function renderLobby() {
         <section class="hero" aria-labelledby="joy8HeroTitle">
           <img class="hero-image" src="/hero/joy8-hero-main.webp" alt="" loading="eager" decoding="async">
           <div class="hero-copy">
-            <p class="hero-kicker">PLAY · DISCOVER · REPEAT</p>
-            <h1 class="hero-title" id="joy8HeroTitle">Play more with Joy8.</h1>
-            <p class="hero-description">Instant browser games, all in one place.</p>
+            <p class="hero-kicker">探索・遊玩・再來一局</p>
+            <h1 class="hero-title" id="joy8HeroTitle">在 Joy8，找到遊戲樂趣。</h1>
+            <p class="hero-description">打開即玩，喜歡的遊戲都在這裡。</p>
             <a class="hero-action" href="#gamesSection">開始遊玩</a>
           </div>
         </section>
@@ -31,8 +31,8 @@ export function renderLobby() {
         <section class="content" id="gamesSection">
           <div class="section-head">
             <div>
-              <p class="section-kicker">GAME LIST</p>
-              <h2 class="section-title">Featured Games</h2>
+              <p class="section-kicker">遊戲列表</p>
+              <h2 class="section-title">精選遊戲</h2>
             </div>
           </div>
           <div class="grid" id="gameGrid"></div>

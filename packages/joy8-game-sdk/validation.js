@@ -1,4 +1,5 @@
 import { Joy8SdkError } from "./errors.js"
+import { isLoopbackHostname } from "./policy.js"
 
 export const PROTOCOL = "server-v1"
 export const CURRENCY = "POINT"
@@ -69,7 +70,7 @@ export function normalizeGatewayUrl(value) {
   } catch {
     fail("JOY8_SDK_INVALID_CONFIGURATION", "gatewayUrl is invalid")
   }
-  const loopback = ["localhost", "127.0.0.1"].includes(url.hostname)
+  const loopback = isLoopbackHostname(url.hostname)
   if ((url.protocol !== "https:" && !(url.protocol === "http:" && loopback))
     || url.username || url.password || url.search || url.hash
     || !url.pathname.replace(/\/+$/, "").endsWith("/joy8-gateway")) {
@@ -90,7 +91,7 @@ export function normalizeParentOrigins(values) {
     } catch {
       fail("JOY8_SDK_INVALID_CONFIGURATION", "parent origin is invalid")
     }
-    const loopback = ["localhost", "127.0.0.1"].includes(url.hostname)
+    const loopback = isLoopbackHostname(url.hostname)
     if (url.origin !== value || (url.protocol !== "https:" && !(url.protocol === "http:" && loopback))) {
       fail("JOY8_SDK_INVALID_CONFIGURATION", "parentOrigins must use exact HTTPS origins")
     }

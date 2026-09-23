@@ -2,10 +2,43 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, providerLabel, safeReturnPath } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
+import { enterBrandedMember } from "../src/member/branded-entry.js"
+import { gameFailure } from "../src/pages/game/errors.js"
 
 const origin = "https://joy8.example"
 const guestUser = { id: "guest-1", is_anonymous: true }
 const registeredUser = { id: "guest-1", is_anonymous: false, email_confirmed_at: "2026-09-16" }
+
+test("branded registered entry enrolls explicitly without linking or guest conversion", async () => {
+  const f = fixture(registeredUser)
+  const launched = []
+  const options = { service: f.service, captcha: { token: () => assert.fail("Unexpected captcha") }, onGoogle: () => assert.fail("Unexpected linking"), onLaunch: () => launched.push(true) }
+  await enterBrandedMember({ ...options, method: "google" })
+  assert.deepEqual(launched, [true])
+  assert.deepEqual(f.calls, [["rpc", "joy8-gateway/enroll-member", { body: {} }]])
+  await assert.rejects(enterBrandedMember({ ...options, method: "guest" }), { code: "registered_session" })
+  await assert.rejects(f.service.guest(), { code: "registered_session" })
+  assert.equal(f.calls.length, 1)
+})
+
+test("provider conflict preserves the guest unless the same guest explicitly switches", async () => {
+  const f = fixture(guestUser)
+  assert.equal(await f.service.switchGuestProvider("google", guestUser.id, () => false), null)
+  assert.deepEqual(f.calls, [])
+  await assert.rejects(f.service.switchGuestProvider("google", "wrong", () => true), { code: "identity_conflict" })
+  assert.deepEqual(f.calls, [])
+  assert.equal((await f.service.switchGuestProvider("google", guestUser.id, () => true)).expectedUserId, null)
+  assert.deepEqual(f.calls.map(call => call[0]), ["signout", "oauth"])
+})
+
+test("Loader distinguishes inactive accounts, throttling, unavailable games and outages without exposing diagnostics", async () => {
+  for (const [status, error, expected] of [[403,"JOY8_PLAYER_INACTIVE","007"],[429,"Too many requests","008"],[403,"JOY8_GAME_NOT_READY","009"],[401,"unknown","010"],[503,"internal secret","011"]]) {
+    const result = await gameFailure({ context: new Response(JSON.stringify({ error }), { status, headers: { "Retry-After": "30" } }) })
+    assert.equal(result.code, `JOY8-GAME-${expected}`)
+    assert.equal(JSON.stringify(result).includes("internal secret"), false)
+    if (status === 429) assert.match(result.message, /30/)
+  }
+})
 
 function fixture(initialUser = null) {
   let user = initialUser

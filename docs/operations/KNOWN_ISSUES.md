@@ -16,6 +16,30 @@ each product must still implement and verify authoritative gameplay before activ
 
 ## Product-Readiness Decisions
 
+### Pending Release Safety Changes
+
+The [reviewed proposals](../../supabase/drafts/README.md#release-safety-review)
+are tested locally where stated, not installed. Release remains blocked on:
+
+- Pausing or explicitly approving the hidden entries. Monster Lab currently uses
+  `https://joy8.cc` and any enrolled member/guest can create a session. Mahjong's
+  localhost Origin binding is not an authenticated tester gate.
+- An operator-approved cumulative platform-payout quota. The hosted per-entry
+  guard alone does not cap repeated payouts across hands or matches.
+- Operator recovery with product-void evidence, expected settlement count and
+  atomic adapter cancellation. No automatic time-based release is authorized.
+- Disabling hosted Email Auth and replacing email-only administrator matching
+  with the verified Google Auth identity. Browser catalog deletion is also
+  revoked by the proposed admin migration; removing its UI alone is insufficient.
+- Scheduling cleanup independently of published-game launches. The proposed
+  pg_cron job requires installation/permission verification before application.
+
+The six-digit public-ID capacity and guest abuse/retention policy remain explicit
+release limits; do not delete identities, recycle IDs or expand the namespace
+without a reviewed product/database change. Turnstile does not make the namespace
+unlimited. Facebook remains deferred; missing-email provider acceptance is not
+silently relaxed by this cleanup.
+
 ### Operational Accounting and Cutover
 
 - The deployed foundation implements scope, backend authority, reservation,
@@ -60,7 +84,7 @@ those operations across matches. Measure hosted capacity before funded or public
 activation. The installed runtime distinguishes available funds from the active
 table's reservation and requires readiness version 2.
 
-The Mahjong fixture consumes the complete 28-source platform export, with ordered
+The Mahjong fixture must consume the current platform export, with ordered
 inventory, migration classification and hash checks. Its native PostgreSQL tests
 cover the current hardening, balance contract and restricted checkpoint lock.
 Local accounting measurements and their limits belong in Mahjong's deployment
@@ -78,7 +102,7 @@ acceptance remain incomplete. This is intentionally deferred while the operator
 is an individual without an appropriate registered business; retain the app and
 do not enable the provider or public entry flag. No Meta App Secret is stored in
 the repository or hosted Auth.
-The public Email/password flow is disabled. Cloudflare Email Sending is disabled,
+The public Email/password UI is absent, but the hosted Email provider and API signup are enabled and require verification. Disable the hosted Email provider before release; do not disable all signup, which would also affect approved identity methods. Cloudflare Email Sending is disabled,
 both SMTP credentials were deleted, and Workers Paid was canceled.
 
 Current behavior:
@@ -89,7 +113,7 @@ Current behavior:
   conflict/preservation acceptance remain incomplete.
 - `/account/` is a callback trampoline back to the Lobby dialog. It is not a
   standalone account, password or recovery page.
-- Branded cross-origin handoff and account-deletion requests remain unimplemented.
+- Branded cross-origin handoff exists; real provider/game acceptance and account-deletion requests remain incomplete.
 - The shared wallet is resolved by trusted Joy8 game policy. Mahjong's enabled
   zero-credit identity policy does not establish funded-play readiness.
 
@@ -305,18 +329,6 @@ reason about than exact-origin delivery.
 The shared Error Modal does not yet provide a complete focus trap and focus restoration after close.
 
 Address this when accessibility work is in scope. Preserve the existing error codes and plain fallback content.
-
-### Repeated Admin Form Metadata
-
-Create and edit flows repeat some field and game-type option definitions.
-
-Do not refactor only for aesthetic reuse. Centralize the definitions when a real catalog change needs both paths or when the options become inconsistent.
-
-### Mixed User-Facing Language
-
-Some public and error UI strings are Chinese while a few fallback paths are English.
-
-This documentation cleanup does not change product copy. Decide the intended product language and localization model before normalizing UI strings.
 
 ## Stable Constraints
 

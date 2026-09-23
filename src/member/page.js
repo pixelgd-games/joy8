@@ -1,3 +1,4 @@
+import { createMemberAuthFlow } from "./auth-flow.js"
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
 import { createMemberCaptcha } from "./captcha.js"
@@ -7,19 +8,17 @@ export function initMemberPanel(root, options = {}) {
   const $ = (id) => root.querySelector(`#${id}`)
   const params = options.params ?? new URLSearchParams()
   const facebookEnabled = options.facebookEnabled ?? import.meta.env.VITE_FACEBOOK_AUTH_ENABLED === "true"
-  const flow = params.get("flow")
   const providerParam = params.get("provider")
   const callbackProvider = providerParam === "google" || (facebookEnabled && providerParam === "facebook") ? providerParam : null
   const authCode = params.get("code")
   const callbackError = params.has("error") || params.has("error_code")
-  const callbackErrorCode = params.get("error_code") || "auth_callback_failed"
   const service = createMemberService(memberSupabase, {
     origin: location.origin,
     next: params.get("next"),
     guestLock: navigator.locks ? (fn) => navigator.locks.request("joy8-guest-entry", fn) : null,
   })
   const captcha = options.captcha ?? createMemberCaptcha(root)
-  const pendingKey = "joy8-member-link-user"
+  const memberFlow = createMemberAuthFlow(service, { isActive: () => !disposed, onRetained: async () => { status("已保留目前的訪客帳號，沒有合併或轉移任何資料。"); await refresh() } })
   const entryDescription = $("account-description").textContent
   let user = null
   let busy = false
@@ -90,52 +89,8 @@ export function initMemberPanel(root, options = {}) {
     $("enroll-button").hidden = Boolean(member)
   }
 
-  async function beginProvider(provider) {
-    if (user?.is_anonymous) sessionStorage.setItem(pendingKey, user.id)
-    else sessionStorage.removeItem(pendingKey)
-    let result
-    try {
-      result = await service.oauth(provider)
-    } catch (error) {
-      if (error?.code !== "identity_already_exists") sessionStorage.removeItem(pendingKey)
-      throw error
-    }
-    if (disposed) return
-    if (result.expectedUserId) sessionStorage.setItem(pendingKey, result.expectedUserId)
-    else sessionStorage.removeItem(pendingKey)
-    location.assign(result.url)
-  }
-
-  async function switchToExistingProvider(provider) {
-    const current = (await service.session())?.user
-    const expected = sessionStorage.getItem(pendingKey)
-    if (!current?.is_anonymous || !expected || current.id !== expected) {
-      throw Object.assign(new Error("Original guest identity unavailable"), { code: "identity_conflict" })
-    }
-    const label = providerLabel(provider)
-    const confirmed = window.confirm(`這個 ${label} 已經綁定其他 Joy8 玩家。\n\n繼續後會離開目前訪客帳號，登入既有帳號；訪客進度、POINT 與錢包不會合併或轉移。`)
-    sessionStorage.removeItem(pendingKey)
-    if (!confirmed) {
-      status("已保留目前的訪客帳號，沒有合併或轉移任何資料。")
-      await refresh()
-      return
-    }
-    await service.signOut()
-    await beginProvider(provider)
-  }
-
   function startProvider(provider) {
-    return run(async () => {
-      try {
-        await beginProvider(provider)
-      } catch (error) {
-        if (error?.code === "identity_already_exists" && user?.is_anonymous) {
-          await switchToExistingProvider(provider)
-          return
-        }
-        throw error
-      }
-    })
+    return run(() => memberFlow.begin(provider))
   }
 
   $("google-button").addEventListener("click", () => startProvider("google"))
@@ -162,26 +117,14 @@ export function initMemberPanel(root, options = {}) {
 
   $("signout-button").addEventListener("click", () => run(async () => {
     if (user?.is_anonymous && !window.confirm("登出後可能無法找回這個訪客進度。建議先綁定 Google，確定仍要登出？")) return
-    await service.signOut()
-    sessionStorage.removeItem(pendingKey)
+    await memberFlow.signOut()
     await refresh()
     status("已登出，請選擇登入方式。")
   }))
 
   const ready = run(async () => {
-    if (callbackError) {
-      if (callbackErrorCode === "identity_already_exists" && flow === "link" && callbackProvider) {
-        await switchToExistingProvider(callbackProvider)
-        return
-      }
-      sessionStorage.removeItem(pendingKey)
-      throw Object.assign(new Error("Authentication callback failed"), { code: callbackErrorCode })
-    }
-    if (authCode) {
-      await service.completeCallback(authCode, sessionStorage.getItem(pendingKey), flow)
-      sessionStorage.removeItem(pendingKey)
-      await service.membership(true)
-      continuePlaying()
+    if (callbackError || authCode) {
+      if (await memberFlow.complete(params)) continuePlaying()
       return
     }
     await refresh()

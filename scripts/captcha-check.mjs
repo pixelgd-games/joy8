@@ -33,7 +33,7 @@ async function fixture(t, loaded = true) {
   t.after(() => { globalThis.window = priorWindow; globalThis.document = priorDocument })
   const { createMemberCaptcha } = await import(`../src/member/captcha.js?test=${instance++}`)
   const create = () => {
-    const captcha = createMemberCaptcha({ querySelector: () => ({}) })
+    const captcha = createMemberCaptcha({ querySelector: () => ({}) }, "test-site-key")
     t.after(() => captcha.dispose())
     return captcha
   }
