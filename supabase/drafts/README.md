@@ -97,7 +97,7 @@ check the retained administrator; it does not create an Auth login or change a
 user. Real interactive provider acceptance remains separate.
 
 The separate Email-provider shutdown is approved but not applied: the local
-access token receives HTTP 403 from Auth configuration. Update the token locally
+access token receives HTTP 403: `Missing required permission(s): auth_config_read`. Update the token locally
 with Auth configuration read/write permission. Then use
 `scripts/supabase-joy8.cmd auth-config disable-email --apply`, preserving Google
 and anonymous signups. `auth-config status` prints selected booleans only. Verify public settings afterward and confirm real Google admin

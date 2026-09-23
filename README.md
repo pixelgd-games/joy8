@@ -28,7 +28,7 @@ and pg_cron schedules cleanup every ten minutes. No payout quota, POINT credit,
 backend key or public game activation was granted.
 
 Email-provider shutdown is approved but blocked: the local Joy8 access token
-receives HTTP 403 for Auth configuration. Update that token locally with Auth
+receives HTTP 403: `Missing required permission(s): auth_config_read`. Update that token locally with Auth
 configuration read/write permission, then run
 `scripts/supabase-joy8.cmd auth-config disable-email --apply`.
 Hosted Email remains enabled until this succeeds; Google and guest settings

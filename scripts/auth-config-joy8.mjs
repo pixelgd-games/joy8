@@ -10,7 +10,15 @@ async function request(method = "GET", body) {
   if (!response.ok) {
     const body = await response.text()
     const category = /permission|scope|privilege/i.test(body) ? "insufficient permission" : /cloudflare|html|forbidden/i.test(body) ? "request blocked" : "API rejection"
-    throw new Error(response.status === 401 ? "Unauthorized: refresh the local Joy8 access token" : `Auth configuration request failed (${response.status}; ${category})`)
+    let reason = "No structured API reason"
+    try {
+      const error = JSON.parse(body)
+      if (typeof error.message === "string") reason = error.message
+    } catch {}
+    reason = reason.replaceAll(process.env.SUPABASE_ACCESS_TOKEN, "[redacted]")
+      .replace(/(?:Bearer\s+\S+|sbp_[\w-]+|sb_secret_[\w-]+|eyJ[\w.-]+|[^\s@]+@[^\s@]+)/gi, "[redacted]")
+      .replace(/[\r\n]/g, " ").slice(0, 400)
+    throw new Error(response.status === 401 ? "Unauthorized: refresh the local Joy8 access token" : `Auth configuration request failed (${response.status}; ${category}): ${reason}`)
   }
   return response.json()
 }
