@@ -16,23 +16,18 @@ each product must still implement and verify authoritative gameplay before activ
 
 ## Product-Readiness Decisions
 
-### Pending Release Safety Changes
+### Remaining Release Safety Gates
 
-The [reviewed proposals](../../supabase/drafts/README.md#release-safety-review)
-are tested locally where stated, not installed. Release remains blocked on:
+The [approved safety migrations](../../supabase/drafts/README.md#release-safety-review)
+are installed. Hidden entries are paused, cumulative payout quotas and operator
+recovery are enforced, Google identity binds administrator authority, browser
+catalog DELETE is revoked, and cleanup is scheduled independently of game launches.
 
-- Pausing or explicitly approving the hidden entries. Monster Lab currently uses
-  `https://joy8.cc` and any enrolled member/guest can create a session. Mahjong's
-  localhost Origin binding is not an authenticated tester gate.
-- An operator-approved cumulative platform-payout quota. The hosted per-entry
-  guard alone does not cap repeated payouts across hands or matches.
-- Operator recovery with product-void evidence, expected settlement count and
-  atomic adapter cancellation. No automatic time-based release is authorized.
-- Disabling hosted Email Auth and replacing email-only administrator matching
-  with the verified Google Auth identity. Browser catalog deletion is also
-  revoked by the proposed admin migration; removing its UI alone is insufficient.
-- Scheduling cleanup independently of published-game launches. The proposed
-  pg_cron job requires installation/permission verification before application.
+Release still requires an explicitly approved game audience and activation,
+funded limits and payout quota amounts, product recovery evidence/procedures, and
+the coordinated frontend/Gateway release. The Auth token currently receives HTTP
+403 for configuration, so the approved Email-provider shutdown is not complete.
+Email remains enabled; update the local token with Auth configuration permission.
 
 The six-digit public-ID capacity and guest abuse/retention policy remain explicit
 release limits; do not delete identities, recycle IDs or expand the namespace
@@ -66,10 +61,11 @@ POINT purchase policy and release timing belong in
 
 The continuous-settlement extension, ledger cleanup and 22-table Mahjong private
 schema are installed. Private entry and the hosted `joy8-gateway` using product
-protocol `server-v1` are active with an
+protocol `server-v1` are installed with an
 identity-only game policy and zero opening credit. The restricted TLS database
 connection passed; the game has only an expiring exchange/renew key. Test entry
-uses ordinary member/guest authentication without per-player approval.
+uses ordinary member/guest authentication without per-player approval, but its
+backend entry is currently paused.
 Real sign-in/game acceptance and funded-play policy/key
 scopes remain incomplete. The test page ships with Joy8, but Mahjong entry is
 configured only for localhost and its public release is not activated.

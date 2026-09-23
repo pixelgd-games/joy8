@@ -15,6 +15,7 @@ before(async () => {
   for (const source of bundle.sources) await db.exec(source.sql)
   await loadProductAccounting(db)
   game = (await one("select id from public.games where slug='test-game'")).id
+  await db.query("insert into public.joy8_payout_budgets(game_id,approved_amount) values($1,10000000)", [game])
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,enabled=true returning id")).id
   await db.query(`insert into public.joy8_game_policies(
     game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode

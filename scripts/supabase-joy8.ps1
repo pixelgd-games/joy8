@@ -93,6 +93,11 @@ if (!$isProjectsList) {
 
 $isDbQuery = $SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "db" -and $SupabaseArgs[1] -eq "query"
 
+if ($SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "auth-config") {
+  & node (Join-Path $PSScriptRoot "auth-config-joy8.mjs") @($SupabaseArgs | Select-Object -Skip 1)
+  exit $LASTEXITCODE
+}
+
 if ($isDbQuery) {
   if ([string]::IsNullOrWhiteSpace($env:SUPABASE_DB_PASSWORD)) {
     Stop-Joy8Supabase "Missing SUPABASE_DB_PASSWORD in .env.supabase.local."

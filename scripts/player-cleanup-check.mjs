@@ -12,6 +12,8 @@ const retained = ["8cd34776-7803-47a7-b0b8-1754eb9128f0", "ac5cb167-7cdc-4e49-ba
 before(async () => {
   await loadPlatformDatabase(db)
   await db.exec(`
+    drop table auth.identities;
+    drop table public.admin_users;
     create table auth.sessions(id uuid primary key default gen_random_uuid(),user_id uuid references auth.users on delete cascade);
     create table auth.identities(user_id uuid references auth.users on delete cascade);
     create table auth.flow_state(user_id uuid);
@@ -24,7 +26,7 @@ before(async () => {
     create table mahjong_clash.economy_state(singleton boolean primary key);
     insert into mahjong_clash.economy_state values(true);
     insert into auth.users(id) values('${retained[0]}'),('${retained[1]}');
-    insert into auth.users select gen_random_uuid(),true,null,null,null from generate_series(1,11);
+    insert into auth.users(id,is_anonymous,email_confirmed_at,deleted_at,banned_until) select gen_random_uuid(),true,null,null,null from generate_series(1,11);
     insert into public.admin_users values('${retained[1]}');
     insert into auth.sessions(user_id) select id from auth.users;
     insert into auth.identities select id from auth.users;

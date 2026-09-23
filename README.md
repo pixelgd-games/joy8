@@ -19,12 +19,20 @@ Turnstile now requires `VITE_TURNSTILE_SITE_KEY` at build time and fails closed
 when missing. Configure the existing production public site key before release;
 use a separate local/test key for local builds. Never use a test key in production.
 
-Security SQL proposals are in [the release review](supabase/drafts/README.md#release-safety-review).
-They have not been applied. Hosted inspection confirms enabled hidden entries for
-Mahjong (`http://localhost:5173`) and Monster Lab (`https://joy8.cc`), no open
-matches and no active financial backend keys. Hidden status and Origin checks do
-not restrict entry to selected testers. Current deployed admin authorization
-matches JWT email; its replacement is part of the pending review.
+The five user-approved security migrations are installed. See the
+[release safety review](supabase/drafts/README.md#release-safety-review) for their
+operating boundaries. Mahjong and Monster Lab hidden entries are paused.
+Administrator checks now bind the verified Google Auth identity, browser catalog
+DELETE is revoked, platform payout quotas and operator recovery are installed,
+and pg_cron schedules cleanup every ten minutes. No payout quota, POINT credit,
+backend key or public game activation was granted.
+
+Email-provider shutdown is approved but blocked: the local Joy8 access token
+receives HTTP 403 for Auth configuration. Update that token locally with Auth
+configuration read/write permission, then run
+`scripts/supabase-joy8.cmd auth-config disable-email --apply`.
+Hosted Email remains enabled until this succeeds; Google and guest settings
+have not been changed.
 
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
@@ -65,10 +73,9 @@ Joy8's local `/play-test/` entry is available at `http://localhost:5173` and use
 normal member/guest authentication and backend entry configuration, with no
 per-player test allowlist. The hosted `joy8-gateway` is active with the private
 session route and continuous-settlement error mapping. Hosted health, rejection
-and identity-key scope checks passed. The test-entry page is part of the standard
-Cloudflare front-end build, but Mahjong's backend entry remains bound to localhost;
-the page is publicly reachable and a forged Origin can reach the hidden session
-issuer. This is not a tester authorization boundary. See the
+and identity-key scope checks passed. The test-entry page is part of the standard Cloudflare build. Both hidden entries
+are now paused, so private-session creation is denied. Stored origins remain
+unchanged; Origin is not a tester authorization boundary. See the
 [identity connection review](supabase/drafts/MAHJONG_REVIEW.md#identity-only-connection).
 The repository now also contains a generic game-branded `/entry/?slug=mahjong-clash`
 shell. It loads the game-owned login artwork first, keeps Google/guest Auth in
@@ -82,8 +89,8 @@ The [integration contract](docs/platform/GAME_PLATFORM_INTEGRATION.md#continuous
 owns the protocol; [Mahjong activation](supabase/drafts/MAHJONG_REVIEW.md) owns
 the remaining configuration gates.
 The public catalog currently contains no published games or Lobby cover assets.
-Mahjong and Monster Lab remain hidden catalog entries reserved for integration
-testing.
+Mahjong and Monster Lab remain hidden catalog entries. Their private entries
+are paused until a separate activation review.
 
 The hosted platform now includes Joy8's generic Seamless Wallet extension. It
 separates each game's bet limit from its payout guard and supports
@@ -91,7 +98,7 @@ player-versus-platform accounting without a game-owned wallet or adapter. A
 follow-up platform constraint keeps `max_bet_amount` at or below 10,000 POINT;
 capped openings enforce that bet limit while table reservations use a separate
 mode. Monster Lab now has the hidden Game ID
-`9f0df218-a0fd-40bc-a018-151fd7a1d996`, an enabled private entry,
+`9f0df218-a0fd-40bc-a018-151fd7a1d996`, a paused private entry,
 platform funding, one participant, a 10,000 POINT platform bet ceiling and a
 1,000,000 POINT payout guard. It remains unpublished and has no Backend Key;
 its current hosted game build is not a completed Joy8 integration.
@@ -406,7 +413,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-The 59 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
+The 64 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
 Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
@@ -528,7 +535,7 @@ only to the target backend's local Wrangler process and never print it. The full
 operator commands and local file names are documented in
 `integrations/third-party/README.md`.
 
-`test:release-safety` exercises the pending quota, administrator, entry-pause and
+`test:release-safety` exercises the installed quota, administrator, entry-pause and
 operator-recovery SQL against the current platform bundle. It tests cumulative
 payouts, retries, shared quota reservations, role restrictions, evidence, retained
 settlements, adapter rollback and cleanup without releasing occupied funds.

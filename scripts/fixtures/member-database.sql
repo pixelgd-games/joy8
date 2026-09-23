@@ -9,6 +9,7 @@ create extension pgcrypto with schema extensions;
 
 create table auth.users (
   id uuid primary key default gen_random_uuid(),
+  email text,
   is_anonymous boolean not null default false,
   email_confirmed_at timestamptz,
   deleted_at timestamptz,
@@ -32,3 +33,8 @@ insert into public.games (name, slug, type, published, launch_url) values
   ('Test game', 'test-game', 'casual', true, 'https://game.example/'),
   ('Hidden game', 'hidden-game', 'casual', false, 'https://game.example/'),
   ('Missing URL', 'missing-url', 'casual', true, null);
+
+create table auth.identities(user_id uuid,provider text);
+create table public.admin_users(email text);
+create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+create function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;

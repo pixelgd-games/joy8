@@ -1,4 +1,5 @@
 select jsonb_build_object(
+  'business', jsonb_build_object('players',(select count(*) from public.player_accounts),'wallets',(select count(*) from public.wallet_accounts),'balance',(select coalesce(sum(balance),0) from public.wallet_accounts),'locked',(select coalesce(sum(locked_balance),0) from public.wallet_accounts),'transactions',(select count(*) from public.wallet_transactions),'matches',(select count(*) from public.joy8_matches),'settlements',(select count(*) from public.joy8_settlements)),
   'entries', (select jsonb_agg(jsonb_build_object('slug',g.slug,'published',g.published,'enabled',e.enabled,'origin',e.entry_origin)) from public.joy8_private_entries e join public.games g on g.id=e.game_id),
   'open_matches', (select count(*) from public.joy8_matches where state='open'),
   'pg_cron_installed', exists(select 1 from pg_extension where extname='pg_cron'),

@@ -1,7 +1,8 @@
 # Mahjong database and runtime review
 
 Status: private entry, identity-only connection, and the shared POINT wallet
-cutover are installed and verified in the hosted database. Hosted play acceptance,
+cutover are installed and verified in the hosted database. The hidden entry is
+paused by the approved release-safety migration. Hosted play acceptance,
 publication and funding remain pending.
 
 ## Installed database boundary
@@ -156,6 +157,9 @@ Two installed runtime limits remain relevant before funded or public play:
   resulting capacity before public activation.
 
 ## Remaining activation
+
+The entry is currently paused. Re-enabling requires a reviewed audience and
+activation change before these acceptance steps.
 
 1. Sign in through Joy8 or restore the existing guest. Verify the same player
    reaches the running game with the same shared balance; no test-access grant is required.

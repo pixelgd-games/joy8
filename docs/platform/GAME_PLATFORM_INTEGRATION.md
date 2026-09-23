@@ -20,7 +20,7 @@ this protocol in their own repositories before activation.
 Repository entry cleanup removes `branded-session` and route-less session
 creation; both branded and explicit test entry call `private-session`.
 The frontend and Gateway changes await coordinated release. Hosted origin bindings
-and the pending safety migrations are tracked in README and `supabase/drafts/README.md`.
+and the installed safety migrations are tracked in README and `supabase/drafts/README.md`.
 
 The current `server-v1` contract still asserts `wallet_scope: platform` and the
 read-only `balance` token scope. These are fixed authority checks, not selectable
@@ -651,9 +651,10 @@ load smaller subsets for migration regressions.
 
 ### Recovery and Errors
 
-`JOY8_PAYOUT_BUDGET_EXCEEDED` is reserved for the tested payout-budget proposal;
-the local Gateway maps it to 409, but hosted SQL does not enforce that budget yet.
-The proposal reserves each platform-funded match's maximum cumulative positive
+`JOY8_PAYOUT_BUDGET_EXCEEDED` is enforced by hosted SQL. The local Gateway maps
+it to 409; that HTTP mapping awaits the coordinated Gateway release. There are
+currently no approved quota rows, so platform-funded opening fails closed.
+The database reserves each platform-funded match's maximum cumulative positive
 player/fee payout against an operator-approved per-game issuance quota. Losses
 do not replenish it, exact retries do not spend twice, and final/cancel releases
 unused exposure. It is a risk ceiling, not a game wallet or Transfer Wallet.

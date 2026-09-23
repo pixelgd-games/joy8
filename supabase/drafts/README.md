@@ -1,8 +1,8 @@
 # Review-only SQL
 
 This directory holds review documents and any future unapproved SQL. SQL here is
-excluded from active migration discovery. The release-safety SQL below is pending
-review and must not enter active migrations or be applied without approval.
+excluded from active migration discovery. The five approved release-safety changes
+below were promoted to active migrations without changing their reviewed SQL.
 
 [MAHJONG_REVIEW.md](MAHJONG_REVIEW.md) owns the installed Mahjong boundary and
 remaining activation decisions. It does not authorize publication, keys or
@@ -30,7 +30,7 @@ execute it. The deployed Gateway passed its positive localhost branded-entry,
 health and rejection smoke without creating an identity, wallet, session or
 settlement.
 
-The current enabled hidden Mahjong entry remains exactly
+The currently paused Mahjong entry retains the exact binding
 `http://localhost:5173` -> `http://localhost:4391/`. Mahjong is not deployed to
 the cloud. A future production origin/launch URL requires a separate small
 reviewed migration and end-to-end acceptance; it must not clear, sum, transfer or
@@ -54,24 +54,27 @@ separate review of POINT source, limits, backend scopes and the game.
 
 ## Release safety review
 
-These are independent forward-change proposals, not deployment history or an
-old/new runtime. `scripts/release-safety-check.mjs` installs the current platform
-bundle and explicitly exercises the proposals in isolated test data. No budget,
-credit, key, production game activation or data reset is authorized by these files.
+All five changes are approved and installed in hosted Joy8. They do not grant
+payout quotas, POINT credit, keys or public game activation. The platform bundle
+includes the administrator, quota and recovery schema. Entry activation and the
+hosted scheduler are classified separately; release-safety tests exercise
+pause and cleanup semantics in isolation.
 
-| Proposal | Concrete effect | Release/rollback boundary |
-| --- | --- | --- |
-| [private-entry-pause.sql](private-entry-pause.sql) | Disable the two hidden Mahjong/Monster Lab entries; require no open matches or active financial keys | Re-enabling requires reviewed audience, origin and activation; no identity or balance deletion |
-| [admin-identity.sql](admin-identity.sql) | Resolve the allowlisted email from `auth.uid()` and a verified, active Google identity; require Google session provider; revoke catalog DELETE from browser administrators | Verify the retained administrator's Google identity before applying; do not restore email-only authorization |
-| [platform-payout-budget.sql](platform-payout-budget.sql) | Reserve per-match maximum payout against a per-game approved issuance quota; consume positive player/fee payouts cumulatively; preserve usage across sessions/keys; release unused liability on close | Reject installation with open platform-funded matches; no quotas are automatically granted, so platform-funded opening is disabled until a reviewed quota row exists |
-| [operator-match-recovery.sql](operator-match-recovery.sql) | Operator-only cancellation with reason, evidence reference and exact settlement count; atomic adapter cancellation and reservation release; preserve prior settlements | Use only after authoritative product evidence establishes the unfinished match is void; an adapter failure rolls back; no timeout-only cancellation or browser access |
-| [runtime-maintenance.sql](runtime-maintenance.sql) | Install pg_cron and schedule fixed-search-path cleanup every ten minutes, independent of game launches | Extension installation and scheduling must succeed atomically; expires sessions and removes expired rate counters, never players, wallets, financial history or reservations |
+| Migration | Installed effect |
+| --- | --- |
+| [Private entry pause](../migrations/20260923143700_private_entry_pause.sql) | Mahjong/Monster Lab entries disabled; origins and game records retained |
+| [Admin identity](../migrations/20260923143710_admin_identity.sql) | Verified active Google Auth identity and Google session required; browser catalog DELETE revoked |
+| [Payout budget](../migrations/20260923143720_platform_payout_budget.sql) | Per-game approved quota reserves cumulative match exposure and consumes positive payouts; no quota granted |
+| [Operator recovery](../migrations/20260923143730_operator_match_recovery.sql) | Operator-only cancellation with evidence and exact settlement count; atomic product cancellation and unlock; immutable recovery evidence |
+| [Runtime maintenance](../migrations/20260923143740_runtime_maintenance.sql) | pg_cron installed; cleanup scheduled every ten minutes; never releases reservations or deletes financial history |
 
-The current preflight finds one verified Google administrator and no installed
-pg_cron extension. The maintenance proposal includes installation using the
-[Supabase Cron installation procedure](https://supabase.com/docs/guides/cron/install).
-The local tests exercise cleanup semantics; actual scheduler execution must be
-verified after approved hosted application.
+Hosted postflight confirms both entries paused, retained Google administrator
+allowed, Email session denied administrator authority, browser deletion/recovery
+permissions denied, three quota triggers enabled and zero approved quota rows.
+The three player accounts remain unchanged, with zero wallets, balances,
+transactions, matches or settlements. The cleanup job is active and its first
+scheduled execution succeeded. Inspect run records through
+`scripts/sql/release-safety-postflight.sql`.
 
 Before every hosted database operation, verify Joy8 with the wrapper. Rerun
 [`release-safety-preflight.sql`](../../scripts/sql/release-safety-preflight.sql)
@@ -88,8 +91,16 @@ Inspect the match and product state first. Never supply the project administrato
 password or evidence containing player credentials in command arguments or chat.
 The function is not granted to anon, authenticated, service_role or game runtimes.
 
-Separate hosted Auth change: disable the Email provider, preserving Google and
-anonymous signups. Verify public settings afterward and confirm real Google admin
+The wrapper's direct `db query --db-url` path accepts one prepared statement.
+Postflight uses a single CTE statement with transaction-local synthetic claims to
+check the retained administrator; it does not create an Auth login or change a
+user. Real interactive provider acceptance remains separate.
+
+The separate Email-provider shutdown is approved but not applied: the local
+access token receives HTTP 403 from Auth configuration. Update the token locally
+with Auth configuration read/write permission. Then use
+`scripts/supabase-joy8.cmd auth-config disable-email --apply`, preserving Google
+and anonymous signups. `auth-config status` prints selected booleans only. Verify public settings afterward and confirm real Google admin
 and member login. Do not set the global `disable_signup` flag to true. Configure
 `VITE_TURNSTILE_SITE_KEY` before the next frontend build; no source-code key fallback
 exists. Neither Auth settings nor Cloudflare deployment changes are performed by
