@@ -345,8 +345,12 @@ secure random source, registers only the SHA-256 hash in Joy8, and passes the
 plaintext through standard input directly to an explicitly named Cloudflare
 Worker secret. The plaintext is never a command argument, profile value,
 temporary SQL value or terminal result. The command verifies the linked Joy8
-project before each database operation, requires an enabled POINT policy and
-refuses a published game. Cloudflare installation deploys immediately. If
+project before each database operation and requires an enabled POINT policy.
+Private-integration provisioning requires an unpublished game. Published games
+support production-purpose rotation of a specified existing game key without
+expanding its scopes. Every mutation requires user approval, the matching
+`--reviewed-plan` file and `--apply`; see the operator commands in README.
+Cloudflare installation deploys immediately. If
 delivery fails, the new database key is revoked; rotation installs the new key
 before revoking the specifically selected old key.
 

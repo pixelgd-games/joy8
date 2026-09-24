@@ -819,6 +819,13 @@ It does not establish that the CLI now has configuration read/write access.
 
 A push to `main` triggers production deployment. Do not push documentation or code changes unless the user explicitly requests it.
 
+The current production artifacts were deployed with Wrangler from the verified
+local `dist` build and tagged with the matching Git commit. Git integration
+remains enabled. Its automatic build path still has a
+[Cloudflare environment blocker](docs/operations/KNOWN_ISSUES.md#cloudflare-build-environment);
+successful artifact deployment does not establish that automatic builds work.
+Never deploy `.smoke-dist.local`, which contains mocked test configuration.
+
 Joy8 remains on Cloudflare Pages. Mahjong H5 is planned for separate static
 hosting on Cloudflare, but it is not part of the current Joy8 deployment and
 still requires its own asset/readiness review. Godot remains local during

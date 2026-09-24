@@ -36,6 +36,21 @@ without a reviewed product/database change. Turnstile does not make the namespac
 unlimited. Facebook remains deferred; missing-email provider acceptance is not
 silently relaxed by this cleanup.
 
+### Cloudflare Build Environment
+
+The Git-connected Pages build can fail before the project build starts:
+Cloudflare's Node installer cannot fetch its GitHub `node-build` repository,
+reports `could not read Username for 'https://github.com'`, and then cannot find
+the configured Node 22.23.2 definition. Retrying reproduced the failure, although
+an earlier build of the same runtime source succeeded. The provider-side cause
+has not been established; this is not evidence of a Joy8 repository permission
+or application build error.
+
+Production is serving the verified local build uploaded with Wrangler to the
+same Pages project and tagged with its source commit. Git integration remains
+enabled. Automatic build recovery requires a successful Git-triggered build;
+the direct upload does not resolve that remaining operational issue.
+
 ### Operational Accounting and Cutover
 
 - The deployed foundation implements scope, backend authority, reservation,
