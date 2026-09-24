@@ -111,18 +111,17 @@ limits, future approved payout quota amounts, funded Mahjong limits, and any
 Facebook identity without email. Those are not solved by deleting users,
 recycling IDs, inventing credit or weakening identity verification.
 
-## Pending metadata and session cleanup
+## Metadata and session cleanup
 
-These two new proposals are not approved or applied. The earlier approval covered
-only the five installed release-safety migrations above.
+Both proposals were approved and installed without changing their reviewed SQL.
 
-- [session-contract-cleanup.sql](session-contract-cleanup.sql) removes the unused
+- [Session contract cleanup](../migrations/20260924012500_session_contract_cleanup.sql) removes the unused
   platform `player_accounts.display_name` and replaces both session issuers with
   the exact `(game_slug, auth_user_id)` signature. POINT, the one-hour session and
   120-second launch code are fixed internally. Public/private entry checks,
   member verification and shared-wallet provisioning remain. Health checks are
   updated; old signatures are dropped, with no fallback.
-- [catalog-metadata-cleanup.sql](catalog-metadata-cleanup.sql) removes
+- [Catalog metadata cleanup](../migrations/20260924012510_catalog_metadata_cleanup.sql) removes
   `games.supports_live` and replaces the catalog function/view without this field.
   Public users still see only published games. Grants remain narrow and the
   catalog function uses an empty search_path.
@@ -135,11 +134,21 @@ and remains untouched. There is no wallet, POINT, key, ID, retention or game-rul
 change. `wallet_scope`, token scopes and policy mappings remain active protocol
 and authorization fields; no game-side contract changes are included.
 
-`session-cleanup-check.mjs` installs the current bundle and exercises these drafts,
-including refusal guards, removed signatures, fixed lifetimes, browser denial and
-published-only catalog access. The drafts remain outside normal migration export.
-After approval, promote the exact reviewed files to timestamped migrations and
-classify them in the fixture manifest. Apply session cleanup before the matching
-local Gateway is deployed, and release the frontend/Gateway together. Keep hidden
-entries paused throughout. Do not deploy the local Gateway against the previous
-issuer signature. A source push to main still needs an explicit user request.
+`session-cleanup-check.mjs` constructs the historical pre-cutover fixture and
+applies both exact migrations, including refusal guards, removed signatures,
+fixed lifetimes, browser denial and published-only catalog access. Both files
+are classified in the fixture manifest; the guarded cutovers are exercised
+separately from the exported historical base bundle.
+
+Hosted postflight confirms both obsolete signatures and columns are absent,
+the new issuer and health check work, service/browser grants are correct, and
+all entries remain paused. Three players remain, with zero wallets, balances,
+transactions, matches or settlements. Recheck with
+[`session-cleanup-postflight.sql`](../../scripts/sql/session-cleanup-postflight.sql)
+using the wrapper's password-authenticated database connection. The linked
+Management API query role cannot execute restricted health/admin functions;
+do not broaden production grants for these checks.
+
+The matching frontend/Gateway still await coordinated deployment. The hosted
+Gateway sends the removed arguments, so keep all game entries paused until
+that release. A source push to main still needs an explicit user request.

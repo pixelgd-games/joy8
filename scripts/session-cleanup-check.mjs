@@ -6,8 +6,8 @@ import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
-const sessionSql = await readFile("supabase/drafts/session-contract-cleanup.sql", "utf8")
-const catalogSql = await readFile("supabase/drafts/catalog-metadata-cleanup.sql", "utf8")
+const sessionSql = await readFile("supabase/migrations/20260924012500_session_contract_cleanup.sql", "utf8")
+const catalogSql = await readFile("supabase/migrations/20260924012510_catalog_metadata_cleanup.sql", "utf8")
 let auth, game, player
 before(async () => {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)

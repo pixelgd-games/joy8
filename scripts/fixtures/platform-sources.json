@@ -68,6 +68,8 @@
     "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games.",
     "20260923110000_mahjong_processed_actions_history_limit.sql": "Product-owned processed-action constraint; retained as applied deployment history and excluded from the platform-only fixture.",
     "20260923143700_private_entry_pause.sql": "Hosted entry activation state; release-safety tests apply the pause explicitly to synthetic entries.",
-    "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler."
+    "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler.",
+    "20260924012500_session_contract_cleanup.sql": "Guarded session cutover requires paused entries; session-cleanup-check applies it after constructing and checking the historical pre-cutover fixture.",
+    "20260924012510_catalog_metadata_cleanup.sql": "Guarded catalog cutover requires the historical catalog view; session-cleanup-check installs it and verifies the current catalog and grants."
   }
 }

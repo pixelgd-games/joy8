@@ -12,10 +12,11 @@ The working implementation shares Auth callbacks/conflict handling and iframe
 handoff across entry surfaces. `/game/` and `/play-test/` have separate bootstraps
 and one Loader; `/entry/` adds game artwork and uses the same `private-session`
 route. The redundant `branded-session` route and route-less session fallback are
-removed. `create-session` accepts only `slug`. The local Gateway now also calls the
-two-argument database issuer from the pending session-cleanup draft. Apply that
-reviewed SQL before deploying this Gateway; frontend and Gateway must be released
-together; these changes are not yet deployed. No old/new runtime is retained.
+removed. `create-session` accepts only `slug`. The approved two-argument database
+issuer is installed and the old signature is removed. The matching local Gateway
+and frontend still await coordinated deployment. Keep all game entries paused
+until that release; the hosted Gateway still sends the removed arguments.
+No old/new runtime is retained.
 
 Turnstile now requires `VITE_TURNSTILE_SITE_KEY` at build time and fails closed
 when missing. Production builds also reject missing variables, another Supabase
@@ -418,7 +419,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-The 64 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
+The 66 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
 Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and

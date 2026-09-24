@@ -17,7 +17,7 @@ select jsonb_build_object(
   'ai_account_count',(select count(*) from mahjong_clash.ai_accounts),
   'product_match_count',(select count(*) from mahjong_clash.matches),
   'service_private_rpc',has_function_privilege('service_role','public.joy8_create_private_session(text,uuid,text)','EXECUTE'),
-  'service_internal_issuer',has_function_privilege('service_role','public.joy8_issue_game_session(text,text,integer,text,uuid)','EXECUTE'),
+  'service_internal_issuer',has_function_privilege('service_role','public.joy8_issue_game_session(text,uuid)','EXECUTE'),
   'browser_private_rpc',has_function_privilege('authenticated','public.joy8_create_private_session(text,uuid,text)','EXECUTE'),
   'browser_private_config',has_table_privilege('authenticated','public.joy8_private_entries','SELECT'),
   'game_wallet_access',has_table_privilege('mahjong_clash_server','public.wallet_accounts','SELECT'),

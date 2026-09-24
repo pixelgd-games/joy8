@@ -4,7 +4,7 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-23. The server-authorized base and continuous
+Current source reviewed: 2026-09-24. The server-authorized base and continuous
 per-hand settlement extension are installed in the hosted database. The Gateway
 function `joy8-gateway` includes private entry, branded entry and the
 settlement-error mappings; the service-only branded-entry resolver is installed.
@@ -26,12 +26,12 @@ The current `server-v1` contract still asserts `wallet_scope: platform` and the
 read-only `balance` token scope. These are fixed authority checks, not selectable
 wallet modes or fallback behavior. Removing them would change the game-facing
 protocol and requires coordinated game-repository work. The hosted service-only database
-issuer still has historical currency, expiry and display-name parameters. The
-[review-only session cleanup](../../supabase/drafts/session-contract-cleanup.sql)
-replaces it with `(game_slug, auth_user_id)`, fixes POINT and the existing session
-lifetimes internally, drops the unused platform display name and removes the old
-function signatures. The local Gateway is updated for that replacement; it must
-not be deployed before the approved database cutover. The game-facing
+issuer accepts only `(game_slug, auth_user_id)`. The installed
+[session cleanup](../../supabase/migrations/20260924012500_session_contract_cleanup.sql)
+fixes POINT and the existing session lifetimes internally, drops the unused
+platform display name and removes the old function signatures. The matching
+local Gateway still awaits deployment; keep all game entries paused until the
+coordinated frontend/Gateway release. The game-facing
 `server-v1` payload remains unchanged. Applied SQL history is never rewritten.
 
 A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
@@ -650,7 +650,12 @@ path list as well as every hash; checkout-based verification must also compare t
 contract and source content to the selected Joy8 checkout. A bundle with drafts is
 a proposed-schema test artifact, not evidence of hosted deployment. The full bundle
 is exercised on PGlite and PostgreSQL 17; focused historical tests may deliberately
-load smaller subsets for migration regressions.
+load smaller subsets for migration regressions. The guarded session/catalog
+cutover migrations are classified separately: `session-cleanup-check.mjs` builds
+the historical pre-cutover fixture, verifies refusal guards, applies both exact
+migrations and checks the current two-argument issuer and catalog permissions.
+The exported base bundle alone retains the historical issuer and is not a full
+current-schema snapshot or a deployment artifact.
 
 ### Recovery and Errors
 
