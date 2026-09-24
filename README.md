@@ -6,22 +6,22 @@ This file is the source of truth for the repository's current implementation. Pr
 
 Last implementation review: 2026-09-24.
 
-### Local changes awaiting release
+### Current deployed implementation
 
-The working implementation shares Auth callbacks/conflict handling and iframe
+The deployed implementation shares Auth callbacks/conflict handling and iframe
 handoff across entry surfaces. `/game/` and `/play-test/` have separate bootstraps
 and one Loader; `/entry/` adds game artwork and uses the same `private-session`
 route. The redundant `branded-session` route and route-less session fallback are
 removed. `create-session` accepts only `slug`. The approved two-argument database
-issuer is installed and the old signature is removed. The matching local Gateway
-and frontend still await coordinated deployment. Keep all game entries paused
-until that release; the hosted Gateway still sends the removed arguments.
-No old/new runtime is retained.
+issuer is installed and the old signature is removed. The matching frontend is
+deployed through Cloudflare Pages and Gateway version 6 is active. Hosted health,
+paused-entry rejection and removed-route checks pass. Game activation remains a
+separate reviewed operation. No old/new runtime is retained.
 
 Turnstile now requires `VITE_TURNSTILE_SITE_KEY` at build time and fails closed
 when missing. Production builds also reject missing variables, another Supabase
-project, privileged keys and Turnstile test keys. Configure the existing
-production public site key before release. Local builds connecting to hosted Auth
+project, privileged keys and Turnstile test keys. The production public site key
+is configured in Cloudflare Pages. Local builds connecting to hosted Auth
 also require its configured widget key and an allowed hostname. Test keys are
 reserved for the mocked smoke build; never use them with hosted Auth or production.
 
@@ -47,7 +47,7 @@ The repository member client now also implements Facebook sign-in, guest
 linking and conflict-safe switching to an existing Facebook player. The Joy8
 Meta app (`1385504273217738`) exists in unpublished development mode without a
 business portfolio. The hosted Supabase Facebook provider remains disabled, and
-Facebook has not passed hosted acceptance or been released through `main`. The
+Facebook has not passed hosted acceptance or been enabled in production. The
 button remains hidden unless `VITE_FACEBOOK_AUTH_ENABLED=true` is set for a build.
 The app is intentionally retained for future use; verification and activation
 are deferred until the operator has an appropriate registered business. No Meta
@@ -56,8 +56,7 @@ The member migrations, four platform foundation migrations, session-scope
 correction, Joy8 object rebrand, read-only member lookup, public-ID allocation
 and product-schema registration are applied; the hosted `joy8-gateway` is active with the `server-v1`
 product protocol.
-The earlier member-entry frontend is released through main; the changes listed
-above remain local. Cloudflare Turnstile protects
+The shared member-entry frontend is released through main. Cloudflare Turnstile protects
 anonymous Auth entry; real Google sign-in and guest entry passed hosted
 acceptance. Public Email/password UI is absent; the hosted Email provider and API signup are still enabled (see Hosted Auth Configuration). Cloudflare Email Sending is
 disabled, its two SMTP credentials were deleted, and the Workers Paid

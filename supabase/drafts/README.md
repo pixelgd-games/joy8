@@ -81,8 +81,8 @@ Before every hosted database operation, verify Joy8 with the wrapper. Rerun
 immediately before review/application. Apply only approved proposals as new
 timestamped migrations, preserving applied files. Verify effective grants,
 administrator access, entry rejection, unchanged player/wallet/transaction totals,
-the installed quota/recovery functions and the scheduled job. Do not deploy the
-Gateway/frontend until the coordinated route and Turnstile configuration is ready.
+the installed quota/recovery functions and the scheduled job. The matching
+Gateway/frontend and production Turnstile configuration are deployed.
 
 After recovery installation, the operator prepares a reviewed single transaction
 calling `public.joy8_operator_cancel_match(game_uuid, match_ref,
@@ -101,8 +101,8 @@ access token receives HTTP 403: `Missing required permission(s): auth_config_rea
 with Auth configuration read/write permission. Then use
 `scripts/supabase-joy8.cmd auth-config disable-email --apply`, preserving Google
 and anonymous signups. `auth-config status` prints selected booleans only. Verify public settings afterward and confirm real Google admin
-and member login. Do not set the global `disable_signup` flag to true. Configure
-`VITE_TURNSTILE_SITE_KEY` before the next frontend build; no source-code key fallback
+and member login. Do not set the global `disable_signup` flag to true. Production
+`VITE_TURNSTILE_SITE_KEY` is configured; no source-code key fallback
 exists. Neither Auth settings nor Cloudflare deployment changes are performed by
 these SQL files.
 
@@ -149,6 +149,6 @@ using the wrapper's password-authenticated database connection. The linked
 Management API query role cannot execute restricted health/admin functions;
 do not broaden production grants for these checks.
 
-The matching frontend/Gateway still await coordinated deployment. The hosted
-Gateway sends the removed arguments, so keep all game entries paused until
-that release. A source push to main still needs an explicit user request.
+The matching frontend/Gateway are deployed and hosted health/rejection checks
+pass. Game entries remain paused pending separate reviewed activation.
+A source push to main still needs an explicit user request.

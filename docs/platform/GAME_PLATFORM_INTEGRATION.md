@@ -19,7 +19,7 @@ this protocol in their own repositories before activation.
 
 Repository entry cleanup removes `branded-session` and route-less session
 creation; both branded and explicit test entry call `private-session`.
-The frontend and Gateway changes await coordinated release. Hosted origin bindings
+The frontend and matching Gateway changes are deployed. Hosted origin bindings
 and the installed safety migrations are tracked in README and `supabase/drafts/README.md`.
 
 The current `server-v1` contract still asserts `wallet_scope: platform` and the
@@ -30,8 +30,8 @@ issuer accepts only `(game_slug, auth_user_id)`. The installed
 [session cleanup](../../supabase/migrations/20260924012500_session_contract_cleanup.sql)
 fixes POINT and the existing session lifetimes internally, drops the unused
 platform display name and removes the old function signatures. The matching
-local Gateway still awaits deployment; keep all game entries paused until the
-coordinated frontend/Gateway release. The game-facing
+Gateway is deployed. Game entries remain paused pending reviewed product
+activation. The game-facing
 `server-v1` payload remains unchanged. Applied SQL history is never rewritten.
 
 A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
@@ -659,8 +659,8 @@ current-schema snapshot or a deployment artifact.
 
 ### Recovery and Errors
 
-`JOY8_PAYOUT_BUDGET_EXCEEDED` is enforced by hosted SQL. The local Gateway maps
-it to 409; that HTTP mapping awaits the coordinated Gateway release. There are
+`JOY8_PAYOUT_BUDGET_EXCEEDED` is enforced by hosted SQL. The deployed Gateway maps
+it to 409. There are
 currently no approved quota rows, so platform-funded opening fails closed.
 The database reserves each platform-funded match's maximum cumulative positive
 player/fee payout against an operator-approved per-game issuance quota. Losses

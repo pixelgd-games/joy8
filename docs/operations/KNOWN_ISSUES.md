@@ -24,10 +24,9 @@ recovery are enforced, Google identity binds administrator authority, browser
 catalog DELETE is revoked, and cleanup is scheduled independently of game launches.
 
 Release still requires an explicitly approved game audience and activation,
-funded limits and payout quota amounts, product recovery evidence/procedures, and
-the coordinated frontend/Gateway release. The two-argument session issuer is
-installed, but the hosted Gateway still sends the removed arguments. Keep all
-game entries paused until the matching Gateway/frontend release. The Auth token currently receives HTTP
+funded limits and payout quota amounts, and product recovery evidence/procedures.
+The matching frontend/Gateway and two-argument session issuer are deployed;
+all game entries remain paused pending product activation. The Auth token currently receives HTTP
 403 for configuration, so the approved Email-provider shutdown is not complete.
 Email remains enabled; update the local token with Auth configuration permission.
 
