@@ -33,7 +33,7 @@ try {
   await loadProductAccounting(db)
   await db.exec("update fixture_product.accounts set balance=100000")
   const game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,enabled=true returning id")).id
+  const policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000,enabled=true returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,product_adapter) values($1,$2,true,5000,5000,'fixture_product.accounting(text,uuid,jsonb)'::regprocedure)", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','open','settle'],now()+interval '1 day')", [game, secret])
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id

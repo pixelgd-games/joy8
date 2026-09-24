@@ -10,7 +10,7 @@ export async function loadMemberPlatformDatabase(db, rebrand = true) {
   const independent = (await one("insert into public.games(name,slug,type,published,launch_url) values('Independent','independent-game','casual',true,'https://game.example/') returning id")).id
   await db.exec("insert into public.games(name,slug,type,published,launch_url) values('Unconfigured','unconfigured-game','casual',true,'https://game.example/')")
   const platformPolicy = (await one(rebrand
-    ? `update public.${namespace}_wallet_policies set enabled=true returning id`
+    ? `update public.${namespace}_wallet_policies set enabled=true,initial_credit=0,guest_initial_credit=0 returning id`
     : `insert into public.${namespace}_wallet_policies(game_id,enabled,initial_credit) values(null,true,0) returning id`)).id
   const keys = new Map()
   for (const id of [game, shared, independent]) {

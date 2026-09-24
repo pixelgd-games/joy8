@@ -14,8 +14,6 @@ select jsonb_build_object(
   'google_admin_allowed',verified.allowed,
   'email_admin_denied',verified.email_denied,
   'browser_delete_revoked',not has_table_privilege('authenticated','public.games','DELETE'),
-  'budget_rows',(select count(*) from public.joy8_payout_budgets),
-  'budget_triggers',(select count(*) from pg_trigger where not tgisinternal and tgname in ('joy8_reserve_payout_budget','joy8_consume_payout_budget','joy8_release_payout_budget') and tgenabled='O'),
   'recovery_service_role_denied',not has_function_privilege('service_role','public.joy8_operator_cancel_match(uuid,text,integer,text,text)','EXECUTE'),
   'recovery_browser_denied',not has_function_privilege('authenticated','public.joy8_operator_cancel_match(uuid,text,integer,text,text)','EXECUTE') and not has_function_privilege('anon','public.joy8_operator_cancel_match(uuid,text,integer,text,text)','EXECUTE'),
   'cleanup_job',(select jsonb_build_object('active',active,'schedule',schedule,'command',command) from cron.job where jobname='joy8-runtime-cleanup'),

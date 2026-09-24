@@ -30,10 +30,8 @@ Joy8 succeeds when:
 
 [README.md](../../README.md) owns the implemented feature list and operating
 instructions. Google/guest member entry, stable public player IDs, the shared POINT wallet
-and trusted settlement are deployed foundations. Facebook client support is
-implemented in the repository and its Meta app exists in unpublished development
-mode, while Meta verification/review, Supabase configuration, provider linking,
-continuity and product activation remain open.
+and trusted settlement are deployed foundations. Facebook is implemented but
+disabled. Provider linking, guest continuity and product activation remain open.
 Continuous per-hand settlement and the private Mahjong schema are installed;
 product activation remains pending as recorded in README and the integration contract. Target policies below do not imply full acceptance.
 
@@ -96,11 +94,10 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 ### First Release and Entry Models
 
 - First release: H5. Android and iOS are later work, not first-release gates.
-- Current sign-in: Google and persistent guest access. Facebook is an approved
-  deferred provider whose implementation and unpublished app are retained until
-  the operator can complete legitimate business verification and release review;
-  it is not a current-release gate.
-  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md) owns the identity design.
+- Current sign-in: Google and persistent guest access. Facebook is implemented
+  but disabled and is not a current-release gate.
+  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md#release-identity-scope)
+  owns the sign-in decision and identity design.
 - Mahjong Clash is the first adopter, not the architectural center of Joy8.
   Platform capabilities must be reusable by other products.
 
@@ -133,16 +130,25 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   resolves it; clients and games cannot select a wallet or change balances directly.
 - Points granted, won, reserved, or spent in any integrated game affect that one
   balance. There is no per-game promotional balance and no cross-game transfer.
-- Slot games have a **10,000 POINT** maximum single bet. Each Slot policy may set a
-  lower limit. A table game may reserve a player's available wallet balance for
-  an entire match; that reservation is not a single Slot bet. Table reservation
-  rules and payout guards require separate game-specific review.
-- Initial credit is granted at most once per player, not once per title.
-  Operational wallets currently start at **0 POINT**.
-  Any later opening grant or product-specific amount needs a separate decision.
-  Existing Demo balances must not be carried into operation. Do not maintain an
-  old Demo runtime or an old/new compatibility branch in the replacement platform.
-  The approved cutover clears test accounting while preserving Auth/player identities and catalog/admin data. Future resets require a new explicit decision.
+- Games never change balances. Every bet, win and loss is reserved and settled
+  through Joy8.
+- Each game sets its own minimum bet, maximum bet and maximum single payout.
+  No game's maximum bet may exceed the platform ceiling of **10,000 POINT**.
+- A table game may instead reserve a player's entire available balance for a
+  match. That reservation is not a single bet and is not limited by the 10,000
+  POINT ceiling. For such a game the minimum bet is the minimum available
+  balance required to join the table.
+- Starting POINT is granted once per player when the player enrolls, not per
+  title and not at game launch:
+
+  | Player | Grant |
+  | --- | --- |
+  | New Google member | 1,000 POINT |
+  | New guest | 100 POINT |
+  | Guest who links Google | One 900 POINT top-up, reaching the 1,000 POINT member grant |
+
+  Grants are platform transactions and carry no originating game. Do not
+  maintain an old Demo runtime or an old/new compatibility branch.
 - POINT is intended for operational play, not a disposable Demo-only design.
   Build one wallet/accounting architecture for testing and operation while
   isolating their data. The hosted release and replacement status are recorded in
@@ -150,8 +156,8 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 - Purchasing POINT is an allowed future product capability. Whether it ships
   at the first public launch is undecided. No payment provider, purchase price,
   or payment deployment is authorized by this document.
-- No redemption, withdrawal, or prizes of monetary value are included.
-  Wallet conversion and transfer are unnecessary because there is only one POINT wallet per player.
+- POINT cannot be withdrawn, transferred between players or exchanged for cash,
+  and no prizes of monetary value are offered.
   The existing nominal `1:1` reference between units grants none of these rights.
 - Preserve transaction source: initial grant, promotional grant, purchase,
   gameplay, fee, and authorized adjustment. AI funding is distinct from human
@@ -162,8 +168,9 @@ and must not initialize Joy8 Auth, sessions, or wallets.
 - Payment orders, verified payment notifications, duplicate protection, and
   refund/chargeback handling must be designed before purchasing is enabled.
   Purchase timing does not delay the reusable wallet and settlement foundation.
-- Every POINT transaction records its originating game plus an idempotency key
-  and source reference, including grants, gameplay, purchases, and adjustments.
+- Every POINT transaction records an idempotency key and source reference.
+  Gameplay, purchase and adjustment transactions also record their originating
+  game; enrollment grants do not.
   Reporting and reconciliation separate games by this immutable source, not by wallet.
 
 Detailed trust, wallet-lifecycle, and atomic-settlement requirements belong in
@@ -178,9 +185,8 @@ when an integration or release needs it. Different URLs against the same live
 database do not provide test isolation.
 
 Local tests use separate data, credentials, and configuration. Do not promote
-test balances, transactions, or fee totals into operational accounts. The approved
-cutover cleared test accounting and starts new wallets at 0 POINT. Any further
-reset or balance change requires a separately reviewed scope and authorization.
+test balances, transactions, or fee totals into operational accounts. Any reset
+or balance change requires a separately reviewed scope and authorization.
 The present repository cannot recreate the full local database from migrations
 alone. A reviewed bootstrap/fixture and backup/restore procedure are prerequisite
 work, tracked in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).

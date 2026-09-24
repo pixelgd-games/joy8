@@ -26,7 +26,7 @@ before(async () => {
   game = (await one("select id from public.games where slug='test-game'")).id
   shared = (await one("insert into public.games(name,slug,type,published,launch_url) values('Shared','shared','casual',true,'https://game.example/') returning id")).id
   other = (await one("insert into public.games(name,slug,type,published,launch_url) values('Independent','independent','casual',true,'https://game.example/') returning id")).id
-  policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,enabled=true returning id")).id
+  policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000,enabled=true returning id")).id
   for (const id of [game, shared, other]) {
     await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [id, policy])
   }
@@ -88,7 +88,7 @@ test("all games share one durable player wallet", async () => {
 })
 
 test("zero opening credit creates no grant and frozen wallet cannot be replaced", async () => {
-  await db.query("update public.joy8_wallet_policies set initial_credit=0 where id=$1", [policy])
+  await db.query("update public.joy8_wallet_policies set initial_credit=0,guest_initial_credit=0 where id=$1", [policy])
   const p = await player()
   const s = await launch(p)
   assert.equal((await wallet(p)).balance, "0.00")
@@ -318,7 +318,7 @@ test("health reads dependencies without creating business records", async () => 
 
 test("reset removes test financial data while preserving identities and catalog", async () => {
   assert.equal((await one("select count(*)::int n from public.wallet_accounts where id=$1", [priorDemo.wallet_account_id])).n, 0)
-  assert.equal((await one("select count(*)::int n from public.wallet_transactions")).n, 0)
+  assert.equal((await one("select count(*)::int n from public.wallet_transactions where source_type<>'initial_grant'")).n, 0)
   assert.equal((await one("select count(*)::int n from public.game_sessions")).n, 0)
   assert.equal((await one("select auth_user_id from public.player_accounts where id=$1", [priorPlayer.id])).auth_user_id, priorPlayer.auth)
   assert.equal((await one("select to_regclass('public.game_rounds') old_rounds")).old_rounds, null)
@@ -333,7 +333,8 @@ test("missing or disabled game policy never falls back to a test wallet", async 
   await denied(launch(p, "unconfigured"), "JOY8_GAME_NOT_READY")
   await db.query("update public.joy8_game_policies set enabled=false where game_id=$1", [game])
   await denied(launch(p), "JOY8_GAME_NOT_READY")
-  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [p.id])).n, 0)
+  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [p.id])).n, 1)
+  assert.equal((await one("select count(*)::int n from public.game_sessions where player_account_id=$1", [p.id])).n, 0)
 })
 
 test("keys cannot cross games, exceed scopes or outlive expiry", async () => {

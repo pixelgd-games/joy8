@@ -1,17 +1,13 @@
 # Joy8 Member and Authentication Plan
 
-Status: member migrations and Gateway are active. Google sign-in and persistent
-guest entry passed hosted acceptance; Cloudflare Turnstile protects guest Auth.
-Facebook sign-in, guest linking and existing-account conflict handling are
-implemented in the repository. The Joy8 Meta app (`1385504273217738`) exists in
-unpublished development mode without a business portfolio; business
-verification/review, hosted Supabase provider configuration and acceptance remain.
-The public Email/password UI is absent and Cloudflare Email Sending is disabled. The hosted Email provider still accepts verified Email API signup; README owns its verified configuration and pending shutdown. Stable
-six-digit public player IDs are deployed. Guest-to-Google linking, guest
-continuity and end-to-end public branded-entry acceptance remain open. The
-reusable branded H5 shell, Mahjong message contract, service-only resolver and
-Gateway routes are implemented; the current Mahjong binding remains localhost-only.
-Last reviewed: 2026-09-20.
+Status: Google and persistent guest entry are live and passed hosted acceptance.
+Facebook is implemented but disabled. Stable six-digit public player IDs are
+deployed. Guest-to-Google linking, guest continuity and end-to-end public
+branded-entry acceptance remain open. The reusable branded H5 shell, Mahjong
+message contract, service-only resolver and Gateway routes are implemented; the
+current Mahjong binding remains localhost-only. [README.md](../../README.md#hosted-auth-configuration)
+owns the verified hosted Auth state.
+Last reviewed: 2026-09-24.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -23,11 +19,20 @@ owns the current implementation and operations.
 
 ## Release Identity Scope
 
-The current H5 release uses Google and persistent guest entry. Facebook is an
-approved deferred provider: its client implementation and unpublished Meta app
-are retained, but activation is not a release gate while the operator remains an
-individual without an appropriate registered business. Email/password, a separate
-username credential system, LINE, Apple, Email OTP, Android and iOS are deferred.
+This section is the single record of the sign-in decision.
+
+| Method | Decision |
+| --- | --- |
+| Google | Live |
+| Persistent guest | Live |
+| Facebook | Implemented but disabled; see [Provider and Abuse Protection](#provider-and-abuse-protection) |
+| Email/password | Not offered; no public UI |
+| Hosted Email provider | Disable before public release; the user has deferred the timing, so it stays enabled until the user schedules the change |
+| SMTP / outbound email | None; do not configure |
+| Username credentials, LINE, Apple, Email OTP | Not planned |
+
+Android and iOS are deferred. Reintroducing any email-based sign-in is a new
+product decision; do not revive it from historical code or documentation.
 
 A player can enter through the public Joy8 Lobby or a Joy8-controlled branded
 game entry. Both resolve the same Joy8 player. A branded entry can open before
@@ -57,18 +62,8 @@ in the owning repository, not a first-release platform dependency.
 
 ## Current Gaps
 
-- Public member UI and Gateway source implement Google/Facebook/guest entry,
-  guest promotion and enrollment. The member migrations are applied and the
-  Gateway is deployed. Google sign-in, guest entry and Turnstile passed hosted
-  acceptance. The unpublished Facebook Meta app exists, but business
-  verification/review and hosted Supabase provider setup remain; its build-time
-  entry flag stays off until acceptance. Google/Facebook guest
-  linking remains pending hosted acceptance.
+- Guest-to-provider linking remains pending hosted acceptance.
   [README.md](../../README.md) owns the implementation details and test limits.
-- Email/password entry is not part of the current public product. Cloudflare
-  Email Sending is disabled, both SMTP credentials were deleted, and Workers
-  Paid was canceled. Re-enabling email authentication requires a new product
-  decision and provider configuration review.
 - Deletion requests and cleanup/retention are not implemented. The repository
   branded entry accepts only a configured game slug, exact trusted parent/game
   origins, Google or explicit guest requests, and in-memory launch messages.
@@ -84,7 +79,7 @@ in the owning repository, not a first-release platform dependency.
   and persistent guests use the same entry without per-player approval. Its SQL
   and Gateway are installed; real game identity acceptance remains pending.
   See the [connection review](../../supabase/drafts/MAHJONG_REVIEW.md).
-- Shared-wallet configuration is the approved contract. Mahjong has zero-credit identity-only activation;
+- Shared-wallet configuration is the approved contract. Mahjong has identity-only activation;
   funded gameplay remains pending. Consume the platform wallet work rather than
   introducing wallet logic into login screens.
 
@@ -125,7 +120,8 @@ anonymous status rather than interpreting every Auth ID as a registered member.
 Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
 
 Promotion changes the sign-in method, not the player. Preserve the shared wallet,
-transactions, and game mappings. If the provider already belongs to another
+transactions, and game mappings; the only balance change is the one-time
+registration top-up defined in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction). If the provider already belongs to another
 Joy8 player, return a recoverable conflict and require verification of that
 account; do not silently transfer assets. Full registered-player merging remains
 outside this release.
@@ -135,7 +131,7 @@ outside this release.
 The Lobby is public and never requires a login just to browse. Selecting a game
 checks existing player enrollment: an active registered player or persistent
 guest proceeds directly; an unenrolled visitor gets the shared member dialog
-over the unchanged Lobby. The dialog offers Google, Facebook and explicit guest play.
+over the unchanged Lobby. The dialog offers Google and explicit guest play.
 Successful entry continues to the selected game. Dismissal cancels
 that selection; opening another game or the top-bar account entry must not reuse
 the previous destination. A service failure must not silently create a guest.
@@ -183,11 +179,10 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
 
 - **Sign-out:** end the current device's Auth session without deleting the
   player, wallet, history, or an already active match's accounting obligation.
-- **Recovery:** Google and Facebook accounts use their provider recovery. Guests are
-  recoverable only while their approved browser session survives; linking to
-  Google or Facebook is the intended continuity path, but hosted linking remains unverified.
-- **Email delivery:** the current public identity scope sends no authentication
-  email. Cloudflare Email Sending is disabled and no SMTP credential remains.
+- **Recovery:** Google accounts use provider recovery. Guests are recoverable
+  only while their approved browser session survives; linking to Google is the
+  intended continuity path, but hosted linking remains unverified.
+- **Email delivery:** Joy8 sends no authentication email.
 - **Closure/deletion:** expose a request flow, and separately define Auth/profile
   deletion or anonymization, transaction retention, game-data coordination, and
   waiting/recovery periods. Do not directly delete Auth users: current player
@@ -201,7 +196,7 @@ Launch-code redemption and short-lived game-token rules are owned exclusively by
    migrations under [AGENTS.md](../../AGENTS.md) before database changes.
 3. Implement backend player resolution, guest restoration/promotion, and lifecycle
    operations, then the reusable H5 UI and session handoff.
-4. Verify Google/Facebook/guest entry, sign-out, refresh, callback replay,
+4. Verify Google/guest entry (and Facebook before enabling it), sign-out, refresh, callback replay,
    simultaneous requests, guest loss, guest linking and provider conflicts.
    Verify game selection, cancellation/reselection, late responses after closing
    a dialog, callback destination preservation, and direct-link entry.
@@ -221,11 +216,7 @@ third stage; no product needs a separate temporary membership system.
   namespace must be extended beyond its 900,000 available values.
 - Production branded H5 origin/hosting assignment, copy/localization and
   end-to-end acceptance of the active `/entry/?slug=...` implementation.
-- Complete Meta business verification/review, privacy/data-deletion requirements,
-  hosted Supabase Facebook provider configuration and real sign-in/linking
-  acceptance for the existing unpublished Joy8 Meta app after the operator has
-  an appropriate registered business. Do not delete the app, fabricate a business
-  portfolio or enable public Facebook entry in the meantime.
+- When to disable the hosted Email provider.
 - Whether future POINT purchases require guest promotion before checkout.
 
 First-release platforms and sign-in methods are already decided; do not reopen
@@ -234,27 +225,19 @@ deferred. Purchase launch timing belongs in the product plan.
 
 ## Provider and Abuse Protection
 
-Google, Facebook and guest entry are the approved public identity methods.
 Cloudflare Turnstile Managed protection is enabled for guest Auth; its public
 site key may be used by the client, while its secret remains provider-side.
-Hosted Google and guest entry have passed. Facebook is not operational until the
-existing unpublished Meta app completes verification/review and the Supabase
-provider is configured. Guest-to-provider linking and
-provider-conflict preservation remain pending and must not be inferred from a
-standalone provider sign-in.
+Guest-to-provider linking and provider-conflict preservation remain pending and
+must not be inferred from a standalone provider sign-in.
 
-The operator is currently an individual developer without an appropriate
-registered business. Retain the Meta app in unpublished development mode and
-leave the hosted provider and build-time entry flag off. No Meta App Secret is
-stored in this repository or configured in hosted Auth. Resume setup only after
-a legitimate business portfolio can be linked and verified.
-
-Cloudflare Email Sending is disabled, both SMTP credentials were deleted, and
-the Workers Paid subscription was canceled. No Email/password action is exposed
-by the public UI. Reintroducing email authentication would be a new product and
-operations decision requiring provider setup, abuse limits, delivery monitoring,
-callback acceptance and updated lifecycle policy; do not silently revive the
-retired flow from historical code or documentation.
+Facebook sign-in, guest linking and existing-account conflict handling are
+implemented, but the hosted provider and the `VITE_FACEBOOK_AUTH_ENABLED`
+build flag stay off. The operator is an individual without an appropriate
+registered business, so keep the Joy8 Meta app unpublished and store no Meta App
+Secret. Enable Facebook only after Meta business verification/review,
+privacy/data-deletion requirements, hosted provider configuration and real
+sign-in/linking acceptance. Do not delete the app or fabricate a business
+portfolio.
 
 ## Technical References
 

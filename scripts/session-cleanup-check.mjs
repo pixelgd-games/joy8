@@ -47,7 +47,7 @@ test("the single replacement session signature preserves identity, POINT, expiry
   await db.exec("reset role")
   assert.deepEqual(await one("select extract(epoch from expires_at-created_at)::int ttl,extract(epoch from launch_code_expires_at-created_at)::int launch_ttl from public.game_sessions where id=$1", [session.session_id]), { ttl: 3600, launch_ttl: 120 })
   assert.equal((await one("select count(*)::int n from public.player_accounts")).n, 1)
-  assert.equal((await one("select coalesce(sum(balance),0)::text balance from public.wallet_accounts")).balance, "0.00")
+  assert.equal((await one("select coalesce(sum(balance),0)::text balance from public.wallet_accounts")).balance, "100.00")
   await db.exec("update public.joy8_private_entries set enabled=true where game_id=(select id from public.games where slug='monster-lab'); set role service_role")
   const privateSession = (await one("select public.joy8_create_private_session('monster-lab',$1,'https://joy8.cc') result", [auth])).result
   assert.equal(privateSession.player_account_ref, player)

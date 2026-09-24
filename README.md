@@ -29,44 +29,35 @@ The five user-approved security migrations are installed. See the
 [release safety review](supabase/drafts/README.md#release-safety-review) for their
 operating boundaries. Mahjong and Monster Lab hidden entries are paused.
 Administrator checks now bind the verified Google Auth identity, browser catalog
-DELETE is revoked, platform payout quotas and operator recovery are installed,
-and pg_cron schedules cleanup every ten minutes. No payout quota, POINT credit,
-backend key or public game activation was granted.
+DELETE is revoked, operator recovery is installed, and pg_cron schedules cleanup
+every ten minutes. No backend key or public game activation was granted.
 
-Email-provider shutdown is approved but blocked: the local Joy8 access token
-receives HTTP 403: `Missing required permission(s): auth_config_read`. Update that token locally with Auth
-configuration read/write permission, then run
-`scripts/supabase-joy8.cmd auth-config disable-email --apply`.
-Hosted Email remains enabled until this succeeds; Google and guest settings
-have not been changed.
+The POINT rules in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md#wallet-and-point-direction)
+are installed: enrollment creates the player's wallet and grants 100 POINT to a
+guest or 1,000 POINT to a Google member, and linking Google adds a one-time
+900 POINT top-up. Each game policy has a minimum bet, maximum bet (at most
+10,000 POINT) and maximum single payout; the per-game total payout budget is
+removed. `scripts/sql/point-rules-postflight.sql` verifies the hosted state.
 
 The platform includes public Lobby browsing, Google/guest member entry,
 persistent player enrollment, six-digit public player IDs and one
-server-authorized wallet/settlement flow.
-The repository member client now also implements Facebook sign-in, guest
-linking and conflict-safe switching to an existing Facebook player. The Joy8
-Meta app (`1385504273217738`) exists in unpublished development mode without a
-business portfolio. The hosted Supabase Facebook provider remains disabled, and
-Facebook has not passed hosted acceptance or been enabled in production. The
-button remains hidden unless `VITE_FACEBOOK_AUTH_ENABLED=true` is set for a build.
-The app is intentionally retained for future use; verification and activation
-are deferred until the operator has an appropriate registered business. No Meta
-App Secret has been copied into this repository or configured in hosted Auth.
+server-authorized wallet/settlement flow. Facebook sign-in is implemented but
+disabled; the sign-in decision is owned by
+[MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope)
+and the hosted state by [Hosted Auth Configuration](#hosted-auth-configuration).
 The member migrations, four platform foundation migrations, session-scope
 correction, Joy8 object rebrand, read-only member lookup, public-ID allocation
 and product-schema registration are applied; the hosted `joy8-gateway` is active with the `server-v1`
 product protocol.
 The shared member-entry frontend is released through main. Cloudflare Turnstile protects
 anonymous Auth entry; real Google sign-in and guest entry passed hosted
-acceptance. Public Email/password UI is absent; the hosted Email provider and API signup are still enabled (see Hosted Auth Configuration). Cloudflare Email Sending is
-disabled, its two SMTP credentials were deleted, and the Workers Paid
-subscription was canceled. Guest-to-Google linking and cross-browser guest
-continuity remain outstanding.
+acceptance. Guest-to-Google linking and cross-browser guest continuity remain
+outstanding.
 
 Wallet-ledger cleanup, continuous per-hand settlement and the Mahjong private
 schema are installed in Supabase. Mahjong has 22 product tables and a hidden
 catalog entry. The private-entry migrations and identity-only activation are
-installed; the zero-credit policy opens no wallet until a player launches. The
+installed. The
 shared POINT wallet cutover is installed and verified in the hosted database.
 Its postflight retained two player accounts with zero wallets, balances, holds,
 transactions, sessions, or unfinished matches. Runtime login and a seven-day
@@ -130,10 +121,11 @@ Joy8 currently provides:
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
 - A reusable branded game-entry shell whose visible login is game artwork while
   Joy8 retains Auth, enrollment, session issuance, and callback ownership.
-- A reusable Lobby dialog for Google, Facebook and persistent guest entry, with explicit
+- A reusable Lobby dialog for Google and persistent guest entry, with explicit
   player enrollment. `/account/` is a narrow Auth return trampoline back to that
   dialog. Google sign-in and guest entry passed real hosted acceptance;
-  Facebook configuration and all provider-linking acceptance remain pending.
+  provider-linking acceptance remains pending. The Facebook button is built but
+  hidden.
 - A stable six-digit public player ID displayed as `Player 123456`, separate
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
@@ -146,10 +138,8 @@ Joy8 currently provides:
 
 Joy8 does not currently provide:
 
-- Public Email/password UI. Hosted API signup remains enabled until the reviewed Auth configuration change is applied.
-- Hosted Facebook sign-in; its repository client and unpublished Meta app exist,
-  but Meta verification/review, Supabase provider configuration and acceptance
-  remain pending.
+- Email/password sign-in or any outbound authentication email.
+- Hosted Facebook sign-in.
 - Hosted guest-to-provider linking or end-to-end public branded-entry acceptance.
 - Production money movement.
 - Full analytics, dashboards, or unattended alerting.
@@ -162,7 +152,7 @@ both product models, operational POINT direction, and platform -> product ->
 integration order. The member foundation starts the platform stage; the shared wallet,
 trusted settlement and health are deployed. Mahjong has identity-only activation;
 no product has completed hosted gameplay/settlement acceptance. Real product
-integration and Google/Facebook provider-linking acceptance remain outstanding.
+integration and Google provider-linking acceptance remain outstanding.
 
 ### Platform Foundation
 
@@ -177,7 +167,7 @@ Transfer Wallet deposit/withdraw APIs are not part of the platform. The deployed
 settlement extension can balance a player-versus-platform result with an internal
 audit line, not a second balance or game point pool.
 
-It includes one shared POINT wallet per player, default 0 POINT provisioning, game-scoped backend
+It includes one shared POINT wallet per player created with its enrollment grant, game-scoped backend
 keys, one-time backend exchange, balance-only client tokens, renewal, reservations,
 atomic settlement, cancellation/status and dependency health. Product policy and
 keys are configured separately; Mahjong currently has an identity-only policy
@@ -271,14 +261,14 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    The label follows Auth session changes and does not grant player eligibility.
    The control opens the shared member UI
    in a dismissible dialog; the Lobby remains visible and its URL is unchanged.
-   The repository dialog offers Google, Facebook and explicit guest entry. `/account/` safely
+   The dialog offers Google and explicit guest entry. `/account/` safely
    returns Auth callbacks to the same Lobby dialog instead of rendering a second
    standalone account page.
 2. Cards are rendered from database metadata.
 3. Selecting a game checks membership. Enrolled registered players and persistent
    guests continue to `/game/?slug=<slug>`. Other visitors see the member dialog
-   over the Lobby, with the chosen game named in the dialog. Google, Facebook or
-   explicit guest entry preserves that game destination. Closing cancels it;
+   over the Lobby, with the chosen game named in the dialog. Google or explicit
+   guest entry preserves that game destination. Closing cancels it;
    another game or the top-bar login starts a new selection.
 4. Missing cover images use the platform fallback behavior.
 
@@ -344,7 +334,8 @@ mapping. `public_id` is a unique six-digit presentation identifier rendered as
 `Player 482731`; it is not a credential, launch field, or settlement key.
 The read route may return `{ "member": null }`. The member migrations preserve player
 IDs, derive guest status from Auth, reject inactive accounts, and grant RPC
-execution only to the service role. Neither member route provisions a wallet.
+execution only to the service role. `enroll-member` creates the player's wallet
+and enrollment grant; the read route never writes.
 
 ### Administration
 
@@ -418,7 +409,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-The 66 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
+The 69 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
 Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
@@ -447,9 +438,8 @@ VITE_SUPABASE_ANON_KEY=...
 VITE_TURNSTILE_SITE_KEY=...
 ```
 
-After Meta business verification/review, Supabase configuration and acceptance, add
-`VITE_FACEBOOK_AUTH_ENABLED=true` to expose Facebook entry. It is hidden by
-default so an unconfigured provider cannot reach players.
+Leave `VITE_FACEBOOK_AUTH_ENABLED` unset so Facebook entry stays hidden; see
+[Deployment](#deployment).
 
 Do not commit or quote real credentials. A local Vite server still uses the
 database configured in `.env.local`; localhost alone does not isolate data.
@@ -544,11 +534,10 @@ only to the target backend's local Wrangler process and never print it. The full
 operator commands and local file names are documented in
 `integrations/third-party/README.md`.
 
-`test:release-safety` exercises the installed quota, administrator, entry-pause and
-operator-recovery SQL against the current platform bundle. It tests cumulative
-payouts, retries, shared quota reservations, role restrictions, evidence, retained
+`test:release-safety` exercises the installed administrator, entry-pause and
+operator-recovery SQL against the current platform bundle. It tests platform
+openings without a payout budget, role restrictions, evidence, retained
 settlements, adapter rollback and cleanup without releasing occupied funds.
-PostgreSQL 17 adds competing connections contending for the last payout quota.
 Local cleanup tests do not install pg_cron or prove a hosted job ran.
 
 `test:mahjong-balance` installs the historical Mahjong runtime and current platform
@@ -560,8 +549,8 @@ the platform-only exchange contract and the restricted checkpoint lock.
 and deployed session-scope correction, member-read hardening, adapter isolation
 and current public-ID allocation and schema-registration migrations in an in-memory PGlite database with pgcrypto
 and a minimal Auth/catalog fixture. It never reads environment credentials or connects to Supabase.
-Its 18 checks cover enrollment without wallet creation, read-only membership
-lookup, zero-POINT launch without automatic grants, one wallet across games, guest promotion preserving the
+Its checks cover enrollment creating one wallet with the guest or member grant,
+the one-time Google top-up, read-only membership lookup, one wallet across games, guest promotion preserving the
 shared wallet and actual reservations/ledger, inactive accounts, browser-role denial,
 secret hashing/expiry, uniqueness, transaction rollback and disabled/missing policies.
 It asserts that the obsolete round table, wallet mode and Demo-credit function are absent.
@@ -621,7 +610,7 @@ reconciliation anomalies were zero. No business records were created by these
 checks. Real provider entry after this correction remains separate acceptance.
 
 `test:platform-db` uses the same deployed platform schema with its accounting fixtures.
-Its 22 SQL cases cover one wallet across games, zero credit, one-time provisioning,
+Its 22 SQL cases cover one wallet across games, one-time provisioning,
 server authority, renewal, reservation and available balance, exactly-once
 settlement, draws, fees, frozen wallets, immutable accounting, adapter permissions,
 cross-game occupancy/source attribution, cross-product adapter isolation and injected
@@ -656,8 +645,8 @@ lock-contention cases on PostgreSQL 17.6 (25 cases total). These tests neither a
 hosted SQL nor implement Mahjong's durable adapter; the foundational single-posting
 contract remains separately exercised by `test:platform-db`.
 
-`test:seamless-wallet` loads the complete current platform bundle. Its five cases
-verify separate bet/payout limits,
+`test:seamless-wallet` loads the complete current platform bundle. Its six cases
+verify separate bet/payout limits, per-game minimum bets and table joining balances,
 10,000 POINT capped opening enforcement, full-balance table reservation above that
 Slot bet ceiling, rejection of game-supplied platform entries,
 automatic internal balancing for player wins and losses, exact retry behavior,
@@ -723,7 +712,7 @@ database concurrency, grants, wallet preservation, or provider linking.
 Private-entry verification additionally covers explicit start, denied access,
 retry and the shared Loader credential boundary. Its eleven isolated SQL tests
 pass on PGlite and PostgreSQL 17; the latter verifies an actual restricted
-password login. Hosted postflight confirms hidden Mahjong, enabled zero-credit policy, restricted
+password login. Hosted postflight confirms hidden Mahjong, an enabled POINT policy, restricted
 LOGIN and an exchange/renew-only expiring key. Test entry accepts active enrolled
 guests and registered members without individual approval. The runtime
 TLS/readiness check passed without creating sessions or funding. Credentials
@@ -768,14 +757,18 @@ Verified in the Joy8 dashboard on 2026-09-20 using the user-authorized Chrome
 session for `pixelgd.games@gmail.com`, organization Pixel GD, project
 `lsazydefvnuqglultqii`:
 
-- The public member UI uses Google and anonymous Auth only. A fresh public Auth settings read reports `external.email=true`, `disable_signup=false`, and `mailer_autoconfirm=false`: Email API signup is enabled and requires verification. UI absence and disabled SMTP are not an Auth-provider restriction. The reviewed release action is to disable the Email provider while preserving Google and anonymous signup. It exposes no
-  Email/password signup, sign-in, verification, or recovery action.
-- Facebook remains disabled in hosted Auth. The unpublished Joy8 Meta app exists,
-  but business verification/review, Supabase provider configuration and real
-  sign-in/linking acceptance remain pending. Repository client support and the
-  Meta app shell do not make the provider operational. Retain the app unpublished;
-  resume setup only after the operator has an appropriate registered business.
-  No Meta App Secret is stored in this repository or hosted Auth.
+- The public member UI uses Google and anonymous Auth only.
+- The Email provider is enabled: public Auth settings report `external.email=true`,
+  `disable_signup=false` and `mailer_autoconfirm=false`, so Email API signup is
+  possible and requires verification. Disabling it is a pending release step
+  whose timing the user controls. When approved, run
+  `scripts/supabase-joy8.cmd auth-config disable-email --apply`; it disables only
+  the Email provider and keeps Google and anonymous signup. The local Joy8 access
+  token currently receives HTTP 403 `Missing required permission(s): auth_config_read`
+  and needs Auth configuration read/write permission first.
+- Facebook is disabled. The Joy8 Meta app (`1385504273217738`) is unpublished
+  with no business portfolio, and no Meta App Secret is stored in this
+  repository or hosted Auth.
 - Anonymous sign-in and manual identity linking are enabled and saved.
 - Site URL is `https://joy8.cc`.
 - Admin redirect allowlist entries are `https://joy8.pages.dev/admin/login/`,
@@ -788,14 +781,13 @@ session for `pixelgd.games@gmail.com`, organization Pixel GD, project
   The suffix accommodates the encoded `next` and `flow` query parameters while
   keeping the host and member route fixed. The allowlist contains 11 entries in
   total; all former Looty callback URLs have been removed.
-- Cloudflare Email Sending is disabled and its two SMTP credentials were
-  deleted. The Workers Paid subscription was canceled because the current
-  Google/guest flow does not require outbound authentication email.
+- No outbound email is configured: Cloudflare Email Sending is disabled and no
+  SMTP credential exists.
 - Cloudflare Turnstile Managed protection is enabled for Auth on `joy8.cc` and
   its subdomains. The public site key is used by the member client; the secret
   exists only in Cloudflare and Supabase. Production Turnstile verification,
-  Google sign-in and guest entry passed. Guest-to-provider linking, Facebook
-  sign-in and cross-browser guest continuity still require end-to-end acceptance.
+  Google sign-in and guest entry passed. Guest-to-provider linking and
+  cross-browser guest continuity still require end-to-end acceptance.
 
 The CLI wrapper still supports project/migration listing and database reads;
 its combined `config diff` read was denied. The authorized dashboard inspection

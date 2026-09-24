@@ -80,8 +80,6 @@ export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.fr
   JOY8_INSUFFICIENT_BALANCE: 409,
   JOY8_SETTLEMENT_SEQUENCE: 409,
   JOY8_UPSTREAM_UNAVAILABLE: 503,
-  JOY8_PAYOUT_BUDGET_EXCEEDED: 409,
-  JOY8_PAYOUT_BUDGET_EXCEEDED: 409,
 })
 const PUBLIC_RPC_MESSAGES = new Set([
   "game is not available", "game session is not active", "player account is not active",

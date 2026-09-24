@@ -59,12 +59,37 @@ test("reading an unenrolled identity creates no player or wallet", async () => {
   assert.equal((await one("select count(*)::int as count from public.player_accounts where auth_user_id=$1", [id])).count, 0)
 })
 
-test("repeated guest enrollment preserves one player without provisioning a wallet", async () => {
+test("repeated guest enrollment preserves one player and one enrollment wallet", async () => {
   const { id, member } = await enrolled()
   assert.equal(member.account_type, "guest")
   for (let i = 0; i < 5; i++) assert.deepEqual(await resolve(id, true), [member])
   assert.deepEqual(await resolve(id), [member])
-  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 0)
+  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
+})
+
+test("enrollment grants 100 POINT to guests and tops up to 1,000 once on Google registration", async () => {
+  await db.query("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=100 where id=$1", [games.platformPolicy])
+  const ledger = playerId => rows("select t.amount,t.source_type,t.game_id,t.balance_after from public.wallet_transactions t join public.wallet_accounts w on w.id=t.wallet_account_id where w.player_account_id=$1 order by t.created_at,t.source_type", [playerId])
+  const balance = async playerId => Number((await one("select balance from public.wallet_accounts where player_account_id=$1", [playerId])).balance)
+  const { id, member } = await enrolled()
+  assert.equal(await balance(member.player_account_id), 100)
+  await resolve(id, true)
+  assert.deepEqual(await ledger(member.player_account_id), [{ amount: "100.00", source_type: "initial_grant", game_id: null, balance_after: "100.00" }])
+  await db.query("update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1", [id])
+  await resolve(id, true)
+  await resolve(id, true)
+  assert.equal(await balance(member.player_account_id), 1000)
+  assert.deepEqual((await ledger(member.player_account_id)).map(entry => [entry.source_type, entry.amount]), [["initial_grant", "100.00"], ["registration_grant", "900.00"]])
+  const registered = await identity(false)
+  const [direct] = await resolve(registered, true)
+  await resolve(registered, true)
+  assert.equal(direct.account_type, "registered")
+  assert.equal(await balance(direct.player_account_id), 1000)
+  assert.deepEqual((await ledger(direct.player_account_id)).map(entry => [entry.source_type, entry.amount]), [["initial_grant", "1000.00"]])
+  const [session] = await launch(registered)
+  assert.equal(session.wallet_account_id, (await one("select id from public.wallet_accounts where player_account_id=$1", [direct.player_account_id])).id)
+  assert.equal(await balance(direct.player_account_id), 1000)
+  await denied(db.query("insert into public.wallet_transactions(wallet_account_id,type,amount,balance_before,balance_after,idempotency_key,source_type) values($1,'deposit',1,0,1,'no-game','gameplay')", [session.wallet_account_id]), "23514")
 })
 
 test("membership reads do not update the player and promotion writes only during enrollment", async () => {
@@ -130,7 +155,7 @@ test("launch retries reuse a zero POINT wallet without an automatic grant", asyn
 
 test("guest promotion preserves the shared wallet, reservation and ledger", async () => {
   const { id, member } = await enrolled()
-  await db.query("update public.joy8_wallet_policies set initial_credit=1000 where id=$1", [games.platformPolicy])
+  await db.query("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000 where id=$1", [games.platformPolicy])
   const sessions = []
   for (const slug of ["test-game", "independent-game"]) {
     const [session] = await launch(id, { slug })
@@ -207,11 +232,12 @@ test("the database rejects duplicate player wallets even when the original is cl
   await denied(db.query("insert into public.wallet_accounts (player_account_id,wallet_policy_id) values ($1,$2)", [member.player_account_id, games.platformPolicy]), "23505")
 })
 
-test("a session insert failure rolls back shared-wallet provisioning and name changes", async () => {
+test("a session insert failure rolls back the session and name changes", async () => {
   const { id, member } = await enrolled()
   await db.exec("alter table public.game_sessions add constraint test_failure check (false)")
   await denied(launch(id, { name: "Test player" }), "23514")
-  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 0)
+  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
+  assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 0)
   assert.equal((await one("select count(*)::int as count from public.wallet_transactions")).count, 0)
   assert.equal((await one("select display_name from public.player_accounts where id=$1", [member.player_account_id])).display_name, null)
 })
@@ -239,11 +265,11 @@ test("launch secrets are hashed and expire within session lifetime", async () =>
   }
 })
 
-test("unavailable games and invalid launch input create no wallet", async () => {
+test("unavailable games and invalid launch input create no additional wallet", async () => {
   const { id, member } = await enrolled()
   for (const slug of ["unknown-game", "hidden-game", "missing-url", " "]) await denied(launch(id, { slug }), "P0002")
   for (const options of [{ seconds: 59 }, { seconds: 86401 }, { currency: " " }, { currency: "USD" }, { name: "x".repeat(121) }]) await denied(launch(id, options), "22023")
-  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 0)
+  assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
 })
 
 test("member checks use the deployed accounting schema without Demo objects", async () => {
@@ -267,13 +293,13 @@ test("all games reuse one zero-balance wallet", async () => {
   assert.ok(wallets.every(wallet => Number(wallet.balance) === 0 && Number(wallet.locked_balance) === 0))
 })
 
-test("unconfigured and disabled policies reject launch without provisioning", async () => {
+test("unconfigured and disabled policies reject launch without a session", async () => {
   const { id, member } = await enrolled()
   await denied(launch(id, { slug: "unconfigured-game" }))
   await db.query("update public.joy8_game_policies set enabled=false where game_id=$1", [games.game])
   await denied(launch(id))
   await db.query("update public.joy8_wallet_policies set enabled=false where id=$1", [games.platformPolicy])
   await denied(launch(id, { slug: "independent-game" }))
-  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).n, 0)
+  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).n, 1)
   assert.equal((await one("select count(*)::int n from public.game_sessions where player_account_id=$1", [member.player_account_id])).n, 0)
 })

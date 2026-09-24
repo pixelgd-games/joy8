@@ -70,13 +70,13 @@ function successful(results) {
   return results.map((result) => result.rows[0])
 }
 
-test("eight simultaneous enrollments create exactly one player", async () => {
+test("eight simultaneous enrollments create exactly one player and one wallet", async () => {
   const id = await identity()
   const members = successful(await blockedRace({ hold: lockSql, holdValues: [id], work: resolveSql, workValues: [id] }))
   assert.equal(new Set(members.map((member) => member.player_account_id)).size, 1)
   assert.ok(members.every((member) => member.account_type === "guest"))
   assert.equal((await one("select count(*)::int as count from public.player_accounts where auth_user_id=$1", [id])).count, 1)
-  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [members[0].player_account_id])).n, 0)
+  assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [members[0].player_account_id])).n, 1)
 })
 
 test("membership lookup does not wait for an unrelated update on the player row", async () => {
@@ -118,10 +118,10 @@ for (const slug of ["test-game", "independent-game"]) {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
     const policy = games.platformPolicy
-    await db.query("update public.joy8_wallet_policies set initial_credit=1000 where id=$1", [policy])
+    await db.query("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000 where id=$1", [policy])
     let session
     try { [session] = await serviceQuery(launchSql, [id]) }
-    finally { await db.query("update public.joy8_wallet_policies set initial_credit=0 where id=$1", [policy]) }
+    finally { await db.query("update public.joy8_wallet_policies set initial_credit=0,guest_initial_credit=0 where id=$1", [policy]) }
     await reserveMemberWallet(db, session, games.keys.get(session.game_id))
     const snapshot = async () => ({
       wallet: await one("select * from public.wallet_accounts where id=$1", [session.wallet_account_id]),
@@ -169,8 +169,6 @@ for (const slug of ["test-game", "independent-game"]) {
   test(`${slug}: a launch committed first lets the waiting freeze finish and blocks later launches`, async () => {
     const id = await identity()
     const [member] = await serviceQuery(resolveSql, [id])
-    const policy = games.platformPolicy
-    await db.query("insert into public.wallet_accounts (player_account_id,wallet_policy_id) values ($1,$2)", [member.player_account_id, policy])
     successful(await blockedRace({
       hold: launchSql, holdValues: [id], count: 1,
       work: "update public.wallet_accounts set status='frozen' where player_account_id=$1 returning id",

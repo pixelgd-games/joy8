@@ -24,5 +24,6 @@ export async function loadPlatformDatabase(db, beforeDrafts = async () => {}, re
     ]) await db.exec(await memberSql(`../../supabase/migrations/${name}`))
     await loadPlatformHardening(db)
     await db.exec(await memberSql("../../supabase/migrations/20260920170000_shared_point_wallet.sql"))
+    await db.exec(await memberSql("../../supabase/migrations/20260924100000_enrollment_point_grants.sql"))
   }
 }

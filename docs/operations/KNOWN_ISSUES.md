@@ -19,22 +19,21 @@ each product must still implement and verify authoritative gameplay before activ
 ### Remaining Release Safety Gates
 
 The [approved safety migrations](../../supabase/drafts/README.md#release-safety-review)
-are installed. Hidden entries are paused, cumulative payout quotas and operator
-recovery are enforced, Google identity binds administrator authority, browser
+are installed. Hidden entries are paused, operator recovery is enforced, Google identity binds administrator authority, browser
 catalog DELETE is revoked, and cleanup is scheduled independently of game launches.
 
 Release still requires an explicitly approved game audience and activation,
-funded limits and payout quota amounts, and product recovery evidence/procedures.
+per-game bet and single-payout limits, and product recovery evidence/procedures.
 The matching frontend/Gateway and two-argument session issuer are deployed;
-all game entries remain paused pending product activation. The Auth token currently receives HTTP
-403 for configuration, so the approved Email-provider shutdown is not complete.
-Email remains enabled; update the local token with Auth configuration permission.
+all game entries remain paused pending product activation. The hosted Email
+provider must be disabled before public release; the user controls the timing
+([README.md](../../README.md#hosted-auth-configuration) owns the procedure).
 
 The six-digit public-ID capacity and guest abuse/retention policy remain explicit
 release limits; do not delete identities, recycle IDs or expand the namespace
 without a reviewed product/database change. Turnstile does not make the namespace
-unlimited. Facebook remains deferred; missing-email provider acceptance is not
-silently relaxed by this cleanup.
+unlimited. Facebook remains disabled; missing-email provider acceptance is not
+silently relaxed.
 
 ### Cloudflare Build Environment
 
@@ -59,8 +58,9 @@ the direct upload does not resolve that remaining operational issue.
   Mahjong has verified identity-only configuration and a restricted hosted
   connection; full gameplay/settlement acceptance remains unverified. Passing
   local fixture tests does not authorize funded operation.
-- Operational opening credit is decided: 0 POINT pending a later grant decision.
-  The approved reset removed test accounting; no old balance was transferred.
+- Enrollment grants 100 POINT to a guest and 1,000 POINT to a Google member,
+  so every new guest adds a funded wallet. Guest abuse limits and retention
+  remain open (see Guest Data Growth).
 - Each product still needs reviewed scope/limits, keys, its authoritative backend
   and any accounting adapter. Mahjong's installed policy and exchange/renew key
   support identity checks only; financial scopes and funding remain pending.
@@ -78,7 +78,7 @@ POINT purchase policy and release timing belong in
 The continuous-settlement extension, ledger cleanup and 22-table Mahjong private
 schema are installed. Private entry and the hosted `joy8-gateway` using product
 protocol `server-v1` are installed with an
-identity-only game policy and zero opening credit. The restricted TLS database
+identity-only game policy. The restricted TLS database
 connection passed; the game has only an expiring exchange/renew key. Test entry
 uses ordinary member/guest authentication without per-player approval, but its
 backend entry is currently paused.
@@ -104,36 +104,31 @@ document; they do not establish hosted capacity or authorize funded operation.
 
 ### Member and Persistent Guest Direction
 
-Hosted member settings have been inspected and the authorized entry changes are
-recorded in [README.md](../../README.md#hosted-auth-configuration). Google sign-in,
-guest entry and production Turnstile verification passed hosted acceptance.
-Facebook client support exists in the repository. The Joy8 Meta app
-(`1385504273217738`) exists in unpublished development mode without a business
-portfolio, while business verification/review, the hosted Supabase provider and
-acceptance remain incomplete. This is intentionally deferred while the operator
-is an individual without an appropriate registered business; retain the app and
-do not enable the provider or public entry flag. No Meta App Secret is stored in
-the repository or hosted Auth.
-The public Email/password UI is absent, but the hosted Email provider and API signup are enabled and require verification. Disable the hosted Email provider before release; do not disable all signup, which would also affect approved identity methods. Cloudflare Email Sending is disabled,
-both SMTP credentials were deleted, and Workers Paid was canceled.
+The sign-in decision is owned by [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md#release-identity-scope)
+and the hosted Auth state by [README.md](../../README.md#hosted-auth-configuration).
+The hosted Email provider still accepts verified API signup. Disable only the
+Email provider before public release; do not disable all signup, which would
+also affect Google and guest entry.
 
 Current behavior:
 
-- Google/Facebook/guest entry, persistent guest restoration, guest promotion and
-  enrollment checks are implemented. The member migrations and Gateway are
-  active. Facebook provider configuration and both providers' real hosted
-  conflict/preservation acceptance remain incomplete.
+- Google/guest entry, persistent guest restoration, guest promotion and
+  enrollment checks are implemented and the member migrations and Gateway are
+  active. Facebook is implemented but disabled. Real hosted provider
+  conflict/preservation acceptance remains incomplete.
 - `/account/` is a callback trampoline back to the Lobby dialog. It is not a
   standalone account, password or recovery page.
 - Branded cross-origin handoff exists; real provider/game acceptance and account-deletion requests remain incomplete.
-- The shared wallet is resolved by trusted Joy8 game policy. Mahjong's enabled
-  zero-credit identity policy does not establish funded-play readiness.
+- The shared wallet is resolved by trusted Joy8 game policy. Mahjong's
+  identity-only policy does not establish funded-play readiness. The Mahjong
+  server still refuses operational start unless the platform starting credit is
+  0, so it must adopt the enrollment grants before it can run against hosted Joy8.
 
 Risk:
 
 - Hosted guest entry, Google sign-in and the earlier launch flow passed the
   acceptance recorded in [README.md](../../README.md#verification). Cross-browser
-  continuity, Facebook sign-in and real provider promotion remain unverified. Isolated SQL tests, including native
+  continuity and real provider promotion remain unverified. Isolated SQL tests, including native
   PostgreSQL 17.6 races, do not prove real provider linking.
 
 The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH_PLAN.md`. The approved wallet direction is in `../product/PRODUCT_SCOPE.md`, and current runtime behavior remains in `../platform/GAME_PLATFORM_INTEGRATION.md`. Do not invent a game-specific wallet, guest-retention, or currency-conversion policy in this document.
@@ -142,8 +137,9 @@ The identity design and unresolved choices are owned by `../platform/MEMBER_AUTH
 
 ### Guest Data Growth
 
-Guest entry creates a persistent Auth identity and enrolled player; game launch
-reuses that player's wallet and creates a session. Auth entry is protected by
+Guest entry creates a persistent Auth identity, an enrolled player and a wallet
+holding the 100 POINT guest grant; game launch reuses that wallet and creates a
+session. Clearing browser data and entering again creates another funded guest. Auth entry is protected by
 Cloudflare Turnstile. Retention, cleanup and broader public-signup abuse controls
 are not finalized.
 
@@ -280,13 +276,13 @@ key pages, iframe restrictions, credential-free launch URLs, load timeout,
 Joy8-managed cover validation and fallback, error presentation, member service logic, Gateway
 membership authorization, safe return paths, and responsive member UI. The
 isolated member SQL suite loads the current platform migrations and checks roles,
-rollback, zero-POINT provisioning and promotion preserving the shared wallet,
+rollback, enrollment grants and promotion preserving the shared wallet,
 ledger and reservations. Its engine and fixture limits are documented in
 [README.md](../../README.md#verification). Native PostgreSQL 17.6 also passes
 15 competing-connection cases against that schema. Hosted guest and Google
 sign-in acceptance and production Turnstile verification are recorded in README.
 Public-ID checks cover stable allocation and service-role-only profile
-resolution. Hosted guest-to-provider linking, Facebook sign-in, cross-browser guest continuity and
+resolution. Hosted guest-to-provider linking, cross-browser guest continuity and
 production load remain unverified.
 
 The repository now has a tested `@joy8/game-sdk` source package and third-party

@@ -37,6 +37,9 @@ test("the complete exported fixture installs current member, session, accounting
   assert.equal((await db.query("select * from public.joy8_resolve_member($1,false)", [auth])).rows.length, 0)
   const member = (await db.query("select * from public.joy8_resolve_member_profile($1,true)", [auth])).rows[0]
   assert.match(member.public_id, /^\d{6}$/)
-  assert.equal((await one("select count(*)::int n from public.wallet_accounts")).n, 0)
+  assert.deepEqual(await one("select count(*)::int n,sum(balance)::text balance from public.wallet_accounts"), { n: 1, balance: "100.00" })
+  assert.deepEqual(await one("select initial_credit::text member,guest_initial_credit::text guest from public.joy8_wallet_policies"), { member: "1000.00", guest: "100.00" })
+  assert.equal((await one("select to_regclass('public.joy8_payout_budgets') value")).value, null)
+  assert.equal((await one("select exists(select 1 from pg_attribute where attrelid='public.joy8_game_policies'::regclass and attname='min_bet_amount' and not attisdropped) value")).value, true)
   assert.equal((await one("select count(*)::int n from public.joy8_product_ddl_checks")).n, 0)
 })

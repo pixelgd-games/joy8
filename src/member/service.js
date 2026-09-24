@@ -50,7 +50,7 @@ export function memberErrorMessage(error, provider) {
     captcha_timeout: "安全驗證逾時，請檢查網路後再試一次。",
     captcha_unavailable: "安全驗證暫時無法載入，請稍後再試。",
     verification_required: "目前的登入身分無法通過驗證，請重新登入。",
-    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 或 Facebook。",
+    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 登入。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     registered_session: "目前已登入正式帳號，請使用 Google 繼續啟用玩家身分。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",

@@ -312,22 +312,26 @@ wallet model:
   internal `platform` audit entry itself. This entry has no wallet balance and
   is not a point pool, banker wallet, or game account.
 
-Trusted game policy has separate `max_bet_amount` and `max_payout_amount`
-values. The first limits a capped opening reserve; the second limits the
-absolute size of any settlement entry. Both values and `funding_mode` are
-snapshotted when a match opens, so a later policy edit cannot change an existing
-match. The database constrains
-`max_bet_amount` to **10,000 POINT** for every policy. The product rule assigns
-that single-bet ceiling to Slot games.
+Trusted game policy has `min_bet_amount`, `max_bet_amount` and
+`max_payout_amount` values. In capped mode a human opening reserve must lie
+between the minimum and maximum bet, otherwise Joy8 returns
+`JOY8_LIMIT_EXCEEDED`. `max_payout_amount` is the game's maximum single payout:
+it limits the absolute size of any settlement entry. The maximum bet, maximum
+payout and `funding_mode` are snapshotted when a match opens, so a later policy
+edit cannot change an existing match. The database constrains `max_bet_amount`
+to **10,000 POINT** for every policy and requires a positive minimum bet no
+larger than the maximum bet in capped mode. The POINT rules are owned by
+[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
 The reservation policy separates capped openings from a full-wallet table
 reservation. A trusted game policy may use `reservation_mode='full_balance'`
 only with participant funding and a
 product adapter. Joy8 then requires each human reserve to equal that wallet's
 entire available balance while holding the wallet lock. An optional
-`max_reserve_amount` can retain a temporary product guard. The default `capped`
-mode continues to enforce `max_bet_amount`, including the 10,000 POINT Slot bet
-ceiling. Mahjong selects `full_balance` but retains a 1-POINT reserve guard and
+`max_reserve_amount` can retain a temporary product guard. In this mode
+`min_bet_amount` is the minimum available balance required to join; a lower
+balance returns `JOY8_INSUFFICIENT_BALANCE`. The default `capped` mode continues
+to enforce the minimum and maximum bet, including the 10,000 POINT ceiling. Mahjong selects `full_balance` but retains a 1-POINT reserve guard and
 its exchange/renew-only key; funded play remains
 inactive.
 
@@ -430,8 +434,8 @@ be called: those routes and their database functions are removed.
 `product_participants` is optional. There must be at least one human participant;
 the combined count must fit the trusted per-game limit (default 16, maximum 64).
 Reserve the maximum authorized loss. For a single-player slot spin, this is the
-spin's total bet. A capped reserve must be positive and within the configured
-`max_bet_amount`. Product/AI reserves use `max_payout_amount`. Joy8 checks
+spin's total bet. A capped reserve must lie between the configured
+`min_bet_amount` and `max_bet_amount`. Product/AI reserves use `max_payout_amount`. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
 wallet can occupy only one open match across all integrated titles. This prevents
 simultaneous games from spending POINT already reserved elsewhere.
@@ -663,14 +667,6 @@ current-schema snapshot or a deployment artifact.
 
 ### Recovery and Errors
 
-`JOY8_PAYOUT_BUDGET_EXCEEDED` is enforced by hosted SQL. The deployed Gateway maps
-it to 409. There are
-currently no approved quota rows, so platform-funded opening fails closed.
-The database reserves each platform-funded match's maximum cumulative positive
-player/fee payout against an operator-approved per-game issuance quota. Losses
-do not replenish it, exact retries do not spend twice, and final/cancel releases
-unused exposure. It is a risk ceiling, not a game wallet or Transfer Wallet.
-
 `server-status-v1` and `server-cancel-v1` take only
 `{"version":1,"match_ref":"product-match-123"}` and return
 `{version,match_id,state,result,settlement_count}` under continuous settlement.
@@ -688,7 +684,7 @@ browser disconnection and token expiry do not authorize cancellation.
 | 401 | `JOY8_BACKEND_UNAUTHORIZED` |
 | 403 | `JOY8_GAME_NOT_READY`, `JOY8_PLAYER_INACTIVE`, `JOY8_WALLET_INACTIVE`, `JOY8_SESSION_INVALID` |
 | 404 | `JOY8_MATCH_NOT_FOUND` |
-| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED`, `JOY8_PAYOUT_BUDGET_EXCEEDED` |
+| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED` |
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
 | 502/503 | Invalid/upstream-unavailable response; `JOY8_UPSTREAM_UNAVAILABLE` or `JOY8_ADAPTER_UNAVAILABLE` |
 

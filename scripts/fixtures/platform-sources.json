@@ -37,7 +37,10 @@
     "20260923100000_full_balance_reservations.sql",
     "20260923143710_admin_identity.sql",
     "20260923143720_platform_payout_budget.sql",
-    "20260923143730_operator_match_recovery.sql"
+    "20260923143730_operator_match_recovery.sql",
+    "20260924100000_enrollment_point_grants.sql",
+    "20260924101000_game_min_bet.sql",
+    "20260924102000_remove_payout_budget.sql"
   ],
   "drafts": [],
   "excluded": {

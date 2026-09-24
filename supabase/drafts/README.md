@@ -55,8 +55,8 @@ separate review of POINT source, limits, backend scopes and the game.
 ## Release safety review
 
 All five changes are approved and installed in hosted Joy8. They do not grant
-payout quotas, POINT credit, keys or public game activation. The platform bundle
-includes the administrator, quota and recovery schema. Entry activation and the
+keys or public game activation. The platform bundle includes the administrator
+and recovery schema. Entry activation and the
 hosted scheduler are classified separately; release-safety tests exercise
 pause and cleanup semantics in isolation.
 
@@ -64,7 +64,7 @@ pause and cleanup semantics in isolation.
 | --- | --- |
 | [Private entry pause](../migrations/20260923143700_private_entry_pause.sql) | Mahjong/Monster Lab entries disabled; origins and game records retained |
 | [Admin identity](../migrations/20260923143710_admin_identity.sql) | Verified active Google Auth identity and Google session required; browser catalog DELETE revoked |
-| [Payout budget](../migrations/20260923143720_platform_payout_budget.sql) | Per-game approved quota reserves cumulative match exposure and consumes positive payouts; no quota granted |
+| [Payout budget](../migrations/20260923143720_platform_payout_budget.sql) | Removed by [remove payout budget](../migrations/20260924102000_remove_payout_budget.sql); each game's `max_payout_amount` is its single-payout limit |
 | [Operator recovery](../migrations/20260923143730_operator_match_recovery.sql) | Operator-only cancellation with evidence and exact settlement count; atomic product cancellation and unlock; immutable recovery evidence |
 | [Runtime maintenance](../migrations/20260923143740_runtime_maintenance.sql) | pg_cron installed; cleanup scheduled every ten minutes; never releases reservations or deletes financial history |
 
@@ -107,7 +107,7 @@ exists. Neither Auth settings nor Cloudflare deployment changes are performed by
 these SQL files.
 
 Remaining product decisions: six-digit ID capacity/guest retention and abuse
-limits, future approved payout quota amounts, funded Mahjong limits, and any
+limits, funded Mahjong limits, and any
 Facebook identity without email. Those are not solved by deleting users,
 recycling IDs, inventing credit or weakening identity verification.
 

@@ -13,7 +13,7 @@ let game
 before(async () => {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
   game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000 returning id")).id
+  const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,guest_initial_credit=20000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode) values($1,$2,true,10000,1000000,1,'platform')", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','cancel','status'],now()+interval '1 day')", [game, secret])
   await loadProductAccounting(db)
@@ -45,38 +45,16 @@ async function rpc(name, body, action) {
 }
 const openBody = p => ({ version: 1, match_ref: randomUUID(), rule_version: "v1", participants: [{ session_id: p.session_id, reserve: "1.00" }] })
 const settleBody = (p, body, amount, n = 1, final = false) => ({ version: 1, match_ref: body.match_ref, rule_version: "v1", operation_key: `${body.match_ref}:${n}`, settlement_no: n, final, entries: amount === null ? [] : [{ kind: "player", account_ref: p.player_account_id, amount, source: "gameplay" }] })
-const budget = () => one("select approved_amount,paid_amount,reserved_amount from public.joy8_payout_budgets where game_id=$1", [game])
-async function fund(limit = "2000000") { await db.query("insert into public.joy8_payout_budgets(game_id,approved_amount) values($1,$2)", [game, limit]) }
 const cancel = body => one("select public.joy8_operator_cancel_match($1,$2,$3,$4,$5) result", [game, body.match_ref, 0, "Product confirmed void", "incident:approved-void-proof"])
 
-test("unapproved platform exposure cannot open a match or lock player funds", async () => {
+test("platform matches open without a per-game payout budget", async () => {
+  assert.equal((await one("select to_regclass('public.joy8_payout_budgets') value")).value, null)
   const p = await player()
-  await assert.rejects(rpc("joy8_open_match_v1", openBody(p)), /JOY8_PAYOUT_BUDGET_EXCEEDED/)
-  assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [p.wallet_account_id])).locked_balance, "0.00")
-})
-
-test("payout quota covers all matches, reserves liability, counts retries once and bounds continuous payouts", async () => {
-  await fund()
-  const a = await player(), b = await player(), c = await player()
-  const first = openBody(a), second = openBody(b), third = openBody(c)
-  await rpc("joy8_open_match_v1", first)
-  await rpc("joy8_open_match_v1", second)
-  await assert.rejects(rpc("joy8_open_match_v1", third), /JOY8_PAYOUT_BUDGET_EXCEEDED/)
-  const request = settleBody(a, first, "600000.00")
-  const result = await rpc("joy8_settle_match_v1", request)
-  assert.deepEqual(await rpc("joy8_settle_match_v1", request), result)
-  await assert.rejects(rpc("joy8_settle_match_v1", settleBody(a, first, "600000.00", 2)), /JOY8_PAYOUT_BUDGET_EXCEEDED/)
-  assert.deepEqual(await budget(), { approved_amount: "2000000.00", paid_amount: "600000.00", reserved_amount: "1400000.00" })
-  await rpc("joy8_settle_match_v1", settleBody(a, first, null, 2, true))
-  assert.equal((await budget()).reserved_amount, "1000000.00")
-  await cancel(second)
-  assert.equal((await budget()).reserved_amount, "0.00")
-  await rpc("joy8_open_match_v1", third)
-  assert.equal((await budget()).paid_amount, "600000.00")
+  await rpc("joy8_open_match_v1", openBody(p))
+  assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [p.wallet_account_id])).locked_balance, "1.00")
 })
 
 test("operator recovery requires evidence, preserves balance and is exactly repeatable", async () => {
-  await fund()
   const p = await player(), body = openBody(p)
   await rpc("joy8_open_match_v1", body)
   await denied(() => one("select public.joy8_operator_cancel_match($1,$2,0,'timeout','')", [game, body.match_ref]), /EVIDENCE_REQUIRED/)
@@ -89,7 +67,6 @@ test("operator recovery requires evidence, preserves balance and is exactly repe
   for (const role of ["anon", "authenticated", "service_role"]) {
     await db.exec(`set local role ${role}`)
     await denied(() => cancel(body), /permission denied/)
-    await denied(() => db.query("select * from public.joy8_payout_budgets"), /permission denied/)
     await db.exec("reset role")
   }
 })
@@ -118,13 +95,11 @@ test("operator recovery rolls back all reservation changes when the product refu
 })
 
 test("operator recovery preserves previously committed payouts", async () => {
-  await fund()
   const p = await player(), body = openBody(p)
   await rpc("joy8_open_match_v1", body)
   await rpc("joy8_settle_match_v1", settleBody(p, body, "10.00"))
   await one("select public.joy8_operator_cancel_match($1,$2,1,$3,$4)", [game, body.match_ref, "Product confirmed void", "incident:approved-void-proof"])
   assert.deepEqual(await one("select balance,locked_balance from public.wallet_accounts where id=$1", [p.wallet_account_id]), { balance: "20010.00", locked_balance: "0.00" })
-  assert.deepEqual(await budget(), { approved_amount: "2000000.00", paid_amount: "10.00", reserved_amount: "0.00" })
   assert.equal((await one("select count(*)::int n from public.joy8_settlements")).n, 1)
 })
 
@@ -137,7 +112,6 @@ test("private-entry pause preserves identities, sessions and financial records",
 test("scheduled cleanup expires credentials without releasing occupied wallet funds", async () => {
   const sql = await readFile("supabase/migrations/20260923143740_runtime_maintenance.sql", "utf8")
   await db.exec(sql.split("create extension")[0].replace(/^begin;/, ""))
-  await fund()
   const p = await player(), body = openBody(p)
   await rpc("joy8_open_match_v1", body)
   await db.query("update public.game_sessions set expires_at=now()-interval '1 second' where id=$1", [p.session_id])
@@ -146,34 +120,4 @@ test("scheduled cleanup expires credentials without releasing occupied wallet fu
   assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [p.wallet_account_id])).locked_balance, "1.00")
   assert.equal((await one("select state from public.joy8_matches where match_ref=$1", [body.match_ref])).state, "open")
   assert.equal((await one("select count(*)::int n from public.gateway_rate_limits")).n, 1)
-})
-
-test("concurrent platform matches cannot reserve the same payout quota", { skip: typeof db.connect !== "function" }, async () => {
-  await fund("1000000")
-  const a = await player(), b = await player()
-  await db.exec("commit")
-  const first = await db.connect(), second = await db.connect()
-  try {
-    await first.query("begin; set local role service_role")
-    await second.query("begin; set local role service_role")
-    const sql = "select public.joy8_open_match_v1($1,$2::jsonb)"
-    await first.query(sql, [secret, JSON.stringify(openBody(a))])
-    const waiting = second.query(sql, [secret, JSON.stringify(openBody(b))]).then(() => null, error => error)
-    let locked = false
-    for (let attempt = 0; attempt < 100; attempt++) {
-      locked = (await one("select wait_event_type='Lock' locked from pg_stat_activity where pid=$1", [second.processID]))?.locked
-      if (locked) break
-      await new Promise(resolve => setTimeout(resolve, 20))
-    }
-    assert.equal(locked, true)
-    await first.query("commit")
-    assert.match((await waiting)?.message ?? "unexpected success", /JOY8_PAYOUT_BUDGET_EXCEEDED/)
-    await second.query("rollback")
-    assert.equal((await budget()).reserved_amount, "1000000.00")
-  } finally {
-    await first.query("rollback")
-    await second.query("rollback")
-    await first.end()
-    await second.end()
-  }
 })
