@@ -60,6 +60,9 @@ Open items before activation:
 - The Mahjong server refuses operational start unless the platform starting
   credit is 0, and `scripts/mahjong-connection-check.mjs` mirrors that check. Both
   must adopt the enrollment grants before Mahjong can run against hosted Joy8.
+- The Mahjong test fixture consumes Joy8's exported platform bundle. The bundle
+  now includes every platform migration and its bootstrap games start
+  unpublished, so the Mahjong fixture must be updated when Mahjong work resumes.
 - Economy operations lock one singleton `economy_state` row, serializing them
   across tables. Measure hosted capacity before funded or public activation.
 - Re-enabling the entry needs a reviewed audience and activation change, then:
@@ -128,6 +131,13 @@ their transaction. GRANT and REVOKE use global validation because event metadata
 omits their target objects, and those changes require READ COMMITTED. Disabling
 the guard or skipping role preflight can stop adapters at runtime. The contract
 belongs to [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
+
+### Deployed Gateway Differs From Source
+
+The deployed `joy8-gateway` still maps the removed `JOY8_PAYOUT_BUDGET_EXCEEDED`
+error to 409; the source no longer does. The database can no longer raise that
+error, so behavior is unaffected. The next reviewed Gateway deployment removes
+the difference.
 
 ### Synchronous Gateway Runtime Cleanup
 
