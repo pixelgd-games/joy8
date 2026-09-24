@@ -25,7 +25,8 @@ Joy8 must provide these items before implementation begins:
 - Protocol `server-v1` and currency `POINT`.
 - Confirmed rule version.
 - Wallet policy: funding mode, maximum bet, maximum payout and participant limit.
-- A restricted, expiring test Backend Key delivered once through a secure channel.
+- A restricted test Backend Key delivered once through a secure channel. Keys do
+  not expire; Joy8 revokes them explicitly.
 - The SDK package, API contract and this acceptance checklist.
 - Private-test POINT and account conditions.
 
@@ -63,7 +64,7 @@ npm run key:backend -- plan --operation provision --profile integrations/third-p
 npm run key:backend -- provision --profile integrations/third-party/integration-profile.local.json --delivery integrations/third-party/backend-key-delivery.local.json --reviewed-plan integrations/third-party/key-plan.local.json --apply
 ```
 
-The operation file binds the game, purpose, scopes, expiry, exact Worker target,
+The operation file binds the game, purpose, scopes, exact Worker target,
 environment and configuration path. Changed arguments require a new review file.
 The file records intent; possession of it or `--apply` is not user approval.
 Credential operations are reviewed operational DML, not schema migrations; no
@@ -72,9 +73,11 @@ plaintext secret belongs in migration history. Review the SQL builders in
 
 Initial provision requires a hidden game and `purpose: private-integration`.
 For a published game, use `purpose: production` and `rotate`, naming the old key.
-Rotation permits the same or fewer scopes, registers the replacement, deploys it,
-and only then revokes the old key. Failed delivery revokes the replacement.
-An expired or revoked old key may be used to establish its game/scope boundary.
+Rotation permits the same or fewer scopes. It revokes the old key and registers
+the replacement in one transaction, then deploys the replacement; the two keys are
+never active together. Failed delivery revokes the replacement, and the game has
+no valid key until a new rotation succeeds. A revoked old key may be used to
+establish its game/scope boundary.
 
 Use `plan --operation rotate` and `rotate` with the same `--old-key-id`, profile,
 delivery and reviewed-plan arguments. Use `plan --operation revoke` and `revoke`
@@ -110,7 +113,7 @@ operator session. The tool refuses to download or run an unpinned Wrangler.
 6. Joy8 enables only the reviewed private entry and runs an end-to-end test.
 7. Both sides verify balance, reservation, settlement, status, cancel, restart,
    timeout and duplicate-request behavior.
-8. Joy8 reviews production URLs, policy, credential scope and expiry before
+8. Joy8 reviews production URLs, policy and credential scope before
    separately authorizing public release.
 
 ## Files

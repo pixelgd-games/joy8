@@ -33,7 +33,6 @@
       "status",
       "cancel"
     ],
-    "delivery": "secure-one-time",
-    "expiresAt": "2026-10-05T15:59:59Z"
+    "delivery": "secure-one-time"
   }
 }

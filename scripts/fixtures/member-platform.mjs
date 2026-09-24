@@ -13,7 +13,7 @@ export async function loadMemberPlatformDatabase(db) {
   for (const id of [game, shared, independent]) {
     await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)", [id, platformPolicy])
     const key = randomBytes(32).toString("hex")
-    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','open'],now()+interval '1 day')", [id, key])
+    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','open'])", [id, key])
     keys.set(id, key)
   }
   return { game, shared, independent, platformPolicy, keys }

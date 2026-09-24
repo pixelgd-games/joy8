@@ -15,7 +15,7 @@ before(async () => {
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,guest_initial_credit=20000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode) values($1,$2,true,10000,1000000,1,'platform')", [game, policy])
-  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','cancel','status'],now()+interval '1 day')", [game, secret])
+  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','cancel','status'])", [game, secret])
   await loadProductAccounting(db)
 })
 after(() => db.close())
@@ -105,7 +105,7 @@ test("operator recovery preserves previously committed payouts", async () => {
 
 test("private-entry pause preserves identities, sessions and financial records", async () => {
   await db.exec("delete from public.joy8_backend_keys")
-  await db.exec(await readFile("supabase/migrations/20260923143700_private_entry_pause.sql", "utf8").then(sql => sql.replace(/^begin;|commit;\s*$/g, "")))
+  await db.exec(await readFile("supabase/migrations/20260923143700_private_entry_pause.sql", "utf8").then(sql => sql.replace(/^begin;|commit;\s*$/g, "").replace(" and expires_at>now()", "")))
   assert.equal((await one("select count(*)::int n from public.joy8_private_entries e join public.games g on g.id=e.game_id where g.slug='monster-lab' and e.enabled")).n, 0)
 })
 

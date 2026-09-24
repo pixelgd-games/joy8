@@ -108,7 +108,7 @@ test('browser roles cannot read entry configuration or issue sessions', () => is
 
 test('an exchange/renew-only backend exchanges once, sees the grant and cannot open a match', () => isolated(async () => {
   const key = 'b'.repeat(64)
-  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew'],now()+interval '1 day')", [game, key])
+  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','renew'])", [game, key])
   const session = (await launch()).result
   const request = { version: 1, launch_code: session.launch_code }
   const result = (await one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb) result", [key, JSON.stringify(request)])).result

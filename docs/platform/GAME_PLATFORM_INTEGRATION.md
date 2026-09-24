@@ -308,13 +308,14 @@ inactive.
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
-hash, game ID, allowed actions, expiry and revocation time for each key. The key
+hash, game ID, allowed actions and revocation time for each key. Keys have no
+expiry; they stay valid until Joy8 revokes them. The key
 authorizes one game; no request can select another game or wallet. Origin
 checks are additional protection, not proof of identity. Products never receive
 the project service-role key or direct platform table grants.
 
 Before provider implementation begins, Joy8 creates a hidden integration record
-with its non-secret Game ID and a restricted, expiring test Backend Key. The
+with its non-secret Game ID and a restricted test Backend Key. The
 authoritative operator path is `npm run key:backend`: it uses a cryptographically
 secure random source, registers only the SHA-256 hash in Joy8, and passes the
 plaintext through standard input directly to an explicitly named Cloudflare
@@ -326,8 +327,9 @@ support production-purpose rotation of a specified existing game key without
 expanding its scopes. Every mutation requires user approval, the matching
 `--reviewed-plan` file and `--apply`; see the operator commands in README.
 Cloudflare installation deploys immediately. If
-delivery fails, the new database key is revoked; rotation installs the new key
-before revoking the specifically selected old key.
+delivery fails, the new database key is revoked; rotation revokes the specifically
+selected old key and registers the new key in one transaction, so two keys for
+the game are never active together.
 
 This direct path is used only when the operator is authorized for the provider
 backend. An external provider receives the same platform-generated value through
@@ -340,7 +342,7 @@ the initial workflow.
 
 A test key enables only the reviewed private integration work. It does not
 publish a catalog entry or authorize public release. Before release, review the
-production URLs, policy, action scope and expiry, then either rotate to a
+production URLs, policy and action scope, then either rotate to a
 production key or explicitly approve the existing key. Revoke every obsolete or
 compromised key. Replacement credentials must retain status/retry access for
 existing matches.
@@ -686,14 +688,14 @@ closed if admission SQL is unavailable. Git upload alone does not deploy it.
 The 30 settlement requests per table are independent: 100 tables can each issue
 30 requests through one backend/address. The backend and ingress ceilings are
 initial coarse abuse limits, not measured production-capacity guarantees. Backend
-identity is stable across key rotation: multiple valid keys for the same game
-share its backend budget. Other games have independent backend budgets. Creating
+identity is stable across key rotation: every key for the same game shares its
+backend budget. Other games have independent backend budgets. Creating
 a session is player-limited because no trusted game Session exists yet; exchanging
 or renewing it uses the verified Session limit.
 
 Never use a caller-supplied player ID, random match reference, unverified JWT claim
 or raw API key as a trusted counting identity. The service-role-only admission RPC
-verifies backend key scope/revocation/expiry and resolves existing game-owned
+verifies backend key scope and revocation and resolves existing game-owned
 Sessions/matches. Unknown or other-game resources are rejected. Token/key rotation,
 IP changes and new operation keys cannot reset a subject's budget. Launch-code
 lookup uses the game/hash index without persisting the raw code in a counter.
@@ -767,7 +769,7 @@ Before provider implementation:
 
 1. Complete the non-secret game profile, rule version, wallet policy, URLs and
    exact parent origins.
-2. Create the hidden Game ID and restricted, expiring test Backend Key.
+2. Create the hidden Game ID and restricted test Backend Key.
 3. Deliver the Game ID, SDK/contract and Backend Key at integration kickoff;
    keep the key outside chat, source control and browser code.
 4. The provider implements and tests its own game and backend, then supplies a

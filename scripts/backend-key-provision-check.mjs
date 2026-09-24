@@ -27,8 +27,7 @@ const profile = {
     purpose: "private-integration",
     environmentVariable: "JOY8_BACKEND_KEY",
     delivery: "secure-one-time",
-    scopes: ["exchange", "renew", "open", "settle", "status", "cancel"],
-    expiresAt: "2099-01-01T00:00:00Z"
+    scopes: ["exchange", "renew", "open", "settle", "status", "cancel"]
   }
 }
 const delivery = {
@@ -55,11 +54,11 @@ test("review binds credential operation, scope, old key and exact delivery targe
 })
 
 test("validates a restricted non-secret profile and explicit Cloudflare target", () => {
-  assert.deepEqual(validateProfile(profile, new Date("2026-01-01T00:00:00Z")).scopes, profile.credential.scopes)
+  assert.deepEqual(validateProfile(profile).scopes, profile.credential.scopes)
   assert.equal(validateDelivery(delivery).deployMode, "immediate")
   assert.throws(() => validateProfile({ ...profile, credential: { ...profile.credential, purpose: "unknown" } }), /purpose/)
   assert.throws(() => validateDelivery({ ...delivery, cwd: "relative/backend" }), /absolute path/)
-  assert.doesNotThrow(() => buildStatusSql({ ...profile, credential: { ...profile.credential, expiresAt: "2025-01-01T00:00:00Z" } }))
+  assert.throws(() => validateProfile({ ...profile, credential: { ...profile.credential, expiresAt: "2099-01-01T00:00:00Z" } }), /do not expire/)
 })
 
 test("creates a 256-bit Backend Key and hashes the plaintext once for storage", () => {
@@ -93,20 +92,22 @@ test("registers, reports and revokes only non-secret key metadata", async () => 
     const status = (await db.query(buildStatusSql(profile))).rows[0].joy8_backend_keys
     assert.equal(status[0].keyId, keyId)
     assert.equal(JSON.stringify(status).includes(hash), false)
-    await db.exec(buildRevokeSql(profile, keyId))
+    assert.equal(Object.hasOwn(status[0], "expiresAt"), false)
     const production = { ...profile, credential: { ...profile.credential, purpose: "production" } }
     await db.query("update public.games set published=true where id=$1", [gameId])
     assert.throws(() => buildRegisterSql(production, { id: oldKeyId, hash }), /rotation/)
     await db.exec(buildRegisterSql(production, { id: oldKeyId, hash: "ab".repeat(32) }, keyId))
     assert.equal((await db.query("select game_id from public.joy8_backend_keys where id=$1", [oldKeyId])).rows[0].game_id, gameId)
     assert.ok((await db.query("select revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0].revoked_at)
+    assert.deepEqual((await db.query("select id from public.joy8_backend_keys where game_id=$1 and revoked_at is null", [gameId])).rows.map(row => row.id), [oldKeyId])
+    await assert.rejects(db.query("select expires_at from public.joy8_backend_keys"), /expires_at/)
     await db.exec(buildRevokeSql(profile, keyId))
   } finally {
     await db.close()
   }
 })
 
-test("registers before delivery and revokes the old key only after delivery", async () => {
+test("rotation replaces the old key in registration and never keeps both active", async () => {
   const events = []
   const result = await provisionCredential({
     profile,
@@ -117,8 +118,7 @@ test("registers before delivery and revokes the old key only after delivery", as
     deliverKey: async value => events.push(["deliver", value]),
     revokeKey: async value => events.push(["revoke", value])
   })
-  assert.deepEqual(events.map(event => event[0]), ["register", "deliver", "revoke"])
-  assert.equal(events[2][1], oldKeyId)
+  assert.deepEqual(events.map(event => event[0]), ["register", "deliver"])
   assert.deepEqual(result, { keyId, gameId, delivered: true, oldKeyRevoked: true })
   assert.equal(JSON.stringify(result).includes(secret), false)
   assert.equal(JSON.stringify(result).includes(hash), false)

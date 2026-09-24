@@ -34,7 +34,6 @@
       "status",
       "cancel"
     ],
-    "delivery": "secure-one-time",
-    "expiresAt": "YYYY-MM-DDTHH:mm:ssZ"
+    "delivery": "secure-one-time"
   }
 }

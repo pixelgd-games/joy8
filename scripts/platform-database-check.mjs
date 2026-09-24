@@ -23,7 +23,7 @@ before(async () => {
     await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)", [id, policy])
   }
   for (const [id, token] of [[game, secret], [other, otherSecret]]) {
-    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [id, token])
+    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'])", [id, token])
   }
 })
 beforeEach(() => db.exec("begin"))
@@ -318,14 +318,15 @@ test("missing or disabled game policy never falls back to a test wallet", async 
   assert.equal((await one("select count(*)::int n from public.game_sessions where player_account_id=$1", [p.id])).n, 0)
 })
 
-test("keys cannot cross games, exceed scopes or outlive expiry", async () => {
+test("keys cannot cross games, exceed scopes or outlive revocation", async () => {
   const a = await ready(), b = await ready()
   await call("joy8_open_match_v1", opening([a, b]))
   await denied(call("joy8_settle_match_v1", settlement(a, b), otherSecret), "JOY8_MATCH_NOT_FOUND")
   await db.query("update public.joy8_backend_keys set scopes=array['status'] where game_id=$1", [game])
   await denied(call("joy8_settle_match_v1", settlement(a, b)), "JOY8_BACKEND_UNAUTHORIZED")
-  await db.query("update public.joy8_backend_keys set expires_at=now()-interval '1 second' where game_id=$1", [game])
+  await db.query("update public.joy8_backend_keys set scopes=array['exchange','renew','open','settle','status','cancel'],revoked_at=now() where game_id=$1", [game])
   await denied(rpc("joy8_match_status_v1", [secret, JSON.stringify({ version: 1, match_ref: "match-1" }), false]), "JOY8_BACKEND_UNAUTHORIZED")
+  await db.query("update public.joy8_backend_keys set revoked_at=null where game_id=$1", [game])
 })
 
 test("new accounting tables and internal helpers have no public or service bypass", async () => {

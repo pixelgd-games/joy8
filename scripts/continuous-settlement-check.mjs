@@ -65,7 +65,7 @@ before(async () => {
   game = (await one("select id from public.games where slug='test-game'")).id
   policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000,enabled=true returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,5000,5000)", [game, policy])
-  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
+  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'])", [game, secret])
 })
 after(() => db.close())
 
@@ -186,7 +186,7 @@ describe("local continuous settlement SQL", () => {
     await db.query("update public.joy8_backend_keys set revoked_at=now() where game_id=$1", [game])
     await denied(call("joy8_settle_match_v1", settlement(players, body.match_ref, 2, true)), "JOY8_BACKEND_UNAUTHORIZED")
     const replacement = randomBytes(32).toString("hex")
-    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['settle'],now()+interval '1 day')", [game, replacement])
+    await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['settle'])", [game, replacement])
     assert.equal((await call("joy8_settle_match_v1", settlement(players, body.match_ref, 2, true), replacement)).state, "settled")
   })
 

@@ -18,7 +18,7 @@ before(async () => {
   await db.query(`insert into public.joy8_game_policies(
     game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode
   ) values($1,$2,true,10000,1000000,1,'platform')`, [game, policy])
-  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
+  await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','status','cancel'])", [game, secret])
 })
 after(() => db.close())
 

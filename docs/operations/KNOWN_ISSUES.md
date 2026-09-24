@@ -40,7 +40,7 @@ POINT rules belong in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-
 ### Mahjong Activation
 
 Mahjong Clash (`D:/Studio/Project-Gaming/production/table/products/mahjong-clash`)
-has a hidden catalog entry, a 22-table private `mahjong_clash` schema, a
+has a hidden catalog entry, a 25-table private `mahjong_clash` schema, a
 registered accounting adapter and an identity-only game policy: full-balance
 table reservation with a 1-POINT `max_reserve_amount` guard. A player with more
 than 1 available POINT cannot open a table under this policy; it is not a funded
@@ -49,14 +49,17 @@ configuration. Its private entry is paused and bound only to
 production URL or public entry.
 
 Its restricted `mahjong_clash_runtime` login and game-scoped exchange/renew-only
-Backend Key expire on 2026-09-25 at 15:25 Asia/Taipei. Renewal requires a
-reviewed operator action through the
+Backend Key have no expiry since 2026-09-25; they stay valid until revoked.
+Replacement requires a reviewed operator action through the
 [credential workflow](../../integrations/third-party/README.md#platform-operator-flow)
 or a secret manager; never write plaintext credential files into this repository.
-Expiry alone is not approval to rotate.
 
 Open items before activation:
 
+- `20260924150000_mahjong_per_table_storage.sql` (applied 2026-09-25) moved the
+  schema to 25 tables with per-table storage, the quarantined-table void and the
+  operator queue. Its `mahjong_clash_operator` role has no login; an operator
+  login needs a separate reviewed credential action.
 - Economy operations lock one singleton `economy_state` row, serializing them
   across tables. Measure hosted capacity before funded or public activation.
 - Re-enabling the entry needs a reviewed audience and activation change, then:

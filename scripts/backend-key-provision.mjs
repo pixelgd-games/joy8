@@ -16,7 +16,7 @@ function requiredString(value, name) {
   return value
 }
 
-export function validateProfile(profile, now = new Date(), requireFutureExpiry = true) {
+export function validateProfile(profile) {
   if (!profile || typeof profile !== "object") throw new Error("Invalid integration profile")
   const gameId = requiredString(profile.game?.gameId, "game.gameId")
   const slug = requiredString(profile.game?.slug, "game.slug")
@@ -31,11 +31,8 @@ export function validateProfile(profile, now = new Date(), requireFutureExpiry =
   if (!Array.isArray(scopes) || scopes.length === 0 || new Set(scopes).size !== scopes.length || scopes.some(scope => !allowedScopes.includes(scope))) {
     throw new Error("Invalid credential.scopes")
   }
-  const expiresAtText = requiredString(profile.credential?.expiresAt, "credential.expiresAt")
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(expiresAtText)) throw new Error("credential.expiresAt must be an ISO UTC timestamp")
-  const expiresAt = new Date(expiresAtText)
-  if (!Number.isFinite(expiresAt.valueOf()) || (requireFutureExpiry && expiresAt <= now)) throw new Error("credential.expiresAt must be a future ISO timestamp")
-  return { gameId, slug, scopes: [...scopes], expiresAt: expiresAt.toISOString() }
+  if (Object.hasOwn(profile.credential, "expiresAt")) throw new Error("Backend Keys do not expire; remove credential.expiresAt")
+  return { gameId, slug, scopes: [...scopes] }
 }
 
 export function validateDelivery(delivery) {
@@ -66,7 +63,7 @@ function quote(value) {
 }
 
 export function buildRegisterSql(profile, credential, oldKeyId = null) {
-  const { gameId, slug, scopes, expiresAt } = validateProfile(profile)
+  const { gameId, slug, scopes } = validateProfile(profile)
   if (!credential || !uuidPattern.test(credential.id) || !/^[a-f0-9]{64}$/.test(credential.hash)) throw new Error("Invalid hashed credential")
   const scopeSql = scopes.map(quote).join(",")
   const production = profile.credential.purpose === "production"
@@ -79,21 +76,22 @@ begin
   where g.id=${quote(gameId)}::uuid and g.slug=${quote(slug)} and ${production ? "g.published" : "not g.published"}
   for update;
   if not found then raise exception 'JOY8_KEY_GAME_STATE_OR_ID_MISMATCH'; end if;
-  ${oldKeyId ? `if not exists(select 1 from public.joy8_backend_keys where id=${quote(oldKeyId)}::uuid and game_id=v_game_id and scopes @> array[${scopeSql}]::text[]) then raise exception 'JOY8_KEY_ROTATION_SCOPE_OR_GAME_MISMATCH'; end if;` : ""}
+  ${oldKeyId ? `if not exists(select 1 from public.joy8_backend_keys where id=${quote(oldKeyId)}::uuid and game_id=v_game_id and scopes @> array[${scopeSql}]::text[]) then raise exception 'JOY8_KEY_ROTATION_SCOPE_OR_GAME_MISMATCH'; end if;
+  update public.joy8_backend_keys set revoked_at=coalesce(revoked_at,now()) where id=${quote(oldKeyId)}::uuid and game_id=v_game_id;` : ""}
   perform 1 from public.joy8_game_policies gp
   join public.joy8_wallet_policies wp on wp.id=gp.wallet_policy_id
   where gp.game_id=v_game_id and gp.enabled and wp.enabled and wp.currency='POINT';
   if not found then raise exception 'JOY8_KEY_POLICY_NOT_READY'; end if;
-  insert into public.joy8_backend_keys(id,game_id,key_hash,scopes,expires_at)
-  values (${quote(credential.id)}::uuid,v_game_id,${quote(credential.hash)},array[${scopeSql}]::text[],${quote(expiresAt)}::timestamptz);
+  insert into public.joy8_backend_keys(id,game_id,key_hash,scopes)
+  values (${quote(credential.id)}::uuid,v_game_id,${quote(credential.hash)},array[${scopeSql}]::text[]);
 end
 $joy8$;
-select json_build_object('keyId',${quote(credential.id)},'gameId',${quote(gameId)},'slug',${quote(slug)},'expiresAt',${quote(expiresAt)}) as joy8_backend_key_registered;
+select json_build_object('keyId',${quote(credential.id)},'gameId',${quote(gameId)},'slug',${quote(slug)},'replacedKeyId',${oldKeyId ? quote(oldKeyId) : "null"}) as joy8_backend_key_registered;
 `
 }
 
 export function buildRevokeSql(profile, keyId) {
-  const { gameId, slug } = validateProfile(profile, new Date(), false)
+  const { gameId, slug } = validateProfile(profile)
   if (!uuidPattern.test(keyId)) throw new Error("Invalid Backend Key ID")
   return `do $joy8$
 begin
@@ -110,9 +108,9 @@ select json_build_object('keyId',${quote(keyId)},'gameId',${quote(gameId)},'revo
 }
 
 export function buildStatusSql(profile) {
-  const { gameId, slug } = validateProfile(profile, new Date(), false)
+  const { gameId, slug } = validateProfile(profile)
   return `select coalesce(json_agg(json_build_object(
-  'keyId',k.id,'scopes',k.scopes,'expiresAt',k.expires_at,'revokedAt',k.revoked_at,'createdAt',k.created_at
+  'keyId',k.id,'scopes',k.scopes,'revokedAt',k.revoked_at,'createdAt',k.created_at
 ) order by k.created_at desc),'[]'::json) as joy8_backend_keys
 from public.joy8_backend_keys k join public.games g on g.id=k.game_id
 where k.game_id=${quote(gameId)}::uuid and g.slug=${quote(slug)};
@@ -170,14 +168,7 @@ export async function provisionCredential({ profile, delivery, oldKeyId = null, 
     } catch {
       throw new Error(`Backend Key delivery failed and compensation failed; revoke key ID ${credential.id}`)
     }
-    throw new Error(`Backend Key delivery failed; new key ID ${credential.id} was revoked`)
-  }
-  if (oldKeyId) {
-    try {
-      await revokeKey(oldKeyId)
-    } catch {
-      throw new Error(`New Backend Key ${credential.id} is active, but old key ${oldKeyId} still requires revocation`)
-    }
+    throw new Error(`Backend Key delivery failed; new key ID ${credential.id} was revoked${oldKeyId ? ` and old key ${oldKeyId} stays revoked` : ""}`)
   }
   return { keyId: credential.id, gameId: profile.game.gameId, delivered: true, oldKeyRevoked: Boolean(oldKeyId) }
 }
@@ -244,16 +235,17 @@ function parseArgs(argv) {
 
 export function credentialPlan({ operation, profile, delivery, keyId = null }) {
   if (!["provision", "rotate", "revoke"].includes(operation)) throw new Error("Choose --operation provision, rotate or revoke")
-  const checked = validateProfile(profile, new Date(), operation !== "revoke")
+  const checked = validateProfile(profile)
   if (operation !== "provision" && !uuidPattern.test(keyId)) throw new Error("Rotation/revocation requires an exact key ID")
   if (operation === "provision" && (keyId || profile.credential.purpose === "production")) throw new Error("Production credentials require explicit rotation")
   return {
     operation, projectRef, gameId: checked.gameId, slug: checked.slug,
-    purpose: profile.credential.purpose, scopes: checked.scopes, expiresAt: checked.expiresAt,
+    purpose: profile.credential.purpose, scopes: checked.scopes,
     keyId, target: operation === "revoke" ? null : validateDelivery(delivery),
-    databaseChange: operation === "revoke" ? "Revoke the named game key" : "Insert a game-scoped credential hash; revoke it if delivery fails",
+    databaseChange: operation === "revoke" ? "Revoke the named game key"
+      : operation === "rotate" ? "Revoke the named key and insert the replacement hash in one transaction; revoke the replacement if delivery fails"
+        : "Insert a game-scoped credential hash; revoke it if delivery fails",
     deliveryChange: operation === "revoke" ? null : "Deploy the named Worker secret immediately",
-    revokeAfterDelivery: operation === "rotate" ? keyId : null,
   }
 }
 

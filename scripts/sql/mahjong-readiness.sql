@@ -9,7 +9,7 @@ select jsonb_build_object(
     'member_execute',has_function_privilege('authenticated',p.oid,'EXECUTE'),
     'gateway_execute',has_function_privilege('service_role',p.oid,'EXECUTE')) order by p.proname)
     from pg_proc p join pg_namespace n on n.oid=p.pronamespace
-    where n.nspname='mahjong_clash' and p.proname in ('runtime_balance','runtime_readiness','lock_runtime_economy')),
+    where n.nspname='mahjong_clash' and p.proname in ('runtime_balance','runtime_readiness','bind_runtime_identity','void_unposted_hand')),
   'continuous',exists(select 1 from information_schema.columns where table_schema='public' and table_name='joy8_matches' and column_name='settlement_count'),
   'catalog',coalesce((select jsonb_agg(jsonb_build_object('id',id,'slug',slug,'published',published,'launch_url',launch_url)) from public.games where slug='mahjong-clash'),'[]'::jsonb),
   'game_policies',(select count(*) from public.joy8_game_policies p join public.games g on g.id=p.game_id where g.slug='mahjong-clash'),
