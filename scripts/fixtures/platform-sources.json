@@ -3,6 +3,7 @@
   "bootstrap": "scripts/fixtures/member-database.sql",
   "runtime": [
     "20260709170000_create_platform_account_wallet_core.sql",
+    "20260710140000_secure_admin_game_access.sql",
     "20260710141000_create_gateway_v1_session_auth.sql",
     "20260710142000_bind_rounds_to_game_sessions.sql",
     "20260710143000_add_gateway_runtime_limits.sql",
@@ -35,12 +36,16 @@
     "20260921112000_cap_game_bets_at_10000.sql",
     "20260921120000_register_monster_lab_private_integration.sql",
     "20260923100000_full_balance_reservations.sql",
+    "20260923143700_private_entry_pause.sql",
     "20260923143710_admin_identity.sql",
     "20260923143720_platform_payout_budget.sql",
     "20260923143730_operator_match_recovery.sql",
+    "20260924012500_session_contract_cleanup.sql",
+    "20260924012510_catalog_metadata_cleanup.sql",
     "20260924100000_enrollment_point_grants.sql",
     "20260924101000_game_min_bet.sql",
-    "20260924102000_remove_payout_budget.sql"
+    "20260924102000_remove_payout_budget.sql",
+    "20260924110000_twelve_hour_game_session.sql"
   ],
   "drafts": [],
   "excluded": {
@@ -49,7 +54,6 @@
     "20260710010000_create_game_session_wallet_rpc.sql": "Superseded by the selected trusted-session migrations.",
     "20260710011000_restrict_game_session_wallet_rpc_grants.sql": "Superseded RPC grants are replaced by selected runtime migrations.",
     "20260710013000_fix_wallet_rpc_variable_conflicts.sql": "Superseded RPC implementation is replaced by selected runtime migrations.",
-    "20260710140000_secure_admin_game_access.sql": "Hosted catalog/admin setup; the synthetic bootstrap supplies the game table.",
     "20260714021000_upsert_valkyrie_dragons_hoard_game.sql": "Hosted catalog data.",
     "20260714234000_upsert_dead_county_game.sql": "Hosted catalog data.",
     "20260716230000_upsert_ninja_four_elements_game.sql": "Hosted catalog data.",
@@ -70,10 +74,6 @@
     "20260921100000_remove_incompatible_catalog_games.sql": "Guarded cleanup of hosted catalog rows.",
     "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games.",
     "20260923110000_mahjong_processed_actions_history_limit.sql": "Product-owned processed-action constraint; retained as applied deployment history and excluded from the platform-only fixture.",
-    "20260923143700_private_entry_pause.sql": "Hosted entry activation state; release-safety tests apply the pause explicitly to synthetic entries.",
-    "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler.",
-    "20260924012500_session_contract_cleanup.sql": "Guarded session cutover requires paused entries; session-cleanup-check applies it after constructing and checking the historical pre-cutover fixture.",
-    "20260924012510_catalog_metadata_cleanup.sql": "Guarded catalog cutover requires the historical catalog view; session-cleanup-check installs it and verifies the current catalog and grants.",
-    "20260924110000_twelve_hour_game_session.sql": "Replaces the current two-argument issuer; session-cleanup-check applies it after the session cutover it depends on."
+    "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler."
   }
 }

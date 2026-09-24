@@ -292,8 +292,6 @@ and verifies critical member/session/settlement function presence. It does not
 exercise financial writes or prove Google, guest Auth, Turnstile, product backend
 or iframe health.
 The rate limiter may update runtime counters; no business records are created.
-The hosted health/rejection check passed against `joy8-gateway` using the
-`server-v1` product protocol.
 
 It should distinguish:
 

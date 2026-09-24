@@ -2,19 +2,20 @@ import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 
 const db = await createLocalPostgres()
 const one = async sql => (await db.query(sql)).rows[0]
 before(async () => {
-  await loadPlatformDatabase(db)
+  await loadCurrentPlatform(db)
   await loadProductAccounting(db)
   await db.exec(`
     update public.joy8_wallet_policies set enabled=true;
-    insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount,product_adapter)
-    select g.id,w.id,true,1000,'fixture_product.accounting(text,uuid,jsonb)'::regprocedure
-    from public.games g cross join public.joy8_wallet_policies w;
+    insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,product_adapter)
+    select g.id,w.id,true,1000,1000,'fixture_product.accounting(text,uuid,jsonb)'::regprocedure
+    from public.games g cross join public.joy8_wallet_policies w
+    where not exists(select 1 from public.joy8_game_policies p where p.game_id=g.id);
     create schema ddl_maintenance;
     create table auth.provider_data(id int);
     create role ddl_candidate_owner nologin;

@@ -1,7 +1,6 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
-import { applyJoy8Rebrand } from "./fixtures/joy8-rebrand.mjs"
-import { loadMemberDatabase, memberSql } from "./fixtures/member-database.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -10,16 +9,14 @@ const one = async (sql, values = []) => (await rows(sql, values))[0]
 let existingPlayerId
 
 before(async () => {
-  await loadMemberDatabase(db, async () => {}, false)
+  await loadCurrentPlatform(db)
   const auth = await one("insert into auth.users (is_anonymous) values (true) returning id")
   existingPlayerId = (await one("insert into public.player_accounts (auth_user_id, account_type, member_enrolled_at) values ($1, 'guest', now()) returning id", [auth.id])).id
-  await applyJoy8Rebrand(db)
-  await db.exec(await memberSql("../../supabase/migrations/20260920100000_public_player_ids.sql"))
 })
 
 after(() => db.close())
 
-test("existing and new players receive stable six-digit public IDs", async () => {
+test("players receive unique six-digit public IDs that survive promotion", async () => {
   const existing = await one("select public_id from public.player_accounts where id=$1", [existingPlayerId])
   assert.match(existing.public_id, /^[1-9][0-9]{5}$/)
 

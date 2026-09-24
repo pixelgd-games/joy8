@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import { after, afterEach, before, beforeEach, test } from "node:test"
-import { buildPlatformBundle } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 
@@ -11,7 +11,7 @@ const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 const secret = randomBytes(32).toString("hex")
 let game
 before(async () => {
-  for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
+  await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,guest_initial_credit=20000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode) values($1,$2,true,10000,1000000,1,'platform')", [game, policy])
@@ -30,7 +30,7 @@ async function denied(action, pattern) {
 async function player() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
-  const session = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
+  const session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await rpc("joy8_server_session_v1", { version: 1, launch_code: session.launch_code }, "exchange")
   return session
 }

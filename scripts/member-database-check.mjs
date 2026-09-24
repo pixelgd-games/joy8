@@ -27,8 +27,8 @@ async function asRole(role, sql, values = []) {
 
 const resolve = (id, enroll = false, role = "service_role") =>
   asRole(role, "select * from public.joy8_resolve_member($1::uuid, $2::boolean)", [id, enroll])
-const launch = (id, { slug = "test-game", currency = "POINT", seconds = 3600, name = null } = {}, role = "service_role") =>
-  asRole(role, "select * from public.create_game_session($1, $2, $3, $4, $5::uuid)", [slug, currency, seconds, name, id])
+const launch = (id, { slug = "test-game" } = {}, role = "service_role") =>
+  asRole(role, "select * from public.create_game_session($1, $2::uuid)", [slug, id])
 const denied = (operation, code = "42501") => assert.rejects(operation, (error) => error.code === code)
 
 async function identity(anonymous = true) {
@@ -232,14 +232,13 @@ test("the database rejects duplicate player wallets even when the original is cl
   await denied(db.query("insert into public.wallet_accounts (player_account_id,wallet_policy_id) values ($1,$2)", [member.player_account_id, games.platformPolicy]), "23505")
 })
 
-test("a session insert failure rolls back the session and name changes", async () => {
+test("a session insert failure rolls back the session", async () => {
   const { id, member } = await enrolled()
   await db.exec("alter table public.game_sessions add constraint test_failure check (false)")
-  await denied(launch(id, { name: "Test player" }), "23514")
+  await denied(launch(id), "23514")
   assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
   assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 0)
   assert.equal((await one("select count(*)::int as count from public.wallet_transactions")).count, 0)
-  assert.equal((await one("select display_name from public.player_accounts where id=$1", [member.player_account_id])).display_name, null)
 })
 
 test("browser roles cannot enroll, launch, or write protected player and wallet tables", async () => {
@@ -255,20 +254,18 @@ test("browser roles cannot enroll, launch, or write protected player and wallet 
   }
 })
 
-test("launch secrets are hashed and expire within session lifetime", async () => {
+test("launch secrets are hashed and expire within the fixed session lifetime", async () => {
   const { id } = await enrolled()
-  for (const seconds of [60, 3600]) {
-    const [session] = await launch(id, { seconds })
-    assert.match(session.launch_code, /^[0-9a-f]{64}$/)
-    const stored = await one("select launch_code_hash=public.joy8_hash_secret($1) as hash_matches, launch_code_hash<>$1 as not_plain, launch_code_expires_at<=expires_at as bounded, extract(epoch from launch_code_expires_at-now())::int as ttl from public.game_sessions where id=$2", [session.launch_code, session.session_id])
-    assert.deepEqual(stored, { hash_matches: true, not_plain: true, bounded: true, ttl: Math.min(seconds, 120) })
-  }
+  const [session] = await launch(id)
+  assert.match(session.launch_code, /^[0-9a-f]{64}$/)
+  const stored = await one("select launch_code_hash=public.joy8_hash_secret($1) as hash_matches, launch_code_hash<>$1 as not_plain, extract(epoch from launch_code_expires_at-created_at)::int as launch_ttl, extract(epoch from expires_at-created_at)::int as ttl from public.game_sessions where id=$2", [session.launch_code, session.session_id])
+  assert.deepEqual(stored, { hash_matches: true, not_plain: true, launch_ttl: 120, ttl: 43200 })
 })
 
-test("unavailable games and invalid launch input create no additional wallet", async () => {
+test("unavailable games create no additional wallet or session", async () => {
   const { id, member } = await enrolled()
-  for (const slug of ["unknown-game", "hidden-game", "missing-url", " "]) await denied(launch(id, { slug }), "P0002")
-  for (const options of [{ seconds: 59 }, { seconds: 86401 }, { currency: " " }, { currency: "USD" }, { name: "x".repeat(121) }]) await denied(launch(id, options), "22023")
+  for (const slug of ["unknown-game", "hidden-game", "missing-url", " ", "Test Game"]) await denied(launch(id, { slug }), "P0002")
+  assert.equal((await one("select count(*)::int as count from public.game_sessions where player_account_id=$1", [member.player_account_id])).count, 0)
   assert.equal((await one("select count(*)::int as count from public.wallet_accounts where player_account_id=$1", [member.player_account_id])).count, 1)
 })
 

@@ -64,24 +64,19 @@ in the owning repository, not a first-release platform dependency.
 
 - Guest-to-provider linking remains pending hosted acceptance.
   [README.md](../../README.md) owns the implementation details and test limits.
-- Deletion requests and cleanup/retention are not implemented. The repository
-  branded entry accepts only a configured game slug, exact trusted parent/game
-  origins, Google or explicit guest requests, and in-memory launch messages.
-  `/account/` now returns callbacks only to the Lobby or validated `/game/`,
-  `/play-test/`, and `/entry/` routes. The resolver and hosted Gateway are active;
-  public acceptance remains pending a reviewed production Mahjong H5/authority
-  URL and real provider/game testing.
-- The local private-test entry is owned by Joy8 at
-  `http://localhost:5173/play-test/?slug=mahjong-clash`; its game frame is owned by
-  Mahjong at `http://localhost:4391/`. The implemented shared member callback also
-  accepts a validated `/play-test/?slug=...` return path. Authorization belongs to
-  verified membership and backend entry configuration. Active registered members
-  and persistent guests use the same entry without per-player approval. Its SQL
-  and Gateway are installed; real game identity acceptance remains pending.
-  See the [connection review](../../supabase/drafts/MAHJONG_REVIEW.md).
-- Shared-wallet configuration is the approved contract. Mahjong has identity-only activation;
-  funded gameplay remains pending. Consume the platform wallet work rather than
-  introducing wallet logic into login screens.
+- Deletion requests and cleanup/retention are not implemented.
+- The branded entry accepts only a configured game slug, exact trusted
+  parent/game origins, Google or explicit guest requests, and in-memory launch
+  messages. `/account/` returns callbacks only to the Lobby or validated `/game/`,
+  `/play-test/`, and `/entry/` routes. Public branded-entry acceptance needs a
+  reviewed production game origin and real provider/game testing.
+- The `/play-test/?slug=...` entry uses the same membership: active registered
+  members and persistent guests enter without per-player approval, and
+  authorization belongs to verified membership and backend entry configuration.
+  Mahjong's current entry state is tracked in
+  [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md#mahjong-activation).
+- Consume the platform wallet contract rather than introducing wallet logic into
+  login screens.
 
 ## Identity Invariants
 

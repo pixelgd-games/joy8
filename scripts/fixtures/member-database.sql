@@ -30,9 +30,9 @@ create table public.games (
 );
 
 insert into public.games (name, slug, type, published, launch_url) values
-  ('Test game', 'test-game', 'casual', true, 'https://game.example/'),
+  ('Test game', 'test-game', 'casual', false, 'https://game.example/'),
   ('Hidden game', 'hidden-game', 'casual', false, 'https://game.example/'),
-  ('Missing URL', 'missing-url', 'casual', true, null);
+  ('Missing URL', 'missing-url', 'casual', false, null);
 
 create table auth.identities(user_id uuid,provider text);
 create table public.admin_users(email text);

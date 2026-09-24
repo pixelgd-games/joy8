@@ -42,4 +42,13 @@ test("the complete exported fixture installs current member, session, accounting
   assert.equal((await one("select to_regclass('public.joy8_payout_budgets') value")).value, null)
   assert.equal((await one("select exists(select 1 from pg_attribute where attrelid='public.joy8_game_policies'::regclass and attname='min_bet_amount' and not attisdropped) value")).value, true)
   assert.equal((await one("select count(*)::int n from public.joy8_product_ddl_checks")).n, 0)
+  assert.equal((await one("select exists(select 1 from pg_attribute where attrelid='public.games'::regclass and attname='supports_live' and not attisdropped) value")).value, false)
+  assert.equal((await one("select exists(select 1 from pg_attribute where attrelid='public.player_accounts'::regclass and attname='display_name' and not attisdropped) value")).value, false)
+  assert.equal((await one("select bool_and(not enabled) value from public.joy8_private_entries")).value, true)
+  await db.exec("update public.games set published=true where slug='test-game'")
+  await db.exec("begin; set local role anon")
+  try {
+    assert.deepEqual((await db.query("select slug from public.public_games_v1")).rows, [{ slug: "test-game" }])
+    await assert.rejects(db.query("select * from public.games"), /permission denied/)
+  } finally { await db.exec("rollback") }
 })

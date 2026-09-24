@@ -14,10 +14,10 @@ for (const file of files.filter(file => file.endsWith(".mjs"))) {
 
 const checks = [
   ["--test", ...[
-    "build-environment-check", "session-cleanup-check", "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
+    "build-environment-check", "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
     "public-player-id-check", "public-id-allocation-check", "product-registration-check",
-    "platform-database-check", "platform-cutover-check", "continuous-settlement-check", "seamless-wallet-check", "sdk-check", "backend-key-provision-check", "monster-lab-registration-check", "branded-entry-check",
-    "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check", "platform-bundle-check", "mahjong-balance-migration-check", "release-safety-check",
+    "platform-database-check", "continuous-settlement-check", "seamless-wallet-check", "sdk-check", "backend-key-provision-check", "monster-lab-registration-check", "branded-entry-check",
+    "private-entry-check", "session-scope-check", "product-ddl-check", "platform-bundle-check", "release-safety-check",
   ].map(name => `scripts/${name}.mjs`)],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/gateway-unit-check.mjs"],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "--test", "scripts/gateway-rate-limit-check.mjs"],

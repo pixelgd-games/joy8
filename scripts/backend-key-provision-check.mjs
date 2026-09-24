@@ -13,7 +13,7 @@ import {
   validateProfile
 } from "./backend-key-provision.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
-import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 
 const gameId = "11111111-1111-4111-8111-111111111111"
 const keyId = "22222222-2222-4222-8222-222222222222"
@@ -82,10 +82,10 @@ test("constructs a local Wrangler command without putting the secret in argument
 test("registers, reports and revokes only non-secret key metadata", async () => {
   const db = await createTestDatabase()
   try {
-    await loadPlatformDatabase(db)
+    await loadCurrentPlatform(db)
     await db.query("insert into public.games(id,name,slug,type,published,launch_url) values($1,'Example','example-game','slot',false,'https://game.example/')", [gameId])
     const policy = (await db.query("select id from public.joy8_wallet_policies where currency='POINT'")).rows[0].id
-    await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount,max_participants) values($1,$2,true,10000,1)", [gameId, policy])
+    await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants) values($1,$2,true,10000,10000,1)", [gameId, policy])
     await db.exec(buildRegisterSql(profile, { id: keyId, hash }))
     const stored = (await db.query("select id,key_hash,revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0]
     assert.equal(stored.key_hash, hash)

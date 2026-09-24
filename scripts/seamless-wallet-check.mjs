@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { after, afterEach, before, beforeEach, describe, test } from "node:test"
-import { buildPlatformBundle } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
@@ -11,8 +11,7 @@ const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 let game
 
 before(async () => {
-  const bundle = await buildPlatformBundle()
-  for (const source of bundle.sources) await db.exec(source.sql)
+  await loadCurrentPlatform(db)
   await loadProductAccounting(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,guest_initial_credit=20000,enabled=true returning id")).id
@@ -49,7 +48,7 @@ async function deniedQuery(sql, values, code) {
 async function ready() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   const player = await one("select * from public.joy8_resolve_member($1,true)", [auth])
-  const session = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
+  const session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await db.query("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: session.launch_code })])
   return { ...session, player: player.player_account_id }
 }

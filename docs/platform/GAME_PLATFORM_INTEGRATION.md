@@ -4,35 +4,18 @@ This document is the authoritative runtime contract between Joy8 and a game. It 
 
 It does not own member-entry design, CrazyGames submission rules, repository setup, or deployment history.
 
-Current source reviewed: 2026-09-24. The server-authorized base and continuous
-per-hand settlement extension are installed in the hosted database. The Gateway
-function `joy8-gateway` includes private entry, branded entry and the
-settlement-error mappings; the service-only branded-entry resolver is installed.
-The current product protocol is `server-v1`.
-The full-balance table reservation policy is installed in the hosted database.
-See [README.md](../../README.md) for verification and product-activation limits.
-There is no
-old/new compatibility path in the replacement. Existing game clients must adopt
-this protocol in their own repositories before activation.
+The current product protocol is `server-v1`. There is no old/new compatibility
+path; a game client must adopt this protocol in its own repository before
+activation. [README.md](../../README.md) owns the current implementation state.
 
 ## Core Rule
 
-Repository entry cleanup removes `branded-session` and route-less session
-creation; both branded and explicit test entry call `private-session`.
-The frontend and matching Gateway changes are deployed. Hosted origin bindings
-and the installed safety migrations are tracked in README and `supabase/drafts/README.md`.
-
-The current `server-v1` contract still asserts `wallet_scope: platform` and the
-read-only `balance` token scope. These are fixed authority checks, not selectable
-wallet modes or fallback behavior. Removing them would change the game-facing
-protocol and requires coordinated game-repository work. The hosted service-only database
-issuer accepts only `(game_slug, auth_user_id)`. The installed
-[session cleanup](../../supabase/migrations/20260924012500_session_contract_cleanup.sql)
-fixes POINT and the existing session lifetimes internally, drops the unused
-platform display name and removes the old function signatures. The matching
-Gateway is deployed. Game entries remain paused pending reviewed product
-activation. The game-facing
-`server-v1` payload remains unchanged. Applied SQL history is never rewritten.
+`server-v1` asserts `wallet_scope: platform` and the read-only `balance` token
+scope. These are fixed authority checks, not selectable wallet modes or fallback
+behavior; removing them would change the game-facing protocol and requires
+coordinated game-repository work. The service-only database session issuer
+accepts only `(game_slug, auth_user_id)` and fixes POINT, the 12-hour session and
+the 120-second launch code internally.
 
 A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
 
@@ -140,10 +123,8 @@ Any enrolled member or guest can request it when enabled. Origin validation is a
 browser boundary, not unforgeable identity proof; localhost bindings do not isolate
 the hosted database. Public access requires explicit entry activation review.
 
-The current local Mahjong binding uses Joy8 `http://localhost:5173` and game
-`http://localhost:4391/`. Entry configuration remains backend-controlled. The
-private entry and Gateway are installed; real game acceptance remains pending.
-See the [review](../../supabase/drafts/MAHJONG_REVIEW.md).
+Entry configuration, including the exact origin and launch URL, is
+backend-controlled and changed only through a reviewed migration.
 
 ### Branded H5 entry
 
@@ -158,10 +139,7 @@ parent. The game never receives provider or member tokens.
 `protocol` from trusted backend configuration and exact Origin. After verified
 membership, `POST /private-session` uses the same hidden-game session authority
 as the private entry. The resulting launch is delivered through the normal
-`joy8-launch-v1` message. Both responses are no-store. Migration
-`20260920180000_branded_game_entry.sql` and the matching Gateway routes are
-installed. The exact current origin/launch binding is localhost-only, so this is
-not a public Mahjong deployment or completed provider/game acceptance.
+`joy8-launch-v1` message. Both responses are no-store.
 
 ### Shared launch parameters
 
@@ -277,16 +255,9 @@ The launch code is valid for two minutes and can be used once.
 
 ## Operational Protocol v1
 
-Status: base deployed through the platform migrations and the hosted
-`joy8-gateway` using product protocol `server-v1`;
-continuous settlement is installed. Every integrated game uses the player's one
-shared POINT wallet. There is no browser payout or legacy Demo path.
-
-The hosted platform includes the Seamless Wallet settlement extension
-`20260921110000_seamless_wallet_settlement.sql`. It separates the bet limit from
-the payout guard and supports platform-funded games without a game-owned point
-account. The migration is installed and locally verified. Product-specific
-policy, credentials and acceptance are still required before a game can use it.
+Every integrated game uses the player's one shared POINT wallet. There is no
+browser payout route. Product-specific policy, credentials and acceptance are
+required before a game can open or settle matches.
 
 ### Configuration and Credentials
 
@@ -446,10 +417,8 @@ The opening locks funds without moving the balance. Its response is
 `{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
 current state; changing the opening under the same game/match reference conflicts.
 
-`server-settle-v1` takes the authoritative result from the game backend. The
-following request uses the installed continuous-settlement fields `settlement_no`
-and `final`. A game still needs an authorized financial backend key and funded-play
-configuration; the current Mahjong identity-only key cannot settle:
+`server-settle-v1` takes the authoritative result from the game backend and
+requires a Backend Key with the `settle` scope:
 
 ```json
 {
@@ -511,15 +480,15 @@ does not erase the authorized match obligation; trusted settlement may complete.
 Response fields are `version`, `settlement_id`, `match_id`, `state`,
 `settlement_no`, `final`, `request_hash` and `settled_at`.
 Exact retries return the saved response.
-Every wallet transaction stores `game_id` from this trusted match configuration,
+Every settlement transaction stores `game_id` from this trusted match configuration,
 so per-game reporting never depends on a game-supplied wallet choice. The operation
 key is unique within a game; changed content conflicts. Another
 operation key cannot settle an already finalized match.
 
 ### Continuous Settlement
 
-`supabase/migrations/20260918010100_continuous_settlement.sql` is deployed and extends the same settlement RPC,
-without a second wallet or legacy request fallback. `settlement_no` is a required
+Continuous settlement uses the same settlement RPC, without a second wallet or
+legacy request fallback. `settlement_no` is a required
 JSON integer from 1 through 999,999,999; `final` is a required JSON boolean.
 A single-hand game uses number 1 and `final:true`. A multi-hand game opens one
 financial match for the entire table and posts each completed hand in order:
@@ -551,13 +520,6 @@ from the current product reserves and validated signed entries. An adapter must
 apply these rolling holds, retain its open state for `final:false`, validate the
 hand number and result, and release on final/cancel. An adapter implementing only
 the previous close-on-settle behavior is not suitable for activation.
-
-The installed extension follows the wallet-ledger cleanup and refuses application
-while a platform match is open. It retains finalized accounting and performs no
-balance reset or grant. Mahjong's private adapter/schema, Gateway error mapping
-and identity-only entry configuration are installed. Financial key scopes, funded
-limits, human/AI funding and real-service acceptance remain activation gates in
-[the Mahjong review](../../supabase/drafts/MAHJONG_REVIEW.md).
 
 ### Product Accounting Adapter
 
@@ -605,20 +567,17 @@ Every product DDL, function ownership or grant transaction must also call
 operator. The validator reads metadata and does not execute gameplay or settle
 a match. Runtime checks remain active; never remove them to make unsafe grants pass.
 
-The installed `supabase/migrations/20260920120000_product_ddl_guard.sql`
-adds a deferred DDL validation queue: supported DDL changes validate automatically
-at transaction commit, allowing function creation and PUBLIC revocation in the
-same transaction. Unsafe changes roll back with `JOY8_PRODUCT_DDL_REJECTED` before
+A deferred DDL validation queue validates supported DDL changes automatically at
+transaction commit, allowing function creation and PUBLIC revocation in the same
+transaction. Unsafe changes roll back with `JOY8_PRODUCT_DDL_REJECTED` before
 another product uses the changed privileges. The queue grants no runtime access.
-PostgreSQL event triggers do not cover shared objects such as roles;
-role membership/attribute changes still need explicit
-preflight. Runtime isolation checks remain necessary. See the
+PostgreSQL event triggers do not cover shared objects such as roles; role
+membership/attribute changes still need explicit preflight. Runtime isolation
+checks remain necessary. See the
 [PostgreSQL event-trigger limits](https://www.postgresql.org/docs/17/event-trigger-definition.html)
 and [Supabase event-trigger support](https://supabase.com/docs/guides/database/postgres/event-triggers).
 
-The installed scoped replacement is
-`supabase/migrations/20260920140000_scoped_product_ddl_guard.sql`.
-It skips index/comment maintenance, inspects changed catalog objects and cascaded
+The guard skips index/comment maintenance, inspects changed catalog objects and cascaded
 drops, and serializes schema changes with registration using schema-specific locks.
 Only relevant product changes or newly unsafe protected-table privileges enqueue
 the full deferred check. Safe Auth table maintenance does not take the global lock.
@@ -635,35 +594,31 @@ EXECUTE, and defaults belong to the creating role. See
 [PostgreSQL default privileges](https://www.postgresql.org/docs/17/sql-alterdefaultprivileges.html).
 Even without schema USAGE, a PUBLIC function grant fails this strict boundary.
 
-Use [member-product preflight](../../scripts/sql/member-product-preflight.sql)
-for aggregate identity/accounting snapshots and schema inventory, and
-[postflight](../../scripts/sql/member-product-postflight.sql) for registry and
-permission checks through the Joy8 wrapper. Management API reads run as
-`supabase_read_only_user`, which cannot execute the internal validator; do not
-grant it execution to bypass this boundary. Migration/operator transactions run
-the validator directly. Account/catalog/player snapshots must remain unchanged
-when installing platform-only permission changes.
+Management API reads run as `supabase_read_only_user`, which cannot execute the
+internal validator; do not grant it execution to bypass this boundary.
+Migration/operator transactions run the validator directly. Account, catalog and
+player data must remain unchanged when installing platform-only permission changes.
 
 ### Platform SQL Fixtures
 
 `scripts/fixtures/platform-sources.json` is the authoritative integration fixture
 inventory. Every active migration must be either ordered runtime input or excluded
 with a reason. New unclassified migrations fail `test:platform-bundle` and `verify`.
-Hosted catalog edits, account cleanup, activation/key data and product-owned schema
-installation are excluded. Each product owns its schema source and registration contract. In isolated fixtures the consumer installs and registers that schema. In the shared hosted Supabase project, Joy8 applies reviewed product SQL as incremental deployment migrations; this does not transfer gameplay ownership to Joy8.
+The runtime list is every platform migration in deployment order on top of the
+minimal `scripts/fixtures/member-database.sql` bootstrap, so the bundle reproduces
+the current hosted platform schema. Hosted catalog/account data changes, product
+activation and keys, the pg_cron schedule and product-owned schema installation
+are excluded. Each product owns its schema source and registration contract. In isolated fixtures the consumer installs and registers that schema. In the shared hosted Supabase project, Joy8 applies reviewed product SQL as incremental deployment migrations; this does not transfer gameplay ownership to Joy8.
 
 `node scripts/export-platform-fixture.mjs` exports the contract and ordered SQL
 sources with normalized-LF SHA-256 hashes. Consumers must compare the exact ordered
 path list as well as every hash; checkout-based verification must also compare the
 contract and source content to the selected Joy8 checkout. A bundle with drafts is
-a proposed-schema test artifact, not evidence of hosted deployment. The full bundle
-is exercised on PGlite and PostgreSQL 17; focused historical tests may deliberately
-load smaller subsets for migration regressions. The guarded session/catalog
-cutover migrations are classified separately: `session-cleanup-check.mjs` builds
-the historical pre-cutover fixture, verifies refusal guards, applies both exact
-migrations and checks the current two-argument issuer and catalog permissions.
-The exported base bundle alone retains the historical issuer and is not a full
-current-schema snapshot or a deployment artifact.
+a proposed-schema test artifact, not evidence of hosted deployment. The bootstrap
+games start unpublished; a consumer publishes what it needs after loading, as
+`loadCurrentPlatform()` in `scripts/fixtures/platform-bundle.mjs` does. Every Joy8
+database suite loads this same bundle on PGlite and PostgreSQL 17; none loads a
+historical subset.
 
 ### Recovery and Errors
 
@@ -708,7 +663,7 @@ Gateway safeguards:
 - An 8-second database RPC timeout.
 - Public error normalization that does not expose internal database detail.
 
-The deployed Gateway uses verified-subject limits from
+The Gateway uses verified-subject limits from
 `supabase/migrations/20260920160000_scoped_gateway_limits.sql`.
 For changes to this admission contract, apply SQL first,
 verify its restricted grants, then deploy the function; the new Gateway fails

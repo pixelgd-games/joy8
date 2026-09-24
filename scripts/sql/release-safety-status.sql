@@ -18,4 +18,4 @@ select jsonb_build_object(
   'recovery_browser_denied',not has_function_privilege('authenticated','public.joy8_operator_cancel_match(uuid,text,integer,text,text)','EXECUTE') and not has_function_privilege('anon','public.joy8_operator_cancel_match(uuid,text,integer,text,text)','EXECUTE'),
   'cleanup_job',(select jsonb_build_object('active',active,'schedule',schedule,'command',command) from cron.job where jobname='joy8-runtime-cleanup'),
   'cleanup_runs',(select coalesce(jsonb_agg(r),'[]'::jsonb) from (select d.status,d.return_message,d.start_time,d.end_time from cron.job_run_details d join cron.job j on j.jobid=d.jobid where j.jobname='joy8-runtime-cleanup' order by d.start_time desc limit 3) r)
-) as release_safety_postflight from verified;
+) as release_safety_status from verified;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout } from "node:timers/promises"
-import { buildPlatformBundle } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -13,7 +13,7 @@ const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
 const admit = (route, request = {}, key = secret, auth = null, client = db) => client.query("select public.joy8_admit_gateway_request($1,$2::jsonb,$3,$4) result", [route, JSON.stringify(request), key, auth]).then(result => result.rows[0].result)
 
 before(async () => {
-  for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
+  await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set enabled=true,initial_credit=1000,guest_initial_credit=1000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)", [game, policy])
@@ -92,7 +92,7 @@ async function assertSameWindow(start, seconds) {
 async function freshSession() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
-  return one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
+  return one("select * from public.create_game_session('test-game',$1)", [auth])
 }
 
 async function table(ref) {

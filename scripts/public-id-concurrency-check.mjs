@@ -1,12 +1,12 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadMemberDatabase } from "./fixtures/member-database.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createLocalPostgres()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 before(async () => {
-  await loadMemberDatabase(db)
+  await loadCurrentPlatform(db)
 })
 after(() => db.close())
 

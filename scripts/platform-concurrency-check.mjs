@@ -3,20 +3,20 @@ import { after, before, test } from "node:test"
 import { randomBytes, randomUUID } from "node:crypto"
 import { setTimeout as delay } from "node:timers/promises"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createLocalPostgres()
 const secret = randomBytes(32).toString("hex")
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
-const launchSql = "select * from public.create_game_session('test-game','POINT',3600,null,$1)"
+const launchSql = "select * from public.create_game_session('test-game',$1)"
 const openSql = "select public.joy8_open_match_v1($1,$2::jsonb) result"
 const settleSql = "select public.joy8_settle_match_v1($1,$2::jsonb) result"
 let game
 before(async () => {
-  await loadPlatformDatabase(db)
+  await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000,enabled=true returning id")).id
-  await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_entry_amount) values($1,$2,true,1000)", [game, policy])
+  await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
 })
 after(() => db.close())
@@ -33,7 +33,7 @@ async function ready() {
   return { ...player, ...session }
 }
 const opening = (members, ref = randomUUID()) => ({ version: 1, match_ref: ref, rule_version: "v1", participants: members.map(p => ({ session_id: p.session_id, reserve: "100.00" })) })
-const settlement = (members, ref) => ({ version: 1, match_ref: ref, rule_version: "v1", operation_key: `result:${ref}`, entries: members.map((p, i) => ({ kind: "player", account_ref: p.id, amount: i ? "90.00" : "-90.00", source: "gameplay" })) })
+const settlement = (members, ref) => ({ version: 1, match_ref: ref, rule_version: "v1", operation_key: `result:${ref}`, settlement_no: 1, final: true, entries: members.map((p, i) => ({ kind: "player", account_ref: p.id, amount: i ? "90.00" : "-90.00", source: "gameplay" })) })
 async function race(hold, holdValues, works, release = "commit") {
   const gate = await db.connect(), clients = [], pending = []
   try {
@@ -69,9 +69,9 @@ function success(results) {
   return results.map(r => r.rows[0])
 }
 
-test("simultaneous operational launches provision one wallet and one grant", async () => {
+test("simultaneous launches reuse the enrollment wallet and its single grant", async () => {
   const p = await identity()
-  const results = success(await race("update public.player_accounts set display_name=display_name where id=$1", [p.id], Array.from({ length: 6 }, () => [launchSql, [p.auth]])))
+  const results = success(await race("update public.player_accounts set status=status where id=$1", [p.id], Array.from({ length: 6 }, () => [launchSql, [p.auth]])))
   assert.equal(new Set(results.map(r => r.wallet_account_id)).size, 1)
   assert.equal((await one("select count(*)::int n from public.wallet_transactions where wallet_account_id=$1", [results[0].wallet_account_id])).n, 1)
 })

@@ -32,3 +32,8 @@ export function validatePlatformBundle(bundle) {
   assert.deepEqual(bundle.sources.map(source => source.path), paths, "Missing, extra or reordered platform SQL source")
   for (const source of bundle.sources) assert.equal(sourceHash(source.sql), source.sha256, `Changed platform SQL: ${source.path}`)
 }
+
+export async function loadCurrentPlatform(db) {
+  for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
+  await db.exec("update public.games set published=true where slug in ('test-game','missing-url')")
+}

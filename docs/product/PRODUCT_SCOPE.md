@@ -2,7 +2,7 @@
 
 This document defines what Joy8 is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-23.
+Last reviewed: 2026-09-24.
 
 ## Product Definition
 
@@ -29,11 +29,8 @@ Joy8 succeeds when:
 ## Current Implementation
 
 [README.md](../../README.md) owns the implemented feature list and operating
-instructions. Google/guest member entry, stable public player IDs, the shared POINT wallet
-and trusted settlement are deployed foundations. Facebook is implemented but
-disabled. Provider linking, guest continuity and product activation remain open.
-Continuous per-hand settlement and the private Mahjong schema are installed;
-product activation remains pending as recorded in README and the integration contract. Target policies below do not imply full acceptance.
+instructions. Target policies below do not imply that implementation or
+acceptance is complete.
 
 ## Ownership Boundaries
 

@@ -16,4 +16,4 @@ select jsonb_build_object(
     and not exists(select 1 from pg_attribute where attrelid='public.joy8_matches'::regclass and attname='platform_paid_amount' and not attisdropped),
   'grant_functions_private',not has_function_privilege('service_role','public.joy8_grant_member_point(uuid)','EXECUTE')
     and not has_function_privilege('authenticated','public.joy8_grant_member_point(uuid)','EXECUTE')
-) as point_rules_postflight;
+) as point_rules_status;

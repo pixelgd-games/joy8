@@ -2,43 +2,28 @@ import assert from "node:assert/strict"
 import { after, afterEach, before, beforeEach, test } from "node:test"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 import { loadMemberPlatformDatabase } from "./fixtures/member-platform.mjs"
-import { memberSql } from "./fixtures/member-database.mjs"
 
 const db = await createTestDatabase()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
-let session, token, beforeData, beforeSecurity
+let session, token
 const active = async (...args) => (await db.query(`select * from public.joy8_active_session(${args.map((_, i) => `$${i + 1}`).join(",")})`, args)).rows
-const dataSnapshot = async () => ({
-  wallets: (await db.query("select * from public.wallet_accounts order by id")).rows,
-  sessions: (await db.query("select * from public.game_sessions order by id")).rows,
-  ledger: (await db.query("select * from public.wallet_transactions order by id")).rows,
-})
-const security = () => one("select proowner,proacl,prosecdef,proconfig from pg_proc where oid='public.joy8_active_session(text,text)'::regprocedure")
 
 before(async () => {
   const games = await loadMemberPlatformDatabase(db)
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
-  session = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
+  session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   const access = await one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb) result", [games.keys.get(games.game), JSON.stringify({ version: 1, launch_code: session.launch_code })])
   token = access.result.gateway_token
-  beforeData = await dataSnapshot()
-  beforeSecurity = await security()
-  const scopeSql = (await memberSql("../../supabase/migrations/20260917100000_active_session_scope.sql"))
-    .replaceAll("LOOTY", "JOY8")
-    .replaceAll("Looty", "Joy8")
-    .replaceAll("looty", "joy8")
-  await db.exec(scopeSql)
 })
 beforeEach(() => db.exec("begin"))
 afterEach(() => db.exec("rollback"))
 after(() => db.close())
 
-test("reapplying the scope migration preserves stored data and internal function permissions", async () => {
-  assert.deepEqual(await dataSnapshot(), beforeData)
-  assert.deepEqual(await security(), beforeSecurity)
-  assert.equal(beforeSecurity.prosecdef, true)
-  assert.ok(beforeSecurity.proconfig.includes('search_path=""'))
+test("the internal session helper is security definer with an empty search path", async () => {
+  const security = await one("select prosecdef,proconfig from pg_proc where oid='public.joy8_active_session(text,text)'::regprocedure")
+  assert.equal(security.prosecdef, true)
+  assert.ok(security.proconfig.includes('search_path=""'))
 })
 
 test("omitted scope resolves the same session as explicit balance", async () => {

@@ -3,11 +3,9 @@ import { after, afterEach, before, beforeEach, describe, test } from "node:test"
 import { randomBytes, randomUUID } from "node:crypto"
 import { setTimeout as delay } from "node:timers/promises"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
-import { loadPlatformDatabase } from "./fixtures/platform-database.mjs"
+import { readFile } from "node:fs/promises"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { loadProductAccounting } from "./fixtures/product-accounting.mjs"
-import { memberSql } from "./fixtures/member-database.mjs"
-import { applyJoy8Rebrand } from "./fixtures/joy8-rebrand.mjs"
-import { loadPlatformHardening } from "./fixtures/platform-hardening.mjs"
 
 const native = process.env.JOY8_TEST_ENGINE === "postgres17"
 const db = await createTestDatabase()
@@ -18,18 +16,7 @@ const openSql = "select public.joy8_open_match_v1($1,$2::jsonb) result"
 let game, policy
 
 before(async () => {
-  await loadPlatformDatabase(db, async () => {}, false)
-  await db.exec(await memberSql("../../supabase/migrations/20260918010000_wallet_ledger_cleanup.sql"))
-  await db.exec(await memberSql("../../supabase/migrations/20260918010100_continuous_settlement.sql"))
-  await applyJoy8Rebrand(db)
-  await db.exec(await memberSql("../../supabase/migrations/20260919130000_read_only_member_lookup.sql"))
-  await db.exec(await memberSql("../../supabase/migrations/20260919131000_cross_product_adapter_isolation.sql"))
-  for (const name of ["20260920100000_public_player_ids.sql", "20260920110000_public_id_allocation.sql", "20260920111000_product_schema_registration.sql"]) {
-    await db.exec(await memberSql(`../../supabase/migrations/${name}`))
-  }
-  await loadPlatformHardening(db)
-  await db.exec(await memberSql("../../supabase/migrations/20260920170000_shared_point_wallet.sql"))
-  await db.exec(await memberSql("../../supabase/migrations/20260921110000_seamless_wallet_settlement.sql"))
+  await loadCurrentPlatform(db)
   await loadProductAccounting(db)
   await db.exec(`
     set role fixture_product_owner;
@@ -76,7 +63,7 @@ before(async () => {
     reset role;
   `)
   game = (await one("select id from public.games where slug='test-game'")).id
-  policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,enabled=true returning id")).id
+  policy = (await one("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000,enabled=true returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,5000,5000)", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes,expires_at) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'],now()+interval '1 day')", [game, secret])
 })
@@ -101,7 +88,7 @@ const denied = (promise, code) => assert.rejects(promise, error => error.message
 async function ready() {
   const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   const p = await one("select * from public.joy8_resolve_member($1,true)", [auth])
-  const s = await one("select * from public.create_game_session('test-game','POINT',3600,null,$1)", [auth])
+  const s = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await db.query("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: s.launch_code })])
   return { ...s, player: p.player_account_id }
 }
@@ -118,7 +105,7 @@ async function table() {
   return { players, body, id: opened.match_id }
 }
 const reconcile = async (openMatches = 0) => {
-  const query = (await memberSql("../sql/platform-reconciliation.sql")).replace("begin read only;", "").replace("commit;", "")
+  const query = (await readFile("scripts/sql/platform-reconciliation.sql", "utf8")).replace("begin read only;", "").replace("commit;", "")
   const result = (await one(query)).reconciliation
   for (const [key, value] of Object.entries(result)) assert.equal(value, key === "open_matches" ? openMatches : 0, key)
 }
@@ -333,21 +320,6 @@ describe("local continuous settlement SQL", () => {
       await db.exec("rollback to savepoint immutable; release savepoint immutable")
     }
     await reconcile(1)
-  })
-
-  test("draft refuses to change the contract underneath an open table", async () => {
-    const { players, body } = await table()
-    const sql = (await memberSql("../../supabase/migrations/20260918010100_continuous_settlement.sql"))
-      .replaceAll("LOOTY", "JOY8")
-      .replaceAll("Looty", "Joy8")
-      .replaceAll("looty", "joy8")
-      .replace("begin;", "")
-      .replace(/\ncommit;\s*$/, "")
-    await db.exec("savepoint migration_guard")
-    await denied(db.exec(sql), "JOY8_OPEN_MATCHES")
-    await db.exec("rollback to savepoint migration_guard; release savepoint migration_guard")
-    assert.equal((await state(body.match_ref)).state, "open")
-    assert.deepEqual(await wallet(players[0]), { balance: "1000.00", locked_balance: "1000.00" })
   })
 })
 
