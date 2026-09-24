@@ -8,6 +8,7 @@ const db = await createTestDatabase()
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
 const sessionSql = await readFile("supabase/migrations/20260924012500_session_contract_cleanup.sql", "utf8")
 const catalogSql = await readFile("supabase/migrations/20260924012510_catalog_metadata_cleanup.sql", "utf8")
+const twelveHourSql = await readFile("supabase/migrations/20260924110000_twelve_hour_game_session.sql", "utf8")
 let auth, game, player
 before(async () => {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
@@ -32,6 +33,7 @@ test("session cleanup refuses active entries and populated display names", async
 
 test("the single replacement session signature preserves identity, POINT, expiry and private-entry denial", async () => {
   await db.exec(sessionSql)
+  await db.exec(twelveHourSql)
   assert.equal((await one("select to_regprocedure('public.create_game_session(text,text,integer,text,uuid)') is null removed")).removed, true)
   assert.equal((await one("select to_regprocedure('public.joy8_issue_game_session(text,text,integer,text,uuid)') is null removed")).removed, true)
   assert.equal((await one("select public.joy8_platform_health_v1() ready")).ready, true)
@@ -45,7 +47,7 @@ test("the single replacement session signature preserves identity, POINT, expiry
   assert.equal(session.currency, "POINT")
   assert.equal(session.protocol, "server-v1")
   await db.exec("reset role")
-  assert.deepEqual(await one("select extract(epoch from expires_at-created_at)::int ttl,extract(epoch from launch_code_expires_at-created_at)::int launch_ttl from public.game_sessions where id=$1", [session.session_id]), { ttl: 3600, launch_ttl: 120 })
+  assert.deepEqual(await one("select extract(epoch from expires_at-created_at)::int ttl,extract(epoch from launch_code_expires_at-created_at)::int launch_ttl from public.game_sessions where id=$1", [session.session_id]), { ttl: 43200, launch_ttl: 120 })
   assert.equal((await one("select count(*)::int n from public.player_accounts")).n, 1)
   assert.equal((await one("select coalesce(sum(balance),0)::text balance from public.wallet_accounts")).balance, "100.00")
   await db.exec("update public.joy8_private_entries set enabled=true where game_id=(select id from public.games where slug='monster-lab'); set role service_role")

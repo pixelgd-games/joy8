@@ -117,8 +117,9 @@ Both proposals were approved and installed without changing their reviewed SQL.
 
 - [Session contract cleanup](../migrations/20260924012500_session_contract_cleanup.sql) removes the unused
   platform `player_accounts.display_name` and replaces both session issuers with
-  the exact `(game_slug, auth_user_id)` signature. POINT, the one-hour session and
-  120-second launch code are fixed internally. Public/private entry checks,
+  the exact `(game_slug, auth_user_id)` signature. POINT, the session lifetime
+  (now 12 hours via [twelve-hour game session](../migrations/20260924110000_twelve_hour_game_session.sql))
+  and 120-second launch code are fixed internally. Public/private entry checks,
   member verification and shared-wallet provisioning remain. Health checks are
   updated; old signatures are dropped, with no fallback.
 - [Catalog metadata cleanup](../migrations/20260924012510_catalog_metadata_cleanup.sql) removes

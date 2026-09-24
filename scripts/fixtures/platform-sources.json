@@ -73,6 +73,7 @@
     "20260923143700_private_entry_pause.sql": "Hosted entry activation state; release-safety tests apply the pause explicitly to synthetic entries.",
     "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler.",
     "20260924012500_session_contract_cleanup.sql": "Guarded session cutover requires paused entries; session-cleanup-check applies it after constructing and checking the historical pre-cutover fixture.",
-    "20260924012510_catalog_metadata_cleanup.sql": "Guarded catalog cutover requires the historical catalog view; session-cleanup-check installs it and verifies the current catalog and grants."
+    "20260924012510_catalog_metadata_cleanup.sql": "Guarded catalog cutover requires the historical catalog view; session-cleanup-check installs it and verifies the current catalog and grants.",
+    "20260924110000_twelve_hour_game_session.sql": "Replaces the current two-argument issuer; session-cleanup-check applies it after the session cutover it depends on."
   }
 }

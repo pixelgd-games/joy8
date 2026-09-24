@@ -119,7 +119,7 @@ automatically or replace this authoritative wire specification.
 9. The game backend exchanges the launch code once, then gives the client a balance-only token.
 10. The client keeps that token in memory; financial operations belong to the game backend.
 
-The current Loader requests `POINT` with a one-hour session expiry.
+The current Loader requests `POINT` with a 12-hour session expiry.
 
 ## Loader In-Memory Handoff
 
@@ -250,7 +250,7 @@ Request:
 Rules:
 
 - `slug` must identify an available published game.
-- The browser sends only `slug`; unknown fields are rejected. Currency is fixed to `POINT` and session lifetime to one hour by the Gateway. The internal database issuer remains service-only; its arguments are not browser configuration.
+- The browser sends only `slug`; unknown fields are rejected. Currency is fixed to `POINT` and session lifetime to 12 hours by the Gateway. The internal database issuer remains service-only; its arguments are not browser configuration.
 - A valid Supabase bearer token and explicit player enrollment are required.
 - A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
   user's own verified session is supported and remains a guest. Missing enrollment
@@ -405,7 +405,7 @@ do not retain a compatibility parser for the retired query transport.
 `server-renew-v1` takes `{"version":1,"session_id":"<UUID>"}` and returns the
 same shape with a new balance token. Renewal invalidates the previous token;
 the backend serializes renewal per session. Tokens last at most 15 minutes and
-never outlive the original game session (the Loader currently requests one hour).
+never outlive the original game session (the Loader currently requests 12 hours).
 Renewal does not extend the game session. Expired/revoked sessions and inactive
 players/wallets cannot renew or start a new match.
 

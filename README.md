@@ -409,7 +409,7 @@ The repository has no baseline migration. Existing migrations are incremental
 and cannot reconstruct the full local database alone. Mahjong changes use the
 installed product schema and small forward migrations; see the
 [installation review](supabase/drafts/MAHJONG_REVIEW.md).
-The 69 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
+The 70 migration files on disk match hosted migration versions. The processed-action limit is a Mahjong-owned deployment snapshot, classified outside the platform fixture. This is version-list verification, not a claim that every historical SQL body was re-audited. The installed changes include the generic Seamless
 Wallet settlement extension, the 10,000 POINT platform bet cap and the Joy8 rebrand,
 the eight Mahjong
 installation migrations, two private-entry/identity-activation migrations and
