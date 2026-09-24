@@ -315,9 +315,6 @@ async function createSession(request: Request, headers: HeadersInit): Promise<Re
 
   const rpcResult = await callRpc("create_game_session", {
     p_game_slug: slug,
-    p_currency: "POINT",
-    p_expires_in_seconds: 3600,
-    p_display_name: null,
     p_auth_user_id: auth.userId,
   })
 

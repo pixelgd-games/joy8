@@ -25,11 +25,14 @@ and the installed safety migrations are tracked in README and `supabase/drafts/R
 The current `server-v1` contract still asserts `wallet_scope: platform` and the
 read-only `balance` token scope. These are fixed authority checks, not selectable
 wallet modes or fallback behavior. Removing them would change the game-facing
-protocol and requires coordinated game-repository work. The service-only database
-session issuer still has its historical currency, expiry and display-name
-parameters; Gateway supplies fixed POINT, 3600 seconds and null. They are not
-accepted from the browser. Database signature/column removal remains a separate
-reviewed migration; applied SQL history is never rewritten for cleanup.
+protocol and requires coordinated game-repository work. The hosted service-only database
+issuer still has historical currency, expiry and display-name parameters. The
+[review-only session cleanup](../../supabase/drafts/session-contract-cleanup.sql)
+replaces it with `(game_slug, auth_user_id)`, fixes POINT and the existing session
+lifetimes internally, drops the unused platform display name and removes the old
+function signatures. The local Gateway is updated for that replacement; it must
+not be deployed before the approved database cutover. The game-facing
+`server-v1` payload remains unchanged. Applied SQL history is never rewritten.
 
 A game owns gameplay. Joy8 owns platform identity, session authorization, wallet authority, the Loader shell, and platform-level errors.
 

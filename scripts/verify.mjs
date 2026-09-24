@@ -14,7 +14,7 @@ for (const file of files.filter(file => file.endsWith(".mjs"))) {
 
 const checks = [
   ["--test", ...[
-    "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
+    "build-environment-check", "session-cleanup-check", "member-unit-check", "captcha-check", "iframe-check", "member-database-check",
     "public-player-id-check", "public-id-allocation-check", "product-registration-check",
     "platform-database-check", "platform-cutover-check", "continuous-settlement-check", "seamless-wallet-check", "sdk-check", "backend-key-provision-check", "monster-lab-registration-check", "branded-entry-check",
     "private-entry-check", "session-scope-check", "ledger-cleanup-check", "product-ddl-check", "player-cleanup-check", "platform-bundle-check", "mahjong-balance-migration-check", "release-safety-check",
@@ -29,4 +29,4 @@ for (const args of checks) {
   if (result.error) throw result.error
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
-console.log("Verification passed: SQL dependencies, deployed-schema tests, Gateway, production build and browser smoke.")
+console.log("Verification passed: SQL dependencies, deployed-schema tests, Gateway, optimized smoke build and browser smoke.")

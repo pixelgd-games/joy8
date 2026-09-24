@@ -160,7 +160,7 @@ try {
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")
   assert.equal((await launched.json()).account_type, "guest")
-  assert.equal(rpcCalls.find(({ name }) => name === "create_game_session").args.p_auth_user_id, "verified-user")
+  assert.deepEqual(rpcCalls.find(({ name }) => name === "create_game_session").args, { p_game_slug: "test", p_auth_user_id: "verified-user" })
 
   for (const [code, message, status] of [
     ["P0002", "game is not available", 404],

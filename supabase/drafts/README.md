@@ -110,3 +110,36 @@ Remaining product decisions: six-digit ID capacity/guest retention and abuse
 limits, future approved payout quota amounts, funded Mahjong limits, and any
 Facebook identity without email. Those are not solved by deleting users,
 recycling IDs, inventing credit or weakening identity verification.
+
+## Pending metadata and session cleanup
+
+These two new proposals are not approved or applied. The earlier approval covered
+only the five installed release-safety migrations above.
+
+- [session-contract-cleanup.sql](session-contract-cleanup.sql) removes the unused
+  platform `player_accounts.display_name` and replaces both session issuers with
+  the exact `(game_slug, auth_user_id)` signature. POINT, the one-hour session and
+  120-second launch code are fixed internally. Public/private entry checks,
+  member verification and shared-wallet provisioning remain. Health checks are
+  updated; old signatures are dropped, with no fallback.
+- [catalog-metadata-cleanup.sql](catalog-metadata-cleanup.sql) removes
+  `games.supports_live` and replaces the catalog function/view without this field.
+  Public users still see only published games. Grants remain narrow and the
+  catalog function uses an empty search_path.
+
+Read-only hosted preflight found zero non-null platform display names, zero true
+live flags, zero published games and zero enabled private entries. The SQL
+rechecks these data/activation guards under locks where relevant; it refuses to
+discard used metadata. Mahjong's own `ai_accounts.display_name` is product-owned
+and remains untouched. There is no wallet, POINT, key, ID, retention or game-rule
+change. `wallet_scope`, token scopes and policy mappings remain active protocol
+and authorization fields; no game-side contract changes are included.
+
+`session-cleanup-check.mjs` installs the current bundle and exercises these drafts,
+including refusal guards, removed signatures, fixed lifetimes, browser denial and
+published-only catalog access. The drafts remain outside normal migration export.
+After approval, promote the exact reviewed files to timestamped migrations and
+classify them in the fixture manifest. Apply session cleanup before the matching
+local Gateway is deployed, and release the frontend/Gateway together. Keep hidden
+entries paused throughout. Do not deploy the local Gateway against the previous
+issuer signature. A source push to main still needs an explicit user request.

@@ -4,7 +4,7 @@ Joy8 is a lightweight H5 game platform. This repository contains the public Lobb
 
 This file is the source of truth for the repository's current implementation. Product decisions, integration contracts, operational risks, and analytics plans live in the specialized documents listed below.
 
-Last implementation review: 2026-09-23.
+Last implementation review: 2026-09-24.
 
 ### Local changes awaiting release
 
@@ -12,12 +12,17 @@ The working implementation shares Auth callbacks/conflict handling and iframe
 handoff across entry surfaces. `/game/` and `/play-test/` have separate bootstraps
 and one Loader; `/entry/` adds game artwork and uses the same `private-session`
 route. The redundant `branded-session` route and route-less session fallback are
-removed. `create-session` accepts only `slug`. Frontend and Gateway must be released
+removed. `create-session` accepts only `slug`. The local Gateway now also calls the
+two-argument database issuer from the pending session-cleanup draft. Apply that
+reviewed SQL before deploying this Gateway; frontend and Gateway must be released
 together; these changes are not yet deployed. No old/new runtime is retained.
 
 Turnstile now requires `VITE_TURNSTILE_SITE_KEY` at build time and fails closed
-when missing. Configure the existing production public site key before release;
-use a separate local/test key for local builds. Never use a test key in production.
+when missing. Production builds also reject missing variables, another Supabase
+project, privileged keys and Turnstile test keys. Configure the existing
+production public site key before release. Local builds connecting to hosted Auth
+also require its configured widget key and an allowed hostname. Test keys are
+reserved for the mocked smoke build; never use them with hosted Auth or production.
 
 The five user-approved security migrations are installed. See the
 [release safety review](supabase/drafts/README.md#release-safety-review) for their
@@ -473,9 +478,12 @@ Use the checks that match the change:
 
 `npm run verify` is the combined local acceptance command: it checks literal SQL
 dependency paths, runs member/captcha/iframe and deployed-schema suites, checks the
-Gateway, builds production assets and runs browser smoke. It fails on the first
+Gateway, builds optimized smoke assets and runs browser smoke. It fails on the first
 unsuccessful stage. Chrome or Edge is required for smoke. It does not apply SQL or
 publish code; the browser checks read the catalog and mock member/session writes.
+Smoke assets use test Turnstile configuration and are written to
+`.smoke-dist.local`, never the production `dist`. Run `npm run build` separately
+with the real public widget key to validate production configuration.
 
 ```powershell
 npm audit
@@ -495,6 +503,7 @@ npm run test:mahjong-balance
 npm run test:session-scope
 npm run test:ledger-cleanup
 npm run test:release-safety
+node --test scripts/build-environment-check.mjs scripts/session-cleanup-check.mjs
 npm run test:platform-db
 npm run test:continuous-db
 npm run test:sdk

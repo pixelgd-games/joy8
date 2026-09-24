@@ -4,7 +4,7 @@ This document contains only confirmed, currently relevant limitations, risks, an
 
 Current implementation facts are in `../../README.md`. Resolved issues belong in Git history, commits, and migrations instead of this file.
 
-Last reviewed: 2026-09-23.
+Last reviewed: 2026-09-24.
 
 ## Status Summary
 
@@ -25,7 +25,9 @@ catalog DELETE is revoked, and cleanup is scheduled independently of game launch
 
 Release still requires an explicitly approved game audience and activation,
 funded limits and payout quota amounts, product recovery evidence/procedures, and
-the coordinated frontend/Gateway release. The Auth token currently receives HTTP
+the coordinated frontend/Gateway release. The local Gateway also requires the
+new review-only session-signature migration before deployment; its preparation
+does not authorize hosted application. The Auth token currently receives HTTP
 403 for configuration, so the approved Email-provider shutdown is not complete.
 Email remains enabled; update the local token with Auth configuration permission.
 

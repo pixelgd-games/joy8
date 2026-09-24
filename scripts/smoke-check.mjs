@@ -78,7 +78,7 @@ try {
 }
 
 function runBuild() {
-  const result = spawnSync(npmCmd, ["run", "build"], {
+  const result = spawnSync(npmCmd, ["run", "build", "--", "--mode", "smoke"], {
     cwd,
     env: smokeEnv,
     stdio: "inherit",
@@ -95,7 +95,7 @@ function runBuild() {
 }
 
 function verifySecurityHeaders() {
-  const headers = readFileSync(path.join(cwd, "dist", "_headers"), "utf8")
+  const headers = readFileSync(path.join(cwd, ".smoke-dist.local", "_headers"), "utf8")
   for (const expected of [
     "Content-Security-Policy: frame-ancestors 'none'",
     "X-Frame-Options: DENY",
@@ -108,7 +108,7 @@ function verifySecurityHeaders() {
 }
 
 function verifyCanonicalHostRedirect() {
-  const script = readFileSync(path.join(cwd, "dist", "canonical-host.js"), "utf8")
+  const script = readFileSync(path.join(cwd, ".smoke-dist.local", "canonical-host.js"), "utf8")
   if (!script.includes('location.hostname === "joy8.pages.dev"') || !script.includes('"https://joy8.cc"')) {
     throw new Error("Missing canonical-host redirect script")
   }
@@ -123,7 +123,7 @@ function verifyCanonicalHostRedirect() {
     "play-test/index.html",
   ]
   for (const entryFile of entryFiles) {
-    const html = readFileSync(path.join(cwd, "dist", entryFile), "utf8")
+    const html = readFileSync(path.join(cwd, ".smoke-dist.local", entryFile), "utf8")
     if (!html.includes('src="/canonical-host.js"')) {
       throw new Error(`Missing canonical-host redirect: ${entryFile}`)
     }
