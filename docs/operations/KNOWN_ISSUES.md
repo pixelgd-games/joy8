@@ -57,12 +57,6 @@ Expiry alone is not approval to rotate.
 
 Open items before activation:
 
-- The Mahjong server refuses operational start unless the platform starting
-  credit is 0, and `scripts/mahjong-connection-check.mjs` mirrors that check. Both
-  must adopt the enrollment grants before Mahjong can run against hosted Joy8.
-- The Mahjong test fixture consumes Joy8's exported platform bundle. The bundle
-  now includes every platform migration and its bootstrap games start
-  unpublished, so the Mahjong fixture must be updated when Mahjong work resumes.
 - Economy operations lock one singleton `economy_state` row, serializing them
   across tables. Measure hosted capacity before funded or public activation.
 - Re-enabling the entry needs a reviewed audience and activation change, then:

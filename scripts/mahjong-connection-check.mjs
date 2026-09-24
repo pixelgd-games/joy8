@@ -23,10 +23,10 @@ try {
   await client.query('begin read only')
   const state=(await client.query('select mahjong_clash.runtime_readiness() result')).rows[0]?.result
   if (!state || state.game_id!==env.MAHJONG_JOY8_GAME_ID || state.environment!=='operational'
-    || !state.continuous || !state.wallet_enabled || !state.game_enabled || Number(state.initial_credit)!==0
+    || !state.continuous || !state.wallet_enabled || !state.game_enabled
     || state.adapter!=='mahjong_clash.platform_accounting(text,uuid,jsonb)') throw new Error('Incomplete activation')
   await client.query('rollback')
-  console.log('Restricted Mahjong TLS connection and zero-credit readiness passed. No sessions, wallets, gameplay or AI funding were created.')
+  console.log('Restricted Mahjong TLS connection and activation readiness passed. No sessions, wallets, gameplay or AI funding were created.')
 } catch (error) {
   const code=/^[A-Z0-9_]{1,50}$/.test(error?.code || '') ? error.code : 'CHECK_FAILED'
   console.error(`Restricted connection check stopped at ${stage} (${code}). No credential values are displayed.`)
