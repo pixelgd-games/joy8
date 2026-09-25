@@ -18,8 +18,9 @@ This file is the source of truth for the repository's current implementation and
   at most 15 minutes and are renewed by the game backend.
 - Monster Lab is published in the public catalog with a production Backend Key;
   its private entry is disabled. Mahjong remains hidden with its private entry
-  paused. Monster Lab has verified hosted launch, bets, and win/loss settlement,
-  while the remaining hosted acceptance cases are still open. Launch risks are tracked in
+  paused. Monster Lab has verified hosted launch, bets, win/loss settlement and
+  complete Free Spins rounds reconciled against Joy8 settlements; the remaining
+  hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Current Scope

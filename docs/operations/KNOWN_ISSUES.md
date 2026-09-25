@@ -18,9 +18,10 @@ must still implement and verify authoritative gameplay before activation.
 
 - Monster Lab is published in the public catalog with its private entry disabled;
   Mahjong remains hidden with its private entry paused. Monster Lab's hosted
-  launch, bets, and win/loss settlement were verified, but Free Spins, timeout
-  recovery, refresh/restart, physical-device QA, and release math/compliance
-  review remain open. Do not treat publication as completion of those checks.
+  launch, bets, win/loss settlement and complete Free Spins rounds were
+  verified, with each round's player settlement total matching the game's round
+  win minus the bet. Refresh during Free Spins, timeout and restart recovery,
+  physical-device QA, and release math/compliance review remain open. Do not treat publication as completion of those checks.
 - The hosted Email provider still accepts verified API signup. Disable only the
   Email provider before public release; the user controls the timing and
   [README.md](../../README.md#hosted-auth-configuration) owns the procedure. Do
@@ -50,14 +51,14 @@ configuration. Its private entry is paused and bound only to
 production URL or public entry.
 
 Its restricted `mahjong_clash_runtime` login and game-scoped exchange/renew-only
-Backend Key have no expiry since 2026-09-25; they stay valid until revoked.
+Backend Key have no expiry; they stay valid until revoked.
 Replacement requires a reviewed operator action through the
 [credential workflow](../../integrations/third-party/README.md#platform-operator-flow)
 or a secret manager; never write plaintext credential files into this repository.
 
 Open items before activation:
 
-- `20260924150000_mahjong_per_table_storage.sql` (applied 2026-09-25) moved the
+- `20260924150000_mahjong_per_table_storage.sql` (applied) moved the
   schema to 25 tables with per-table storage, the quarantined-table void and the
   operator queue. Its `mahjong_clash_operator` role has no login; an operator
   login needs a separate reviewed credential action.
