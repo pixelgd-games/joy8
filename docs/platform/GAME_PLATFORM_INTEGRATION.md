@@ -709,9 +709,12 @@ Sessions/matches. Unknown or other-game resources are rejected. Token/key rotati
 IP changes and new operation keys cannot reset a subject's budget. Launch-code
 lookup uses the game/hash index without persisting the raw code in a counter.
 
-Admission is committed in its own RPC before business processing, so invalid
-business requests and exact retries consume budget without rolling back the
-counter. Settlement idempotency remains enforced by the settlement RPC. The
+For backend routes, `joy8_server_request_v1` performs coarse ingress admission,
+verified-subject admission, and the business operation in one database RPC. The
+business operation runs inside a PL/pgSQL exception block, so its failed writes
+roll back while the earlier rate counters still commit. Browser routes retain
+separate admission RPCs. Invalid business requests and exact retries therefore
+consume budget. Settlement idempotency remains enforced by the settlement RPC. The
 backend counter also counts invalid requests after backend authentication, while
 invalid credentials only reach coarse ingress protection. Counters use the existing
 atomic SQL upsert and fixed wall-clock windows; a boundary can permit a burst across

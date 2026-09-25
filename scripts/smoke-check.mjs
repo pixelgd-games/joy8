@@ -528,32 +528,33 @@ async function expectMemberModal(client) {
 }
 
 async function expectGameSelection(client, appPort) {
-  let syntheticCatalog = false
   const deadline = Date.now() + 12000
   while (Date.now() < deadline) {
     const state = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ games: document.querySelectorAll("#gameGrid .game-tile-poster").length, empty: Boolean(document.querySelector("#gameGrid .empty-state")) })' })
-    if (state.result.value.games >= 2 || state.result.value.empty) break
+    if (state.result.value.games > 0 || state.result.value.empty) break
     await sleep(100)
   }
   const catalogState = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: '({ games: document.querySelectorAll("#gameGrid .game-tile-poster").length, title: document.querySelector("#gameGrid .empty-title")?.textContent || "", copy: document.querySelector("#gameGrid .empty-copy")?.textContent || "", error: document.querySelector("#gameGrid .empty-state")?.classList.contains("is-error") || false })',
+    expression: '(() => { const link = document.querySelector("#gameGrid .game-tile-poster"); return { games: document.querySelectorAll("#gameGrid .game-tile-poster").length, title: document.querySelector("#gameGrid .empty-title")?.textContent || "", copy: document.querySelector("#gameGrid .empty-copy")?.textContent || "", error: document.querySelector("#gameGrid .empty-state")?.classList.contains("is-error") || false, first: link ? { path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent } : null } })()',
   })
-  if (catalogState.result.value.games < 2) {
-    const state = catalogState.result.value
+  const state = catalogState.result.value
+  if (state.games === 0) {
     if (state.title !== "目前沒有開放的遊戲" || state.copy !== "遊戲上架後會顯示在這裡。" || state.error) {
       throw new Error(`Empty catalog state failed: ${JSON.stringify(state)}`)
     }
-    syntheticCatalog = true
-    await client.send("Runtime.evaluate", {
-      awaitPromise: true,
-      expression: `import("/src/pages/lobby/game-grid.js").then(({ renderGameGrid }) => renderGameGrid(document.querySelector("#gameGrid"), [
-        { name: "Smoke Game One", slug: "smoke-game-one", thumbnail: "", type: "arcade" },
-        { name: "Smoke Game Two", slug: "smoke-game-two", thumbnail: "", type: "card" },
-      ]))`,
-    })
     console.log("OK Empty public catalog")
+  } else if (state.error || !state.first) {
+    throw new Error(`Catalog state failed: ${JSON.stringify(state)}`)
   }
+  const liveGame = state.first
+  await client.send("Runtime.evaluate", {
+    awaitPromise: true,
+    expression: `import("/src/pages/lobby/game-grid.js").then(({ renderGameGrid }) => renderGameGrid(document.querySelector("#gameGrid"), [
+      { name: "Smoke Game One", slug: "smoke-game-one", thumbnail: "", type: "arcade" },
+      { name: "Smoke Game Two", slug: "smoke-game-two", thumbnail: "", type: "card" },
+    ]))`,
+  })
   const gameLinks = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `[...document.querySelectorAll("#gameGrid .game-tile-poster")].slice(0, 2).map(link => ({ path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent }))`,
@@ -588,7 +589,7 @@ async function expectGameSelection(client, appPort) {
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
-  if (syntheticCatalog) {
+  if (!liveGame) {
     await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("目前沒有開放的遊戲"), "Empty catalog rejects direct game link")
     const emptyPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
     if (emptyPath.result.value !== "/") throw new Error("Rejected direct link did not clear the pending game URL")
@@ -597,7 +598,7 @@ async function expectGameSelection(client, appPort) {
     console.log("OK Game selection, callback destination, cancellation and empty-catalog direct-link rejection")
     return
   }
-  await expectPageText(client, appPort, games[0].path, (text) => text.includes(`遊玩「${games[0].name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, liveGame.path, (text) => text.includes(`遊玩「${liveGame.name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })

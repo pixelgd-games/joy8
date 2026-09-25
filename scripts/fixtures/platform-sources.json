@@ -49,7 +49,8 @@
     "20260925090000_backend_keys_without_expiry.sql",
     "20260925100000_monster_lab_max_payout.sql",
     "20260925110000_platform_round_payout_limit.sql",
-    "20260925120000_monster_lab_round_payout.sql"
+    "20260925120000_monster_lab_round_payout.sql",
+    "20260925150000_single_trip_server_requests.sql"
   ],
   "drafts": [],
   "excluded": {

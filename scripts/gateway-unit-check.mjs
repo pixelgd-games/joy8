@@ -215,44 +215,45 @@ try {
     assert.equal((await request(route, {}, "", null)).status, 404)
   }
   const key = "a".repeat(64)
-  let serverError = null, health = true
+  let serverError = null, health = true, directLimitCalls = 0
   const serverCalls = []
   globalThis.fetch = async (url, options) => {
     const name = url.split("/").at(-1)
-    if (name === "joy8_consume_gateway_rate_limit") return Response.json(true)
-    if (name === "joy8_admit_gateway_request") return Response.json({ allowed: true })
+    if (name === "joy8_consume_gateway_rate_limit") { directLimitCalls++; return Response.json(true) }
+    if (name === "joy8_admit_gateway_request") { directLimitCalls++; return Response.json({ allowed: true }) }
     if (name === "joy8_platform_health_v1") return Response.json(health)
     serverCalls.push({ name, args: JSON.parse(options.body) })
-    return serverError ? Response.json(serverError, { status: 400 }) : Response.json({ version: 1, state: "open" })
+    return Response.json(serverError ? { error: serverError } : { result: { version: 1, state: "open" } })
   }
-  const expected = {
-    exchange: "joy8_server_session_v1", renew: "joy8_server_session_v1",
-    open: "joy8_open_match_v1", settle: "joy8_settle_match_v1",
-    status: "joy8_match_status_v1", cancel: "joy8_match_status_v1",
-  }
-  for (const [action, name] of Object.entries(expected)) {
+  for (const action of ["exchange", "renew", "open", "settle", "status", "cancel"]) {
     const route = `server-${action}-v1`
     assert.equal((await request(route, {}, key)).status, 403)
     assert.equal((await request(route, {}, "member-token", null)).status, 401)
     assert.equal((await request(route, {}, "", null)).status, 401)
     const body = { version: 1, match_ref: "fixture" }
     assert.equal((await request(route, body, key, null)).status, 200)
-    assert.equal(serverCalls.at(-1).name, name)
+    assert.equal(serverCalls.at(-1).name, "joy8_server_request_v1")
+    assert.equal(serverCalls.at(-1).args.p_route, route)
+    assert.equal(serverCalls.at(-1).args.p_ingress_key, "ingress:unknown")
+    assert.equal(serverCalls.at(-1).args.p_ingress_limit, 10000)
+    assert.equal(serverCalls.at(-1).args.p_ingress_window, 60)
     assert.equal(serverCalls.at(-1).args.p_secret, key)
     assert.deepEqual(serverCalls.at(-1).args.p_request, body)
-    if (["exchange", "renew"].includes(action)) assert.equal(serverCalls.at(-1).args.p_action, action)
-    if (["status", "cancel"].includes(action)) assert.equal(serverCalls.at(-1).args.p_cancel, action === "cancel")
   }
+  assert.equal(directLimitCalls, 0)
   const count = serverCalls.length
   assert.equal((await request("server-open-v1", [], key, null)).status, 400)
   assert.equal((await request("server-open-v1", { data: "x".repeat(17000) }, key, null)).status, 400)
-  assert.equal(serverCalls.length, count)
+  assert.equal(serverCalls.length, count + 2)
+  assert.equal(serverCalls.at(-1).args.p_request, null)
   for (const [code, status] of Object.entries(SERVER_ERROR_STATUSES)) {
     serverError = { message: code }
     const response = await request("server-settle-v1", {}, key, null)
     assert.equal(response.status, status)
     assert.deepEqual(await response.json(), { error: code })
   }
+  serverError = { message: "invalid input syntax", code: "22P02" }
+  assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "JOY8_INVALID_REQUEST" })
   serverError = { message: "private database diagnostic", details: key }
   assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "JOY8_UPSTREAM_UNAVAILABLE" })
   assert.deepEqual(await (await request("health", {}, "", null)).json(), { status: "ok" })

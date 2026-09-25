@@ -121,7 +121,7 @@ Deno.serve(async (request) => {
     } else if (!ROUTES.has(route)) {
       response = jsonResponse({ error: "Route not found" }, 404, corsHeaders)
     } else {
-      const rateLimitResponse = await enforceRateLimit(route, request, corsHeaders)
+      const rateLimitResponse = route.startsWith("server-") ? null : await enforceRateLimit(route, request, corsHeaders)
       response = rateLimitResponse ?? await dispatchRoute(route, request, corsHeaders)
     }
   } catch (error) {
@@ -185,35 +185,56 @@ if (route === "balance") {
 
 async function serverOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
   const match = request.headers.get("authorization")?.match(/^Bearer ([a-f0-9]{64})$/)
-  if (!match) return jsonResponse({ error: "JOY8_BACKEND_UNAUTHORIZED" }, 401, headers)
-  const body = await readJsonBody(request)
-  if (!body.ok) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
-  const admission = await enforceSubjectRateLimit(route, body.value, headers, match[1])
-  if (admission) return admission
-  const action = route.slice(7, -3)
-  const args: Record<string, unknown> = { p_secret: match[1], p_request: body.value }
-  let name: string
-  if (action === "exchange" || action === "renew") {
-    name = "joy8_server_session_v1"
-    args.p_action = action
-  } else if (action === "open" || action === "settle") {
-    name = action === "open" ? "joy8_open_match_v1" : "joy8_settle_match_v1"
-  } else {
-    name = "joy8_match_status_v1"
-    args.p_cancel = action === "cancel"
-  }
-  const result = await callRpc(name, args)
+  const body = match ? await readJsonBody(request) : null
+  const result = await callRpc("joy8_server_request_v1", {
+    p_route: route,
+    p_ingress_key: `ingress:${getClientAddress(request)}`,
+    p_ingress_limit: INGRESS_LIMIT.limit,
+    p_ingress_window: INGRESS_LIMIT.windowSeconds,
+    p_secret: match?.[1] ?? null,
+    p_request: body?.ok ? body.value : null,
+  })
   if (!result.ok) {
     const error = result.body as { message?: string; code?: string } | null
     const code = error?.message ?? ""
     if (SERVER_ERROR_STATUSES[code]) return jsonResponse({ error: code }, SERVER_ERROR_STATUSES[code], headers)
     if (error?.code === "22P02") return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  const packet = result.body as Record<string, unknown> | null
+  if (!packet || typeof packet !== "object" || Array.isArray(packet)) {
+    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (packet.limited === true) {
+    if (!Number.isInteger(packet.retry_after) || Number(packet.retry_after) <= 0 || Number(packet.retry_after) > 86400) {
+      return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+    }
+    return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": String(packet.retry_after) })
+  }
+  if (!match) return jsonResponse({ error: "JOY8_BACKEND_UNAUTHORIZED" }, 401, headers)
+  if (!body?.ok) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+  if (typeof packet.admission_error === "string") {
+    return Object.hasOwn(SERVER_ERROR_STATUSES, packet.admission_error)
+      ? jsonResponse({ error: packet.admission_error }, SERVER_ERROR_STATUSES[packet.admission_error], headers)
+      : jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (Object.hasOwn(packet, "error")) {
+    if (!packet.error || typeof packet.error !== "object" || Array.isArray(packet.error)) {
+      return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+    }
+    const error = packet.error as { message?: string; code?: string } | null
+    const code = error?.message ?? ""
+    if (SERVER_ERROR_STATUSES[code]) return jsonResponse({ error: code }, SERVER_ERROR_STATUSES[code], headers)
+    if (error?.code === "22P02") return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
     return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
   }
-  if (!result.body || typeof result.body !== "object" || Array.isArray(result.body)) {
+  if (!Object.hasOwn(packet, "result")) {
+    return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (!packet.result || typeof packet.result !== "object" || Array.isArray(packet.result)) {
     return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
   }
-  return jsonResponse(result.body as JsonValue, 200, headers)
+  return jsonResponse(packet.result as JsonValue, 200, headers)
 }
 
 async function resolveMember(request: Request, headers: HeadersInit, enroll: boolean): Promise<Response> {

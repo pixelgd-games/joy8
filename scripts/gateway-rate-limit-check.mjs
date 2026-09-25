@@ -46,15 +46,19 @@ before(async () => {
       if (subjectOverride !== undefined) return Response.json(subjectOverride)
       return Response.json(await admit(args.p_route,args.p_request,args.p_secret,args.p_auth_user_id))
     }
+    if (name === "joy8_server_request_v1") {
+      if (unavailable || subjectUnavailable) return Response.json({}, { status: 503 })
+      if (subjectOverride !== undefined) return Response.json(subjectOverride)
+      const packet = (await one("select public.joy8_server_request_v1($1,$2,$3,$4,$5,$6::jsonb) result", [
+        args.p_route, args.p_ingress_key, args.p_ingress_limit, args.p_ingress_window,
+        args.p_secret, args.p_request == null ? null : JSON.stringify(args.p_request),
+      ])).result
+      if (args.p_route === "server-settle-v1" && (packet.result || packet.error)) settlementCalls++
+      return Response.json(packet)
+    }
     if (name === "joy8_resolve_member_profile") {
       const { rows } = await db.query("select * from public.joy8_resolve_member_profile($1,$2)", [args.p_auth_user_id, args.p_enroll])
       return Response.json(rows)
-    }
-    if (name === "joy8_settle_match_v1") {
-      settlementCalls++
-      try {
-        return Response.json((await one("select public.joy8_settle_match_v1($1,$2::jsonb) result", [args.p_secret,JSON.stringify(args.p_request)])).result)
-      } catch (error) { return Response.json({ message: error.message, code: error.code }, { status: 400 }) }
     }
     throw new Error(`Unexpected upstream RPC ${name}`)
   }
@@ -160,11 +164,17 @@ test("unverified, revoked, wrong-product and invented subjects cannot acquire a 
   assert.equal((await one("select sum(request_count)::int n from public.gateway_rate_limits where bucket_key_hash=public.joy8_hash_secret($1)",[`match:${id}:settle`])).n,1)
   for (const role of ["anon","authenticated"]) {
     await db.exec(`set role ${role}`)
-    try { await assert.rejects(admit("member",{},null,identities.get("test-member-0")),/permission denied/) }
+    try {
+      await assert.rejects(admit("member",{},null,identities.get("test-member-0")),/permission denied/)
+      await assert.rejects(db.query("select public.joy8_server_request_v1($1,$2,$3,$4,$5,$6::jsonb)", ["server-open-v1","ingress:restricted",10000,60,null,null]),/permission denied/)
+    }
     finally { await db.exec("reset role") }
   }
   await db.exec("set role service_role")
-  try { assert.equal((await admit("server-status-v1",request)).allowed,true) }
+  try {
+    assert.equal((await admit("server-status-v1",request)).allowed,true)
+    assert.deepEqual((await one("select public.joy8_server_request_v1($1,$2,$3,$4,$5,$6::jsonb) result", ["server-open-v1","ingress:restricted",10000,60,null,null])).result,{precheck:true})
+  }
   finally { await db.exec("reset role") }
   assert.equal((await one("select to_regclass('public.game_sessions_game_launch_code_idx') is not null present")).present,true)
 })
