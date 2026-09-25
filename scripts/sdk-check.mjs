@@ -143,6 +143,35 @@ describe("Joy8 server SDK", () => {
     assert.equal(calls[3].body.entries[0].account_ref, playerId)
   })
 
+  test("returns two-decimal balances and sends an embedded first settlement", async () => {
+    const calls = []
+    const savedSettlement = { version: 1, settlement_id: settlementId, match_id: matchId,
+      state: "settled", settlement_no: 1, final: true, request_hash: "c".repeat(64),
+      settled_at: "2026-09-21T01:05:00Z" }
+    const fetch = async (url, options) => {
+      calls.push(JSON.parse(options.body))
+      return response(url.endsWith("server-open-v1")
+        ? { version: 1, match_id: matchId, state: "settled", available_balance: "120.00", settlement: savedSettlement }
+        : { ...savedSettlement, available_balance: "125.00" })
+    }
+    const client = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch })
+    const entries = [{ kind: "player", accountRef: playerId, amount: "-100.00", source: "gameplay" }]
+    const opened = await client.openMatch({ matchRef: "spin-1", ruleVersion: "rules-v1",
+      participants: [{ sessionId, reserve: "100.00" }],
+      settlement: { operationKey: "spin-1:settle:1", final: true, entries } })
+    assert.equal(opened.availableBalance, "120.00")
+    assert.equal(opened.settlement.settlementNo, 1)
+    assert.deepEqual(calls[0].settlement, { operation_key: "spin-1:settle:1", final: true,
+      entries: [{ kind: "player", account_ref: playerId, amount: "-100.00", source: "gameplay" }] })
+    const settled = await client.settleMatch({ matchRef: "spin-1", ruleVersion: "rules-v1",
+      operationKey: "spin-1:settle:2", settlementNo: 2, final: true, entries })
+    assert.equal(settled.availableBalance, "125.00")
+    await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId,
+      fetch: async () => response({ version: 1, match_id: matchId, state: "open", available_balance: "12.3" })
+    }).openMatch({ matchRef: "bad", ruleVersion: "rules-v1", participants: [{ sessionId, reserve: "100.00" }] }),
+    error => error.code === "JOY8_INVALID_RESPONSE")
+  })
+
   test("rejects invalid local input, another Game ID and safe API errors without leaking the key", async () => {
     assert.throws(() => new Joy8ServerClient({ gatewayUrl, backendKey: "bad", gameId }), error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
     const wrongGame = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({
@@ -178,7 +207,7 @@ test("the npm package contains only the documented distributable SDK files", () 
   assert.equal(result.status, 0, result.stderr)
   const pack = JSON.parse(result.stdout)[0]
   assert.equal(pack.name, "@joy8/game-sdk")
-  assert.equal(pack.version, "1.0.0")
+  assert.equal(pack.version, "1.1.0")
   const paths = pack.files.map(file => file.path)
   for (const required of ["README.md", "browser.js", "browser.d.ts", "server.js", "server.d.ts", "index.js", "index.d.ts", "errors.js", "errors.d.ts", "http.js", "validation.js", "package.json"]) {
     assert.ok(paths.includes(required), required)

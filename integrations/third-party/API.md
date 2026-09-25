@@ -86,12 +86,20 @@ session and discard the old token. Renewal does not extend the Joy8 session.
   ruleVersion,
   participants: [{ sessionId, reserve }],
   productParticipants?: [{ accountRef, reserve }],
+  settlement?: { operationKey, final, entries, productCommit? },
 }
 ```
 
 There must be at least one human participant. Amounts are decimal strings. Use
 the durable game match reference and reserve the maximum authorized player loss.
 Do not send `productParticipants` for a platform-funded game.
+When `settlement` is supplied, Joy8 opens the match and commits settlement 1
+in the same transaction. `final:true` finishes a paid spin; `final:false` keeps
+the match open for later Free Spins. Exact `matchRef` and body retries return
+the saved result; changed content conflicts. The response contains `matchId`,
+`state`, `settlement` (or `null`), and `availableBalance` for one player. For
+multiple players it contains `availableBalances` keyed by player account ID.
+Amounts are two-decimal strings.
 
 ### `settleMatch(request)`
 
@@ -112,6 +120,9 @@ Entries are signed nonzero decimal changes. A platform-funded game submits only
 its player/fee results; it never invents a `platform` entry. A zero-change result
 uses an empty entry list. Continuous settlement increments `settlementNo` and
 uses `final:true` only on the last posting.
+The response also contains the post-settlement `availableBalance` string, or
+`availableBalances` for multiple players. While a round remains open, Joy8
+continues to lock its winnings until the final settlement releases them.
 
 ### `getMatchStatus({ matchRef })`
 

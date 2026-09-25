@@ -417,9 +417,20 @@ simultaneous games from spending POINT already reserved elsewhere.
 In full-balance mode, a configured table game instead reserves the exact
 available wallet balance, subject to its separate reserve guard. Slot
 openings continue to use the capped rule.
-The opening locks funds without moving the balance. Its response is
-`{version:1,match_id:<UUID>,state:"open"}`. An identical retry returns that match's
-current state; changing the opening under the same game/match reference conflicts.
+The opening locks funds without moving the balance. Its response includes
+`version`, `match_id`, `state`, and `available_balance` as a two-decimal string
+for one player (`available_balances` keyed by player ID for multiple players).
+An identical retry returns that match's current state; changing the opening
+under the same game/match reference conflicts.
+
+An optional nested `settlement` object lets `server-open-v1` commit settlement
+number 1 in the same transaction as the opening. It contains `operation_key`,
+`final`, `entries`, and optional `product_commit`; `settlement_no` is always 1
+and is omitted from this nested object. Use `final:true` for a complete paid
+spin or `final:false` when Free Spins continue on the same match. The combined
+response also includes the first `settlement` result. The same `match_ref` and
+identical full request replay the saved result; changed content conflicts. If
+the settlement fails, the opening and its reservation roll back together.
 
 `server-settle-v1` takes the authoritative result from the game backend and
 requires a Backend Key with the `settle` scope:
@@ -472,8 +483,9 @@ If the player loses 1,000 POINT, the game submits only the player's result:
 ```
 
 Joy8 records the player change and an internal `platform` `+1000.00` audit line.
-A player win reverses those signs. The game never receives a Joy8 balance to
-hold and never submits that internal line.
+A player win reverses those signs. The game receives the current available
+balance in the response, but does not own the wallet ledger or submit that
+internal audit line.
 
 Joy8 validates authority, rules reference, account binding and accounting;
 the game backend and its adapter validate the actual gameplay result. All human
@@ -484,7 +496,8 @@ participants. Player suspension, browser logout or session expiry after opening
 does not erase the authorized match obligation; trusted settlement may complete.
 
 Response fields are `version`, `settlement_id`, `match_id`, `state`,
-`settlement_no`, `final`, `request_hash` and `settled_at`.
+`settlement_no`, `final`, `request_hash`, `settled_at`, and the post-settlement
+`available_balance` or `available_balances`.
 Exact retries return the saved response.
 Every settlement transaction stores `game_id` from this trusted match configuration,
 so per-game reporting never depends on a game-supplied wallet choice. The operation

@@ -16,6 +16,9 @@ export interface Joy8Match {
   readonly version: 1
   readonly matchId: string
   readonly state: "open" | "settled" | "cancelled"
+  readonly availableBalance: string | null
+  readonly availableBalances: Readonly<Record<string, string>> | null
+  readonly settlement: Joy8Settlement | null
 }
 
 export interface Joy8Settlement {
@@ -27,6 +30,8 @@ export interface Joy8Settlement {
   readonly final: boolean
   readonly requestHash: string
   readonly settledAt: string
+  readonly availableBalance: string | null
+  readonly availableBalances: Readonly<Record<string, string>> | null
 }
 
 export interface Joy8MatchStatus {
@@ -59,6 +64,12 @@ export class Joy8ServerClient {
     ruleVersion: string
     participants: Array<{ sessionId: string; reserve: string }>
     productParticipants?: Array<{ accountRef: string; reserve: string }>
+    settlement?: {
+      operationKey: string
+      final: boolean
+      entries: Joy8SettlementEntry[]
+      productCommit?: Record<string, unknown>
+    }
   }): Promise<Joy8Match>
   settleMatch(request: {
     matchRef: string

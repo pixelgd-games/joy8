@@ -25,7 +25,7 @@ Local `npm pack` remains supported. Licensing and registry publication require
 an explicit decision; `UNLICENSED` does not grant third-party redistribution rights.
 
 ```bash
-npm install ./joy8-game-sdk-1.0.0.tgz
+npm install ./joy8-game-sdk-1.1.0.tgz
 ```
 
 Joy8 builds the tarball with:
@@ -95,6 +95,32 @@ await joy8.openMatch({
   participants: [{ sessionId: session.sessionId, reserve: "100.00" }],
 })
 ```
+
+For an authoritative result already known before opening, pass the optional
+first settlement in the same request. Joy8 commits the open and settlement
+together. `final: false` keeps the match open for later Free Spins; `final: true`
+completes it. Replays must use the identical `matchRef` and settlement content.
+
+```js
+const opened = await joy8.openMatch({
+  matchRef: spin.id,
+  ruleVersion: process.env.JOY8_RULE_VERSION,
+  participants: [{ sessionId: session.sessionId, reserve: "100.00" }],
+  settlement: {
+    operationKey: `${spin.id}:settlement:1`,
+    final: true,
+    entries: [{ kind: "player", accountRef: session.playerAccountRef,
+      amount: "-100.00", source: "gameplay" }],
+  },
+})
+```
+
+For a single-player match, `openMatch` and `settleMatch` return
+`availableBalance` as a two-decimal POINT string. An opening with an embedded
+settlement also returns its `settlement` result. Multi-player matches return
+`availableBalances` keyed by player account UUID. During a Gateway rollout,
+the new SDK accepts older responses and returns `null` for missing balance
+fields.
 
 Settle a player loss:
 

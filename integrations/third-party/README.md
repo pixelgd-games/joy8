@@ -1,6 +1,6 @@
 # Joy8 Third-Party Game Integration Kit
 
-Kit version: `1.0.0`. Its machine-readable version and protocol are in
+Kit version: `1.1.0`. Its machine-readable version and protocol are in
 [`manifest.json`](manifest.json).
 
 This kit is the handoff package for a game provider implementing Joy8

@@ -223,6 +223,9 @@ The Gateway uses `verify_jwt=false` because it performs its own launch-code,
 token, origin, scope, session, and rate-limit checks. Its protected database RPCs
 are granted only to `service_role`. It is deployed separately from Cloudflare
 Pages; a Git push does not deploy it.
+Browser preflight responses include `Access-Control-Max-Age: 7200`. Successful
+server open and settlement replies include the player's available POINT;
+`server-open-v1` can include settlement 1 for a one-request paid spin.
 
 ## Database
 
@@ -405,6 +408,8 @@ for the complete safety rules.
 - Production hostnames: `joy8.cc` and `www.joy8.cc`. The Pages deployment URL
   `joy8.pages.dev` redirects to the canonical `https://joy8.cc` host while
   preserving the path, query, and fragment.
+- Cloudflare Redirect Rule `Redirect www.joy8.cc to joy8.cc` sends a 301 to the
+  apex host, preserving path and query string.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY`.

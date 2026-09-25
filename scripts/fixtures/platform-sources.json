@@ -50,7 +50,8 @@
     "20260925100000_monster_lab_max_payout.sql",
     "20260925110000_platform_round_payout_limit.sql",
     "20260925120000_monster_lab_round_payout.sql",
-    "20260925150000_single_trip_server_requests.sql"
+    "20260925150000_single_trip_server_requests.sql",
+    "20260925170000_open_settle_balance_response.sql"
   ],
   "drafts": [],
   "excluded": {

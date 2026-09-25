@@ -129,6 +129,11 @@ try {
     headers: { "Content-Type": "application/json", apikey: "anon-key", ...(token ? { authorization: `Bearer ${token}` } : {}), ...(origin ? { origin } : {}) },
     body: JSON.stringify(body),
   }))
+  const preflight = await handleRequest(new Request("https://gateway.example/balance", {
+    method: "OPTIONS", headers: { origin: "https://monster-lab-7aj.pages.dev", "access-control-request-method": "POST" },
+  }))
+  assert.equal(preflight.status, 204)
+  assert.equal(preflight.headers.get("Access-Control-Max-Age"), "7200")
   for (const route of ["member", "enroll-member", "create-session", "private-session"]) {
     assert.equal((await request(route, {}, "", "https://evil.example")).status, 403)
     assert.equal((await request(route, {}, "", null)).status, 403)

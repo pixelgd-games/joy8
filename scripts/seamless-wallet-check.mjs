@@ -35,6 +35,12 @@ async function rpc(name, body) {
     throw error
   }
 }
+async function gatewayRpc(route, body) {
+  const result = await one("select public.joy8_server_request_v1($1,$2,10000,60,$3,$4::jsonb) result", [
+    route, `ingress:${randomUUID()}`, secret, JSON.stringify(body),
+  ])
+  return result.result
+}
 const denied = (promise, code) => assert.rejects(promise, error => error.message.includes(code))
 async function deniedQuery(sql, values, code) {
   await db.exec("savepoint denied_query")
@@ -74,6 +80,62 @@ const settlement = (player, matchRef, amount, number = 1, final = true, extra = 
 describe("seamless wallet platform settlement", () => {
   beforeEach(() => db.exec("begin"))
   afterEach(() => db.exec("rollback"))
+
+  test("Gateway open and settle report the new available POINT", async () => {
+    const player = await ready()
+    const body = opening(player, "100.00")
+    const opened = await gatewayRpc("server-open-v1", body)
+    assert.equal(opened.result.available_balance, "19900.00")
+    assert.equal(opened.result.state, "open")
+    const settled = await gatewayRpc("server-settle-v1", settlement(player, body.match_ref, "-20.00"))
+    assert.equal(settled.result.available_balance, "19980.00")
+    assert.equal(settled.result.state, "settled")
+  })
+
+  test("embedded first settlement is atomic, final, and exactly retryable", async () => {
+    const player = await ready()
+    const body = opening(player, "100.00", { settlement: {
+      operation_key: `${randomUUID()}:first`, final: true,
+      entries: [{ kind: "player", account_ref: player.player, amount: "-100.00", source: "gameplay" }],
+    } })
+    const first = await gatewayRpc("server-open-v1", body)
+    assert.equal(first.result.state, "settled")
+    assert.equal(first.result.available_balance, "19900.00")
+    assert.equal(first.result.settlement.settlement_no, 1)
+    assert.equal((await gatewayRpc("server-open-v1", body)).result.settlement.settlement_id, first.result.settlement.settlement_id)
+    assert.equal((await gatewayRpc("server-status-v1", { version: 1, match_ref: body.match_ref })).result.settlement_count, 1)
+    assert.equal((await one("select count(*)::int n from public.joy8_settlements where match_id=$1", [first.result.match_id])).n, 1)
+    const changed = structuredClone(body)
+    changed.settlement.entries[0].amount = "-50.00"
+    assert.equal((await gatewayRpc("server-open-v1", changed)).error.message, "JOY8_IDEMPOTENCY_CONFLICT")
+  })
+
+  test("embedded nonfinal settlement keeps the match open for later Free Spins", async () => {
+    const player = await ready()
+    const body = opening(player, "100.00", { settlement: {
+      operation_key: `${randomUUID()}:first`, final: false,
+      entries: [{ kind: "player", account_ref: player.player, amount: "-20.00", source: "gameplay" }],
+    } })
+    const first = await gatewayRpc("server-open-v1", body)
+    assert.equal(first.result.state, "open")
+    assert.equal(first.result.available_balance, "19900.00")
+    assert.equal((await gatewayRpc("server-status-v1", { version: 1, match_ref: body.match_ref })).result.settlement_count, 1)
+    const second = await gatewayRpc("server-settle-v1", settlement(player, body.match_ref, "50.00", 2, true))
+    assert.equal(second.result.state, "settled")
+    assert.equal(second.result.available_balance, "20030.00")
+    assert.equal((await gatewayRpc("server-status-v1", { version: 1, match_ref: body.match_ref })).result.settlement_count, 2)
+  })
+
+  test("failed embedded settlement rolls back the opening and reservation", async () => {
+    const player = await ready()
+    const body = opening(player, "100.00", { settlement: {
+      operation_key: `${randomUUID()}:first`, final: true,
+      entries: [{ kind: "player", account_ref: player.player, amount: "1000000.01", source: "gameplay" }],
+    } })
+    assert.equal((await gatewayRpc("server-open-v1", body)).error.message, "JOY8_LIMIT_EXCEEDED")
+    assert.equal((await one("select count(*)::int n from public.joy8_matches where match_ref=$1", [body.match_ref])).n, 0)
+    assert.equal((await one("select locked_balance from public.wallet_accounts where id=$1", [player.wallet_account_id])).locked_balance, "0.00")
+  })
 
   test("policy separates the bet limit from the payout guard", async () => {
     const policy = await one("select max_bet_amount,max_payout_amount,max_participants,funding_mode,product_adapter from public.joy8_game_policies where game_id=$1", [game])

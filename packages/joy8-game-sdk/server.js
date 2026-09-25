@@ -50,7 +50,7 @@ export class Joy8ServerClient {
     return sessionResponse(payload, this.#gameId)
   }
 
-  async openMatch({ matchRef, ruleVersion, participants, productParticipants } = {}) {
+  async openMatch({ matchRef, ruleVersion, participants, productParticipants, settlement } = {}) {
     requireText(matchRef, "matchRef", 1, 120)
     requireText(ruleVersion, "ruleVersion", 1, 80)
     if (!Array.isArray(participants) || participants.length < 1 || participants.length > 64) {
@@ -72,51 +72,21 @@ export class Joy8ServerClient {
         return { account_ref: requireText(item.accountRef, `productParticipants[${index}].accountRef`, 1, 120), reserve: requireAmount(item.reserve, `productParticipants[${index}].reserve`, { positive: true }) }
       })
     }
+    if (settlement !== undefined) {
+      requireAllowedKeys(settlement, ["operationKey", "final", "entries", "productCommit"], ["operationKey", "final", "entries"], "settlement")
+      body.settlement = settlementFields({ ...settlement, settlementNo: 1 }, this.#gameId, true)
+    }
     return matchResponse(await this.#request("server-open-v1", body))
   }
 
   async settleMatch({ matchRef, ruleVersion, operationKey, settlementNo, final, entries, productCommit } = {}) {
     requireText(matchRef, "matchRef", 1, 120)
     requireText(ruleVersion, "ruleVersion", 1, 80)
-    requireText(operationKey, "operationKey", 1, 180)
-    if (!Number.isInteger(settlementNo) || settlementNo < 1 || settlementNo > 999999999 || typeof final !== "boolean") {
-      throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", "settlementNo or final is invalid")
-    }
-    if (!Array.isArray(entries) || entries.length > 65) throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", "entries is invalid")
     const body = {
       version: 1,
       match_ref: matchRef,
       rule_version: ruleVersion,
-      operation_key: operationKey,
-      settlement_no: settlementNo,
-      final,
-      entries: entries.map((item, index) => {
-        requireExactKeys(item, ["kind", "accountRef", "amount", "source"], `entries[${index}]`)
-        if (!["player", "product", "fee"].includes(item.kind)
-          || (item.kind === "fee" ? item.source !== "fee" : item.source !== "gameplay")) {
-          throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] has invalid kind or source`)
-        }
-        const accountRef = item.kind === "product"
-          ? requireText(item.accountRef, `entries[${index}].accountRef`, 1, 120)
-          : requireUuid(item.accountRef, `entries[${index}].accountRef`)
-        if (item.kind === "fee" && accountRef !== this.#gameId) {
-          throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] fee account must match the configured Game ID`)
-        }
-        const amount = requireAmount(item.amount, `entries[${index}].amount`, { nonzero: true })
-        if (item.kind === "fee" && amount.startsWith("-")) {
-          throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] fee amount must be positive`)
-        }
-        return {
-          kind: item.kind,
-          account_ref: accountRef,
-          amount,
-          source: item.source,
-        }
-      }),
-    }
-    if (productCommit !== undefined) {
-      requireRecord(productCommit, "productCommit")
-      body.product_commit = productCommit
+      ...settlementFields({ operationKey, settlementNo, final, entries, productCommit }, this.#gameId, false),
     }
     return settlementResponse(await this.#request("server-settle-v1", body))
   }
@@ -143,6 +113,42 @@ export class Joy8ServerClient {
       timeoutMs: this.#timeoutMs,
     })
   }
+}
+
+function settlementFields({ operationKey, settlementNo, final, entries, productCommit }, gameId, embedded) {
+  requireText(operationKey, "operationKey", 1, 180)
+  if (!Number.isInteger(settlementNo) || settlementNo < 1 || settlementNo > 999999999 || typeof final !== "boolean") {
+    throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", "settlementNo or final is invalid")
+  }
+  if (!Array.isArray(entries) || entries.length > 65) throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", "entries is invalid")
+  const result = {
+    operation_key: operationKey,
+    final,
+    entries: entries.map((item, index) => {
+      requireExactKeys(item, ["kind", "accountRef", "amount", "source"], `entries[${index}]`)
+      if (!["player", "product", "fee"].includes(item.kind)
+        || (item.kind === "fee" ? item.source !== "fee" : item.source !== "gameplay")) {
+        throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] has invalid kind or source`)
+      }
+      const accountRef = item.kind === "product"
+        ? requireText(item.accountRef, `entries[${index}].accountRef`, 1, 120)
+        : requireUuid(item.accountRef, `entries[${index}].accountRef`)
+      if (item.kind === "fee" && accountRef !== gameId) {
+        throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] fee account must match the configured Game ID`)
+      }
+      const amount = requireAmount(item.amount, `entries[${index}].amount`, { nonzero: true })
+      if (item.kind === "fee" && amount.startsWith("-")) {
+        throw new Joy8SdkError("JOY8_SDK_INVALID_ARGUMENT", `entries[${index}] fee amount must be positive`)
+      }
+      return { kind: item.kind, account_ref: accountRef, amount, source: item.source }
+    }),
+  }
+  if (!embedded) result.settlement_no = settlementNo
+  if (productCommit !== undefined) {
+    requireRecord(productCommit, "productCommit")
+    result.product_commit = productCommit
+  }
+  return result
 }
 
 function sessionResponse(payload, expectedGameId) {
@@ -172,15 +178,17 @@ function sessionResponse(payload, expectedGameId) {
 
 function matchResponse(payload) {
   return validateResponse("match", () => {
-    requireExactKeys(payload, ["version", "match_id", "state"], "match response")
+    requireAllowedKeys(payload, ["version", "match_id", "state", "available_balance", "available_balances", "settlement"], ["version", "match_id", "state"], "match response")
     if (payload.version !== 1 || !MATCH_STATES.includes(payload.state)) throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 match response is invalid")
-    return Object.freeze({ version: 1, matchId: requireUuid(payload.match_id, "match_id"), state: payload.state })
+    const balance = balanceResponse(payload)
+    return Object.freeze({ version: 1, matchId: requireUuid(payload.match_id, "match_id"), state: payload.state,
+      ...balance, settlement: payload.settlement === undefined ? null : settlementResponse(payload.settlement) })
   })
 }
 
 function settlementResponse(payload) {
   return validateResponse("settlement", () => {
-    requireExactKeys(payload, ["version", "settlement_id", "match_id", "state", "settlement_no", "final", "request_hash", "settled_at"], "settlement response")
+    requireAllowedKeys(payload, ["version", "settlement_id", "match_id", "state", "settlement_no", "final", "request_hash", "settled_at", "available_balance", "available_balances"], ["version", "settlement_id", "match_id", "state", "settlement_no", "final", "request_hash", "settled_at"], "settlement response")
     if (payload.version !== 1 || !["open", "settled"].includes(payload.state) || !Number.isInteger(payload.settlement_no) || typeof payload.final !== "boolean") {
       throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 settlement response is invalid")
     }
@@ -193,8 +201,34 @@ function settlementResponse(payload) {
       final: payload.final,
       requestHash: requireText(payload.request_hash, "request_hash", 64, 64),
       settledAt: requireText(payload.settled_at, "settled_at", 1, 80),
+      ...balanceResponse(payload),
     })
   })
+}
+
+function balanceResponse(payload) {
+  if (Object.hasOwn(payload, "available_balance") && Object.hasOwn(payload, "available_balances")) {
+    throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 balance response is ambiguous")
+  }
+  let availableBalance = null
+  let availableBalances = null
+  if (Object.hasOwn(payload, "available_balance")) {
+    availableBalance = exactBalance(payload.available_balance)
+  }
+  if (Object.hasOwn(payload, "available_balances")) {
+    requireRecord(payload.available_balances, "available_balances")
+    availableBalances = Object.freeze(Object.fromEntries(Object.entries(payload.available_balances).map(([player, amount]) => [
+      requireUuid(player, "available_balances player"), exactBalance(amount),
+    ])))
+  }
+  return { availableBalance, availableBalances }
+}
+
+function exactBalance(value) {
+  if (typeof value !== "string" || !/^(0|[1-9][0-9]{0,15})\.[0-9]{2}$/.test(value)) {
+    throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 available balance is invalid")
+  }
+  return value
 }
 
 function statusResponse(payload) {

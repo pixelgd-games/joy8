@@ -554,6 +554,7 @@ function buildCorsHeaders(
   const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "7200",
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
     "X-Joy8-Request-Id": requestId,

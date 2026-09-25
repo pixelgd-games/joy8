@@ -1,10 +1,10 @@
 {
-  "kitVersion": "1.0.0",
+  "kitVersion": "1.1.0",
   "protocol": "server-v1",
   "currency": "POINT",
   "sdk": {
     "package": "@joy8/game-sdk",
-    "version": "1.0.0"
+    "version": "1.1.0"
   },
   "startHere": "README.md",
   "integrationProfile": "integration-profile.example.json",
