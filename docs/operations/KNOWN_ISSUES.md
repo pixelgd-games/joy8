@@ -16,10 +16,11 @@ must still implement and verify authoritative gameplay before activation.
 
 ### Release Gates
 
-- No game is published and every private entry is paused. Release requires an
-  explicitly approved game audience and activation, per-game bet and
-  per-round payout limits, and product recovery evidence and procedures.
-- No product has completed hosted gameplay and settlement acceptance.
+- Monster Lab is published in the public catalog with its private entry disabled;
+  Mahjong remains hidden with its private entry paused. Monster Lab's hosted
+  launch, bets, and win/loss settlement were verified, but Free Spins, timeout
+  recovery, refresh/restart, physical-device QA, and release math/compliance
+  review remain open. Do not treat publication as completion of those checks.
 - The hosted Email provider still accepts verified API signup. Disable only the
   Email provider before public release; the user controls the timing and
   [README.md](../../README.md#hosted-auth-configuration) owns the procedure. Do

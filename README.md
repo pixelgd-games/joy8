@@ -16,9 +16,10 @@ This file is the source of truth for the repository's current implementation and
   platform-funded games.
 - Game sessions last 12 hours; launch codes last 2 minutes; balance tokens last
   at most 15 minutes and are renewed by the game backend.
-- The public catalog has no published games. Mahjong and Monster Lab are hidden
-  catalog entries with paused private entries. No product has completed hosted
-  gameplay and settlement acceptance. Launch blockers are tracked in
+- Monster Lab is published in the public catalog with a production Backend Key;
+  its private entry is disabled. Mahjong remains hidden with its private entry
+  paused. Monster Lab has verified hosted launch, bets, and win/loss settlement,
+  while the remaining hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 ## Current Scope

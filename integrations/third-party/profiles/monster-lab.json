@@ -23,7 +23,7 @@
     "continuousSettlement": true
   },
   "credential": {
-    "purpose": "private-integration",
+    "purpose": "production",
     "environmentVariable": "JOY8_BACKEND_KEY",
     "scopes": [
       "exchange",

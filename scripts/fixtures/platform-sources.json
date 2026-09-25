@@ -79,6 +79,8 @@
     "20260923101000_mahjong_full_balance_policy.sql": "Hosted Mahjong identity-only policy; synthetic fixtures register their own games.",
     "20260923110000_mahjong_processed_actions_history_limit.sql": "Product-owned processed-action constraint; retained as applied deployment history and excluded from the platform-only fixture.",
     "20260923143740_runtime_maintenance.sql": "Hosted pg_cron installation and schedule; release-safety tests exercise its cleanup function without a hosted scheduler.",
-    "20260924150000_mahjong_per_table_storage.sql": "Product-owned forward upgrade to per-table storage and quarantined-table resolution; fresh Mahjong fixtures install its current product SQL."
+    "20260924150000_mahjong_per_table_storage.sql": "Product-owned forward upgrade to per-table storage and quarantined-table resolution; fresh Mahjong fixtures install its current product SQL.",
+    "20260925130000_monster_lab_private_entry_activation.sql": "Hosted Monster Lab private-entry activation; synthetic fixtures keep private entries paused.",
+    "20260925140000_publish_monster_lab.sql": "Hosted Monster Lab public catalog release; synthetic fixtures keep games unpublished."
   }
 }
