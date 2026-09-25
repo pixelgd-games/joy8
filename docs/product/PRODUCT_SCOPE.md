@@ -129,8 +129,13 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   balance. There is no per-game promotional balance and no cross-game transfer.
 - Games never change balances. Every bet, win and loss is reserved and settled
   through Joy8.
-- Each game sets its own minimum bet, maximum bet and maximum single payout.
-  No game's maximum bet may exceed the platform ceiling of **10,000 POINT**.
+- Each game sets its own minimum bet, maximum bet and maximum payout. For a
+  platform-funded game, one round is one Joy8 match. The maximum is per round,
+  per player: the gross payout equals the opening stake plus all net results
+  posted in that match.
+  A slot round includes the paid spin and every Free Spin it triggers.
+  Participant-funded games retain a per-entry payout limit. No game's maximum
+  bet may exceed the platform ceiling of **10,000 POINT**.
 - A table game may instead reserve a player's entire available balance for a
   match. That reservation is not a single bet and is not limited by the 10,000
   POINT ceiling. For such a game the minimum bet is the minimum available

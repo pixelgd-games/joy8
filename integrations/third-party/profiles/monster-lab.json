@@ -18,7 +18,7 @@
     "ruleVersion": "monster-lab-rules-v1",
     "fundingMode": "platform",
     "maxBetAmount": "10000.00",
-    "maxPayoutAmount": "1000000.00",
+    "maxPayoutAmount": "5000000.00",
     "maxParticipants": 1,
     "continuousSettlement": true
   },

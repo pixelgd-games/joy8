@@ -46,7 +46,9 @@
     "20260924101000_game_min_bet.sql",
     "20260924102000_remove_payout_budget.sql",
     "20260924110000_twelve_hour_game_session.sql",
-    "20260925090000_backend_keys_without_expiry.sql"
+    "20260925090000_backend_keys_without_expiry.sql",
+    "20260925100000_monster_lab_max_payout.sql",
+    "20260925110000_platform_round_payout_limit.sql"
   ],
   "drafts": [],
   "excluded": {

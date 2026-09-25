@@ -12,7 +12,8 @@ This file is the source of truth for the repository's current implementation and
   [MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope).
 - The POINT rules in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md#wallet-and-point-direction)
   are installed: enrollment grants and one-time Google top-up, per-game minimum
-  bet, maximum bet (at most 10,000 POINT) and maximum single payout.
+  bet, maximum bet (at most 10,000 POINT) and per-round payout limit for
+  platform-funded games.
 - Game sessions last 12 hours; launch codes last 2 minutes; balance tokens last
   at most 15 minutes and are renewed by the game backend.
 - The public catalog has no published games. Mahjong and Monster Lab are hidden

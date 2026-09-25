@@ -182,16 +182,56 @@ describe("seamless wallet platform settlement", () => {
     const player = await ready()
     const tooLarge = opening(player)
     await rpc("joy8_open_match_v1", tooLarge)
-    await denied(rpc("joy8_settle_match_v1", settlement(player, tooLarge.match_ref, "1000000.01")), "JOY8_LIMIT_EXCEEDED")
+    await denied(rpc("joy8_settle_match_v1", settlement(player, tooLarge.match_ref, "990000.01")), "JOY8_LIMIT_EXCEEDED")
     const winner = await ready()
     const body = opening(winner)
     await rpc("joy8_open_match_v1", body)
-    await rpc("joy8_settle_match_v1", settlement(winner, body.match_ref, "1000000.00"))
-    assert.equal((await one("select balance from public.wallet_accounts where id=$1", [winner.wallet_account_id])).balance, "1020000.00")
+    await rpc("joy8_settle_match_v1", settlement(winner, body.match_ref, "990000.00"))
+    assert.equal((await one("select balance from public.wallet_accounts where id=$1", [winner.wallet_account_id])).balance, "1010000.00")
     assert.equal((await one(`select coalesce(sum(e.amount),0) total
       from public.joy8_settlement_entries e
       join public.joy8_settlements s on s.id=e.settlement_id
       join public.joy8_matches m on m.id=s.match_id
       where m.match_ref=$1`, [body.match_ref])).total, "0.00")
+  })
+
+  test("continuous platform settlement caps the whole round and permits an empty final posting", async () => {
+    const player = await ready()
+    const body = opening(player, "100.00")
+    await rpc("joy8_open_match_v1", body)
+    assert.equal((await rpc("joy8_settle_match_v1", settlement(player, body.match_ref, "600000.00", 1, false))).state, "open")
+    assert.equal((await rpc("joy8_settle_match_v1", settlement(player, body.match_ref, "399900.00", 2, false))).state, "open")
+    assert.deepEqual(await one("select balance,locked_balance from public.wallet_accounts where id=$1", [player.wallet_account_id]), {
+      balance: "1019900.00",
+      locked_balance: "1000000.00",
+    })
+    await denied(rpc("joy8_settle_match_v1", settlement(player, body.match_ref, "0.01", 3, false)), "JOY8_LIMIT_EXCEEDED")
+    await denied(rpc("joy8_settle_match_v1", settlement(player, body.match_ref, "0.01", 3, true)), "JOY8_LIMIT_EXCEEDED")
+    assert.equal((await one("select settlement_count from public.joy8_matches where match_ref=$1", [body.match_ref])).settlement_count, 2)
+    assert.equal((await rpc("joy8_settle_match_v1", settlement(player, body.match_ref, null, 3, true))).state, "settled")
+    assert.deepEqual(await one("select balance,locked_balance from public.wallet_accounts where id=$1", [player.wallet_account_id]), {
+      balance: "1019900.00",
+      locked_balance: "0.00",
+    })
+  })
+
+  test("participant-funded matches keep the per-entry payout limit", async () => {
+    await db.query(`update public.joy8_game_policies
+      set funding_mode='participants',product_adapter='fixture_product.accounting(text,uuid,jsonb)'::regprocedure,
+        max_payout_amount=100,max_participants=2
+      where game_id=$1`, [game])
+    const player = await ready()
+    const body = opening(player, "100.00", {
+      product_participants: [{ account_ref: "bot-1", reserve: "100.00" }],
+    })
+    await rpc("joy8_open_match_v1", body)
+    const result = await rpc("joy8_settle_match_v1", settlement(player, body.match_ref, "100.00", 1, true, {
+      entries: [
+        { kind: "player", account_ref: player.player, amount: "100.00", source: "gameplay" },
+        { kind: "product", account_ref: "bot-1", amount: "-100.00", source: "gameplay" },
+      ],
+    }))
+    assert.equal(result.state, "settled")
+    assert.equal((await one("select balance from public.wallet_accounts where id=$1", [player.wallet_account_id])).balance, "20100.00")
   })
 })

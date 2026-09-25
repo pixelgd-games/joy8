@@ -286,11 +286,13 @@ wallet model:
 Trusted game policy has `min_bet_amount`, `max_bet_amount` and
 `max_payout_amount` values. In capped mode a human opening reserve must lie
 between the minimum and maximum bet, otherwise Joy8 returns
-`JOY8_LIMIT_EXCEEDED`. `max_payout_amount` is the game's maximum single payout:
-it limits the absolute size of any settlement entry. The maximum bet, maximum
-payout and `funding_mode` are snapshotted when a match opens, so a later policy
-edit cannot change an existing match. The database constrains `max_bet_amount`
-to **10,000 POINT** for every policy and requires a positive minimum bet no
+`JOY8_LIMIT_EXCEEDED`. `max_payout_amount` limits the absolute size of every
+settlement entry. In `platform` funding mode, it also caps each player's total
+gross payout for one match: the opening stake plus the cumulative net results
+of all postings. In `participants` mode, the limit remains per entry. The
+maximum bet, payout limit and `funding_mode` are snapshotted when a match opens,
+so a later policy edit cannot change an existing match. The database constrains
+`max_bet_amount` to **10,000 POINT** for every policy and requires a positive minimum bet no
 larger than the maximum bet in capped mode. The POINT rules are owned by
 [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
@@ -443,8 +445,10 @@ audit entry after validating the request. Omit participants whose change is zero
 an empty list records a draw; `final` determines reservation release. Players and product
 accounts must belong to the opening. Loss cannot exceed the recorded reserve;
 every absolute entry must fit the opening's snapshotted `max_payout_amount`.
-Fee entries are
-positive, game-bound and separate from player or AI funding.
+In `platform` mode, the player's opening reserve plus cumulative net results
+must also stay at or below that limit. In `participants` mode, the per-entry
+rule is unchanged. Fee entries are positive, game-bound and separate from
+player or AI funding.
 
 For example, a platform-funded slot sends no `product_participants` when opening:
 
@@ -505,8 +509,13 @@ financial match for the entire table and posts each completed hand in order:
 - `final:true` posts the last hand and releases remaining reservations atomically.
   An explicit empty final posting can close a table with no additional transfer;
   products must validate the corresponding durable result/close marker.
-- Entry limits remain the opening's snapshotted per-entry limit. New losses are
-  checked against the current reserve. No new session or wallet is created
+- Entry limits remain the opening's snapshotted per-entry limit. In `platform`
+  mode, the player's current reserve is the opening stake plus cumulative net
+  results and must not exceed the match's payout limit after any posting,
+  including a final posting. A slot's paid spin and all triggered Free Spins
+  therefore share one round limit. In `participants` mode, only the per-entry
+  payout limit applies. New losses are checked against the current reserve.
+  No new session or wallet is created
   between hands. Session expiry, logout or suspension cannot erase an already
   opened obligation; backend authorization and active-wallet checks still apply.
 - Exact historical retries return their original response, even after a later
