@@ -86,7 +86,6 @@ begin
   values (${quote(credential.id)}::uuid,v_game_id,${quote(credential.hash)},array[${scopeSql}]::text[]);
 end
 $joy8$;
-select json_build_object('keyId',${quote(credential.id)},'gameId',${quote(gameId)},'slug',${quote(slug)},'replacedKeyId',${oldKeyId ? quote(oldKeyId) : "null"}) as joy8_backend_key_registered;
 `
 }
 
@@ -103,7 +102,6 @@ begin
   where id=${quote(keyId)}::uuid and game_id=${quote(gameId)}::uuid;
 end
 $joy8$;
-select json_build_object('keyId',${quote(keyId)},'gameId',${quote(gameId)},'revoked',true) as joy8_backend_key_revoked;
 `
 }
 
@@ -173,13 +171,24 @@ export async function provisionCredential({ profile, delivery, oldKeyId = null, 
   return { keyId: credential.id, gameId: profile.game.gameId, delivered: true, oldKeyRevoked: Boolean(oldKeyId) }
 }
 
+export function summarizeSupabaseFailure(stderr, stdout) {
+  const lines = `${stderr ?? ""}\n${stdout ?? ""}`.replace(/\x1b\[[0-9;]*m/g, "").split(/\r?\n/)
+  const code = lines.join(" ").match(/\b(?:SQLSTATE|error code)\s*[:=]?\s*([0-9A-Z]{5})\b/i)?.[1]
+  const message = lines.map(line => line.match(/\bERROR:\s*(.+)$/i)?.[1]).find(Boolean)
+  const safeMessage = message?.replace(/(?:postgres(?:ql)?|https?):\/\/\S+/gi, "[redacted URL]")
+    .replace(/--db-url(?:=|\s+)\S+/gi, "[redacted URL]")
+    .replace(/['"][^'"]*['"]/g, "[redacted value]")
+    .replace(/\b[a-f0-9]{32,}\b/gi, "[redacted value]")
+  return `Joy8 Supabase command failed${code ? ` (SQLSTATE ${code})` : ""}${safeMessage ? `: ${safeMessage}` : ""}`
+}
+
 function runPowerShell(args) {
   const result = spawnSync("powershell.exe", ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", path.join(root, "scripts", "supabase-joy8.ps1"), ...args], {
     cwd: root,
     encoding: "utf8",
     windowsHide: true
   })
-  if (result.error || result.status !== 0) throw new Error("Joy8 Supabase command failed; inspect the local operator terminal")
+  if (result.error || result.status !== 0) throw new Error(summarizeSupabaseFailure(result.stderr, result.stdout))
   return result.stdout
 }
 

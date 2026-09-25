@@ -9,6 +9,7 @@ import {
   credentialPlan,
   verifyCredentialPlan,
   provisionCredential,
+  summarizeSupabaseFailure,
   validateDelivery,
   validateProfile
 } from "./backend-key-provision.mjs"
@@ -65,8 +66,19 @@ test("creates a 256-bit Backend Key and hashes the plaintext once for storage", 
   assert.deepEqual(createBackendCredential(Buffer.alloc(32), keyId), { id: keyId, secret, hash })
   const sql = buildRegisterSql(profile, { id: keyId, hash })
   assert.match(sql, new RegExp(hash))
+  assert.match(sql, /\$joy8\$;\s*$/)
   assert.equal(sql.includes(secret), false)
   assert.equal(buildStatusSql(profile).includes("key_hash"), false)
+})
+
+test("reports Supabase diagnostics without a connection string or key material", () => {
+  const error = summarizeSupabaseFailure("Error: cannot insert multiple commands into a prepared statement (SQLSTATE 42601)", "")
+  assert.match(error, /cannot insert multiple commands into a prepared statement/)
+  assert.match(error, /SQLSTATE 42601/)
+  const redacted = summarizeSupabaseFailure(`ERROR: connection postgresql://user:password@host/db rejected '${secret}' ${hash}`, "")
+  assert.equal(redacted.includes("postgresql://"), false)
+  assert.equal(redacted.includes(secret), false)
+  assert.equal(redacted.includes(hash), false)
 })
 
 test("constructs a local Wrangler command without putting the secret in arguments", () => {
@@ -85,7 +97,7 @@ test("registers, reports and revokes only non-secret key metadata", async () => 
     await db.query("insert into public.games(id,name,slug,type,published,launch_url) values($1,'Example','example-game','slot',false,'https://game.example/')", [gameId])
     const policy = (await db.query("select id from public.joy8_wallet_policies where currency='POINT'")).rows[0].id
     await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants) values($1,$2,true,10000,10000,1)", [gameId, policy])
-    await db.exec(buildRegisterSql(profile, { id: keyId, hash }))
+    await db.query(buildRegisterSql(profile, { id: keyId, hash }))
     const stored = (await db.query("select id,key_hash,revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0]
     assert.equal(stored.key_hash, hash)
     assert.equal(stored.revoked_at, null)
@@ -96,12 +108,15 @@ test("registers, reports and revokes only non-secret key metadata", async () => 
     const production = { ...profile, credential: { ...profile.credential, purpose: "production" } }
     await db.query("update public.games set published=true where id=$1", [gameId])
     assert.throws(() => buildRegisterSql(production, { id: oldKeyId, hash }), /rotation/)
-    await db.exec(buildRegisterSql(production, { id: oldKeyId, hash: "ab".repeat(32) }, keyId))
+    await db.query(buildRegisterSql(production, { id: oldKeyId, hash: "ab".repeat(32) }, keyId))
     assert.equal((await db.query("select game_id from public.joy8_backend_keys where id=$1", [oldKeyId])).rows[0].game_id, gameId)
     assert.ok((await db.query("select revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0].revoked_at)
     assert.deepEqual((await db.query("select id from public.joy8_backend_keys where game_id=$1 and revoked_at is null", [gameId])).rows.map(row => row.id), [oldKeyId])
     await assert.rejects(db.query("select expires_at from public.joy8_backend_keys"), /expires_at/)
-    await db.exec(buildRevokeSql(profile, keyId))
+    const revokeSql = buildRevokeSql(profile, keyId)
+    assert.match(revokeSql, /\$joy8\$;\s*$/)
+    await db.query(revokeSql)
+    assert.ok((await db.query("select revoked_at from public.joy8_backend_keys where id=$1", [keyId])).rows[0].revoked_at)
   } finally {
     await db.close()
   }
