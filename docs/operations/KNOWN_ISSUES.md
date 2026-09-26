@@ -74,15 +74,6 @@ Open items before activation:
 
 The game owns its runtime verification in its own `server/README.md`.
 
-### Cloudflare Build Environment
-
-The Git-connected Pages build can fail before the project build starts:
-Cloudflare's Node installer cannot fetch its GitHub `node-build` repository,
-reports `could not read Username for 'https://github.com'`, and then cannot find
-the configured Node 22.23.2 definition. The provider-side cause has not been
-established; it is not a Joy8 repository permission or application build error.
-Until a Git-triggered build succeeds, deploy a verified local build with Wrangler.
-
 ## Member and Guest Risks
 
 - Guest-to-Google linking, provider-conflict preservation and cross-browser guest
@@ -130,15 +121,6 @@ their transaction. GRANT and REVOKE use global validation because event metadata
 omits their target objects, and those changes require READ COMMITTED. Disabling
 the guard or skipping role preflight can stop adapters at runtime. The contract
 belongs to [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
-
-### Deployed Gateway Differs From Source
-
-The deployed `joy8-gateway` still maps the removed `JOY8_PAYOUT_BUDGET_EXCEEDED`
-error to 409; the source no longer does. The database can no longer raise that
-error, so that difference does not affect behavior. The source also exposes
-`Retry-After` and `X-Joy8-Request-Id` to cross-origin browser clients; this has
-passed local browser acceptance but needs a reviewed Gateway deployment and
-hosted header verification before it is considered live.
 
 ### Synchronous Gateway Runtime Cleanup
 

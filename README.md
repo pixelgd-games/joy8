@@ -228,7 +228,8 @@ The Gateway uses `verify_jwt=false` because it performs its own launch-code,
 token, origin, scope, session, and rate-limit checks. Its protected database RPCs
 are granted only to `service_role`. It is deployed separately from Cloudflare
 Pages; a Git push does not deploy it.
-Browser preflight responses include `Access-Control-Max-Age: 7200`. Successful
+Browser preflight responses include `Access-Control-Max-Age: 7200`. Responses
+expose `Retry-After` and `X-Joy8-Request-Id` to cross-origin browser clients. Successful
 server open and settlement replies include the player's available POINT;
 `server-open-v1` can include settlement 1 for a one-request paid spin.
 
@@ -422,10 +423,9 @@ for the complete safety rules.
   and its conflict-safe sign-in/linking flow pass acceptance. Omit it otherwise.
 - `public/_headers` denies framing of Joy8 pages and supplies the production
   content-type and referrer protections copied into the Cloudflare Pages build.
-- The Git-triggered Pages build has an open
-  [Cloudflare environment issue](docs/operations/KNOWN_ISSUES.md#cloudflare-build-environment);
-  a verified local `dist` build can be uploaded with Wrangler instead. Never
-  deploy `.smoke-dist.local`, which contains mocked test configuration.
+- Git-triggered Pages builds deploy the production branch. If a provider build
+  fails, an authorized operator can deploy a verified local `dist` with Wrangler.
+  Never deploy `.smoke-dist.local`, which contains mocked test configuration.
 - The `joy8-gateway` Edge Function is deployed separately through Supabase.
 
 ## Game and Asset Boundaries
