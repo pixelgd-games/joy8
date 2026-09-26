@@ -7,6 +7,7 @@ import http from "node:http"
 import net from "node:net"
 import { fileURLToPath } from "node:url"
 import WebSocket from "ws"
+import { expectMailbox } from "./mailbox-browser-check.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const host = "127.0.0.1"
@@ -72,6 +73,7 @@ try {
     return text.includes("JOY8-SMOKE-001") && text.includes("Smoke test error modal")
   }, "Shared error modal shows code")
   await expectErrorPresentation(client)
+  await expectMailbox(client, appPort)
 
   client.ws.close()
   console.log("Smoke check passed.")
@@ -118,6 +120,8 @@ function verifyCanonicalHostRedirect() {
   const entryFiles = [
     "index.html",
     "account/index.html",
+    "mailbox/index.html",
+    "admin/mail/index.html",
     "admin/login/index.html",
     "admin/games/index.html",
     "admin/games/new/index.html",

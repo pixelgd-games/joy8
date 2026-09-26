@@ -28,6 +28,8 @@ export default defineConfig(({ command, mode }) => {
           brandedEntry: resolve(__dirname, "entry/index.html"),
           privateGame: resolve(__dirname, "play-test/index.html"),
           account: resolve(__dirname, "account/index.html"),
+          mailbox: resolve(__dirname, "mailbox/index.html"),
+          adminMail: resolve(__dirname, "admin/mail/index.html"),
           adminLogin: resolve(__dirname, "admin/login/index.html"),
           adminGames: resolve(__dirname, "admin/games/index.html"),
           adminGamesNew: resolve(__dirname, "admin/games/new/index.html"),

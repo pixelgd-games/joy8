@@ -58,7 +58,7 @@ export async function initLobbyPage(appRoot) {
 
 function setupMemberEntry(appRoot) {
   const service = createMemberService(memberSupabase, { origin: location.origin })
-  const accountLink = appRoot.querySelector(".member-login-link")
+  const accountLink = appRoot.querySelector(".member-login-link:not(.mailbox-link)")
   let accountRevision = 0
 
   const renderAccount = (label, publicId = "") => {
@@ -133,7 +133,7 @@ function setupMemberEntry(appRoot) {
     if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
     const trigger = event.target.closest("a")
     if (!trigger || !appRoot.contains(trigger)) return
-    const isLogin = trigger.matches(".member-login-link")
+    const isLogin = trigger.matches(".member-login-link:not(.mailbox-link)")
     const isGame = trigger.matches("#gameGrid .game-tile-poster")
     if (!isLogin && !isGame) return
     event.preventDefault()

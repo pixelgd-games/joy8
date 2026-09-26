@@ -13,6 +13,7 @@
     "test:captcha": "node --test scripts/captcha-check.mjs",
     "test:iframe": "node --test scripts/iframe-check.mjs",
     "test:member-db": "node --test scripts/member-database-check.mjs",
+    "test:mailbox": "node --test scripts/mailbox-database-check.mjs",
     "test:member-pg": "node scripts/member-postgres-check.mjs",
     "test:public-id": "node --test scripts/public-player-id-check.mjs",
     "test:member-product-db": "node --test scripts/public-id-allocation-check.mjs scripts/product-registration-check.mjs",

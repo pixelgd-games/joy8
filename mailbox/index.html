@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>站內信箱 · Joy8</title>
+  <script type="module" src="/src/mailbox/page.js"></script>
+</head>
+<body>
+  <main class="mail-shell">
+    <header class="mail-header"><a class="brand-link" href="/"><span class="brand-mark">Joy8</span></a><a href="/">返回大廳</a></header>
+    <div class="mail-heading"><div><p class="mail-kicker">公告・通知・獎勵</p><h1>站內信箱</h1></div><button id="refresh" type="button">重新整理</button></div>
+    <p id="status" role="status" aria-live="polite">正在讀取信箱…</p>
+    <a id="login" href="/?member=open" hidden>前往大廳登入</a>
+    <div class="mail-columns"><section aria-label="信件列表"><div id="mail-list"></div><nav class="mail-pager" aria-label="信件分頁"><button id="previous" disabled>上一頁</button><span id="page-number">1</span><button id="next" disabled>下一頁</button></nav></section>
+    <section id="detail" class="mail-panel" aria-label="信件內容" tabindex="-1"><p class="mail-muted">選擇一封信，查看內容與獎勵。</p></section></div>
+  </main>
+</body>
+</html>

@@ -10,6 +10,9 @@ This file is the source of truth for the repository's current implementation and
   the shared POINT wallet and trusted settlement are deployed.
 - Facebook sign-in is implemented but disabled. The sign-in decision is owned by
   [MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope).
+- The in-app mailbox, administrator composer and claim-once POINT attachments
+  are deployed. See [MAILBOX.md](docs/platform/MAILBOX.md) for operation and the
+  remaining real-player acceptance boundary.
 - The POINT rules in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md#wallet-and-point-direction)
   are installed: enrollment grants and one-time Google top-up, per-game minimum
   bet, maximum bet (at most 10,000 POINT) and per-round payout limit for
@@ -93,6 +96,8 @@ game-facing protocol is `server-v1`, defined in
 | --- | --- | --- |
 | `/` | `index.html` | Public Lobby |
 | `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog or a validated branded entry |
+| `/mailbox/` | `mailbox/index.html` | Member announcements, notifications and reward claims |
+| `/admin/mail/` | `admin/mail/index.html` | Administrator compose, preview, send and recipient audit |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
 | `/entry/` | `entry/index.html` | Joy8-controlled, game-branded Google/guest entry and in-memory launch handoff |
 | `/play-test/` | `play-test/index.html` | Hidden-game test entry using normal membership and the shared Loader; no player allowlist |
@@ -112,6 +117,8 @@ Vite declares these entries in `vite.config.js`.
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
 | `src/pages/entry/` | Branded iframe entry, Google/guest orchestration and callback completion |
 | `src/admin/` | Admin authentication and game CRUD |
+| `src/admin/mail.js` | Administrator mailbox composer and delivery audit |
+| `src/mailbox/` | Member inbox and shared mailbox presentation/service |
 | `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
@@ -319,6 +326,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `npm run test:member` / `test:captcha` / `test:iframe` | Member flow, Turnstile handling and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, grants, promotion, launch and wallet concurrency |
+| `npm run test:mailbox` | Mailbox audience snapshot, permissions, read/claim states, atomic credit and retries on the current schema; set `JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN` for competing connections |
 | `npm run test:public-id` / `test:member-product-db` / `test:member-product-pg` | Public IDs and product-schema registration |
 | `npm run test:platform-db` / `test:platform-pg` | Reservation, settlement, fees, frozen wallets and adapter isolation |
 | `npm run test:continuous-db` / `test:continuous-pg` | Per-hand table settlement |
@@ -446,6 +454,7 @@ for the complete safety rules.
 | `docs/product/PRODUCT_SCOPE.md` | Product boundaries, approved direction, POINT rules and priorities |
 | `docs/platform/GAME_PLATFORM_INTEGRATION.md` | Joy8-to-game runtime contract |
 | `docs/platform/MEMBER_AUTH_PLAN.md` | Sign-in decision, member, persistent guest and branded-entry identity |
+| `docs/platform/MAILBOX.md` | In-app mailbox, administrator workflow, claim accounting and activation procedure |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |
 | `docs/operations/KNOWN_ISSUES.md` | Active limitations, risks, and launch blockers |

@@ -8,6 +8,7 @@ export function renderLobby() {
           </a>
           <div class="header-actions">
             <a class="member-login-link" href="/account/" aria-haspopup="dialog" aria-controls="member-dialog">登入</a>
+            <a class="member-login-link mailbox-link" href="/mailbox/">信箱</a>
             <button class="install-button" id="installAppButton" type="button" aria-expanded="false" aria-controls="installHelp" hidden>
               加入桌面
             </button>

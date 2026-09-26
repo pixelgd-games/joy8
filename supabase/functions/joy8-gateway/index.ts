@@ -57,7 +57,7 @@ const ROUTES = new Set([
   "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
   "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
   "enroll-member", "create-session", "private-session", "branded-entry",
-  "balance",
+  "balance", "mailbox", "admin-mailbox",
 ])
 export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.freeze({
   JOY8_BACKEND_UNAUTHORIZED: 401,
@@ -152,6 +152,7 @@ async function dispatchRoute(
   request: Request,
   headers: HeadersInit,
 ): Promise<Response> {
+  if (route === "mailbox" || route === "admin-mailbox") return mailboxOperation(route, request, headers)
   if (route === "health") {
     const result = await callRpc("joy8_platform_health_v1", {})
     const healthy = result.ok && result.body === true
@@ -181,6 +182,50 @@ async function dispatchRoute(
   }
 
   return jsonResponse({ error: "Route not found" }, 404, headers)
+}
+
+async function mailboxOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  const admin = route === "admin-mailbox"
+  const { action, request: payload } = body.value
+  const actions = admin ? ["prepare", "send", "cancel", "list", "recipients"] : ["list", "read", "claim"]
+  if (Object.keys(body.value).some(key => !["action", "request"].includes(key)) || typeof action !== "string"
+    || !actions.includes(action) || !payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+  }
+  const admission = await callRpc("joy8_consume_gateway_rate_limit", {
+    p_key: `mail:${route}:${auth.userId}`, p_limit: admin ? 30 : 120, p_window_seconds: 60,
+  })
+  if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  const args = { p_action: action, p_request: payload }
+  let result: RpcResult
+  if (admin) {
+    try {
+      const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/joy8_admin_mail`, {
+        method: "POST", headers: { apikey: ANON_KEY, Authorization: request.headers.get("authorization")!, "Content-Type": "application/json" },
+        body: JSON.stringify(args), signal: AbortSignal.timeout(RPC_REQUEST_TIMEOUT_MS),
+      })
+      result = { ok: response.ok, body: await response.json() }
+    } catch {
+      return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
+    }
+  } else result = await callRpc("joy8_member_mail", { ...args, p_auth_user_id: auth.userId })
+  if (!result.ok) {
+    const error = result.body as { message?: string; code?: string } | null
+    const allowed = new Set(["JOY8_INVALID_REQUEST", "JOY8_MAIL_FORBIDDEN", "JOY8_MAIL_NOT_FOUND", "JOY8_MAIL_NO_REWARD",
+      "JOY8_MAIL_NO_RECIPIENTS", "JOY8_MAIL_AUDIENCE_LIMIT", "JOY8_MAIL_STATE_CONFLICT", "JOY8_IDEMPOTENCY_CONFLICT",
+      "JOY8_WALLET_INACTIVE", "JOY8_WALLET_OCCUPIED"])
+    if (error?.code === "22P02" || error?.code === "22003") return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+    if (allowed.has(error?.message ?? "")) return jsonResponse({ error: error!.message! }, statusFromRpcError(error), headers)
+    return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
+  }
+  if (!result.body || typeof result.body !== "object" || Array.isArray(result.body)) return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  return jsonResponse(result.body as JsonValue, 200, headers)
 }
 
 async function serverOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
@@ -570,6 +615,7 @@ function buildCorsHeaders(
 }
 
 function isCorsOriginAllowed(origin: string | null, route: string): boolean {
+  if (route === "mailbox" || route === "admin-mailbox") return Boolean(origin && allowedOrigins.includes(origin))
   if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
   if (["private-session", "branded-entry"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)

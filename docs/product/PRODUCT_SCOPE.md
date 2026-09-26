@@ -43,6 +43,9 @@ Joy8 owns:
 - Game-session creation.
 - Launch-code and Gateway-token issuance.
 - Wallet authority and transaction records.
+- In-app announcements, notifications, reward/compensation mail and administrator
+  issuance. Claims credit the existing shared POINT wallet; mail does not use
+  player email or SMTP. Details belong to [MAILBOX.md](../platform/MAILBOX.md).
 - The minimum financial round summary required for wallet settlement.
 - The Loader iframe shell, permissions, timeout, and platform error states.
 - Lobby cover images and platform presentation.

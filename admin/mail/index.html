@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>信件管理 · Joy8</title>
+  <script type="module" src="/src/admin/mail.js"></script>
+</head>
+<body>
+  <main class="mail-shell">
+    <header class="mail-header"><a class="brand-link" href="/admin/games/"><span class="brand-mark">Joy8 管理</span></a><a href="/admin/games/">遊戲管理</a><button id="logout">登出</button></header>
+    <div class="mail-heading"><div><p class="mail-kicker">公告・通知・獎勵</p><h1>信件管理</h1></div><button id="refresh">重新整理紀錄</button></div>
+    <p id="status" role="status" aria-live="polite">正在確認管理員身分…</p>
+    <div class="mail-columns">
+      <section class="mail-panel"><h2>新增信件</h2>
+        <form id="compose" class="mail-form">
+          <fieldset id="fields" disabled>
+            <label>信件類型<select name="kind"><option value="announcement">公告</option><option value="notification">個人通知</option><option value="reward">活動獎勵</option><option value="compensation">異常補償</option></select></label>
+            <label>收件對象<select name="audience"><option value="player">指定玩家</option><option value="game">曾啟動指定遊戲的玩家</option><option value="all">全體現有玩家</option></select></label>
+            <label id="player-field">玩家編號<input name="public_id" pattern="[1-9][0-9]{5}" maxlength="6" inputmode="numeric" placeholder="六位數 Player 編號" required></label>
+            <label>來源<select name="game_id"><option value="">Joy8 平台</option></select><span class="mail-help">平台公告與活動可選 Joy8；寄給指定遊戲玩家時，必須選擇該遊戲。</span></label>
+            <label>標題<input name="title" maxlength="120" required></label>
+            <label>內容<textarea name="body" maxlength="3000" required></textarea></label>
+            <div id="reward-fields" hidden>
+              <label>每位玩家的 POINT<input name="amount" type="number" min="1" max="9999999999" step="1" inputmode="numeric"></label>
+              <label>案件或活動編號<input name="source_ref" maxlength="200" placeholder="例如：客服案件或活動識別碼"></label>
+            </div>
+            <p class="mail-help">立即發送；信件與獎勵不設到期時間。收件人以建立預覽時的名單為準，每封最多 5,000 人，超過時整筆停止。</p>
+            <button type="submit" class="mail-primary">建立預覽，確認收件名單</button>
+          </fieldset>
+        </form>
+      </section>
+      <section id="preview" class="mail-panel" aria-label="信件預覽" tabindex="-1"><p class="mail-muted">填寫左側內容後，先確認人數與獎勵總額，再正式發送。</p></section>
+    </div>
+    <section class="mail-history"><h2>信件紀錄</h2><div id="history"></div><nav class="mail-pager" aria-label="紀錄分頁"><button id="previous" disabled>上一頁</button><span id="page-number">1</span><button id="next" disabled>下一頁</button></nav></section>
+    <section id="recipients" class="mail-history" hidden aria-label="收件狀態"></section>
+  </main>
+</body>
+</html>

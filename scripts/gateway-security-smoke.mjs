@@ -16,6 +16,11 @@ async function post(route, body = {}, browserOrigin = null) {
     body: JSON.stringify(body), signal: AbortSignal.timeout(12000),
   })
 }
+for (const route of ["mailbox", "admin-mailbox"]) {
+  assert.equal((await post(route, { action: "list", request: {} }, "https://not-joy8.example")).status, 403)
+  assert.equal((await post(route, { action: "list", request: {} })).status, 403)
+  assert.equal((await post(route, { action: "list", request: {} }, origin)).status, 401)
+}
 assert.equal((await post("create-session", {}, "https://not-joy8.example")).status, 403)
 assert.equal((await post("create-session")).status, 403)
 assert.equal((await post("create-session", {}, origin)).status, 401)

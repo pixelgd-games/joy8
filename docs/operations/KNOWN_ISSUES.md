@@ -26,9 +26,11 @@ must still implement and verify authoritative gameplay before activation.
   Email provider before public release; the user controls the timing and
   [README.md](../../README.md#hosted-auth-configuration) owns the procedure. Do
   not disable all signup, which would also stop Google and guest entry.
-- No general compensation or funding API exists. Define the reviewed linked
-  compensation procedure before funded operation; immutable records cannot be
-  edited to repair an accounting discrepancy.
+- The mailbox compensation path is deployed; issuing and claiming a real hosted
+  test reward still requires a designated player and approved amount. Follow the
+  [mailbox operating procedure](../platform/MAILBOX.md#operator-workflow)
+  before operational use. There is no purchase/funding API; immutable gameplay
+  records cannot be edited to repair an accounting discrepancy.
 - The six-digit public-ID capacity and guest abuse/retention policy remain
   explicit release limits. Do not delete identities, recycle IDs or expand the
   namespace without a reviewed product/database change.

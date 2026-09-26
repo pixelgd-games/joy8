@@ -676,11 +676,12 @@ browser disconnection and token expiry do not authorize cancellation.
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
 | 502/503 | Invalid/upstream-unavailable response; `JOY8_UPSTREAM_UNAVAILABLE` or `JOY8_ADAPTER_UNAVAILABLE` |
 
-Internal database diagnostics are not returned. No generic player compensation,
-purchase or funding endpoint is enabled. Correcting a committed result requires
-a separately reviewed linked compensating transaction; never edit immutable
-history or restore a browser payout route as a correction tool. Complete that operating procedure
-before activating a funded operational product.
+Internal database diagnostics are not returned. No purchase or funding endpoint
+is enabled. The separate administrator-issued [mailbox compensation path](MAILBOX.md)
+is deployed. Its claim
+credits the shared wallet with a linked adjustment; it does not rewrite gameplay
+or settlement history. Games cannot issue mail or submit claim amounts. Never
+restore a browser payout route as a correction tool.
 
 ## Security and Failure Behavior
 
