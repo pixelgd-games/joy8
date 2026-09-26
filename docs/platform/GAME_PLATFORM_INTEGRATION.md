@@ -130,8 +130,14 @@ backend-controlled and changed only through a reviewed migration.
 
 Joy8's `/entry/?slug=...` is a platform-controlled shell with no visible Joy8
 lobby. It loads the game iframe first so the player sees the game's login art.
-The iframe may send only `{type:"joy8-entry-request-v1",method:"google"}` or the
+The iframe sends `{type:"joy8-entry-request-v1",method:"google",requestId}` or the
 same message with `method:"guest"`, from the configured frame window and origin.
+`requestId` is a fresh in-memory random identifier of 16–80 ASCII letters, digits,
+underscores or hyphens for each explicit login/relogin action. The parent permits
+only one in-flight request and ignores immediate duplicates. It retains the
+verified frame listener after launch so a later explicit request can issue a fresh
+session without rebuilding the game iframe. Readiness messages never replay a
+delivered credential. Normal lobby/private game frames still deliver only once.
 Joy8 performs Auth, Turnstile, enrollment and OAuth callback completion in the
 parent. The game never receives provider or member tokens.
 
@@ -139,7 +145,11 @@ parent. The game never receives provider or member tokens.
 `protocol` from trusted backend configuration and exact Origin. After verified
 membership, `POST /private-session` uses the same hidden-game session authority
 as the private entry. The resulting launch is delivered through the normal
-`joy8-launch-v1` message. Both responses are no-store.
+`joy8-launch-v1` message, with the matching `requestId` alongside `launch` when
+responding to an iframe request. Entry errors carry that same `requestId` in
+`joy8-entry-result-v1`. The child accepts only its pending request's response;
+an initial automatic membership/OAuth-callback launch has no request ID. A retry
+after a failure creates a new request ID. Both responses are no-store.
 
 ### Shared launch parameters
 

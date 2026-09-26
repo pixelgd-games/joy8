@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { mountGameFrame } from "../src/pages/game/iframe.js"
+import { createBrandedEntryRequests } from "../src/member/branded-entry.js"
 
 function fixture(t, options = {}) {
   t.mock.timers.enable({ apis: ["setTimeout"] })
@@ -141,6 +142,51 @@ test("branded entry waits for document and readiness, then delivers one deferred
   assert.equal(f.controller.sendLaunch({ joy8_launch_code: "later" }), true)
   assert.equal(f.controller.sendLaunch({ joy8_launch_code: "again" }), false)
   assert.equal(f.messages.length, 1)
+  assert.equal(f.listeners.size, 1)
+  f.controller.dispose()
   assert.equal(f.listeners.size, 0)
   assert.deepEqual(f.failures, [])
+})
+
+test("branded reauthorization accepts a fresh correlated request without replaying the prior launch", async t => {
+  let release
+  let entered = 0
+  const requests = []
+  const handle = createBrandedEntryRequests({
+    canRequest: () => true,
+    enter: async (_method, requestId) => {
+      entered++
+      await new Promise(resolve => { release = resolve })
+      assert.equal(f.controller.sendLaunch({ joy8_launch_code: `fresh-${entered}` }, requestId), true)
+    },
+    onError: error => { throw error },
+  })
+  const f = fixture(t, { launch: null, deferredLaunch: true, onMessage: data => requests.push(handle(data)) })
+  f.load()
+  f.ready()
+  f.controller.sendLaunch({ joy8_launch_code: "initial" })
+  const request = { type: "joy8-entry-request-v1", method: "guest", requestId: "reauthorize-00001" }
+  f.ready({ data: request, source: {} })
+  f.ready({ data: request, origin: "https://attacker.example" })
+  f.ready({ data: { ...request, requestId: "invalid" } })
+  assert.equal(entered, 0)
+  f.ready({ data: request })
+  f.ready({ data: request })
+  f.ready({ data: { ...request, requestId: "reauthorize-00002" } })
+  assert.equal(entered, 1, "Only one authorization may be in flight")
+  release()
+  await Promise.all(requests)
+  f.ready()
+  f.ready({ data: request })
+  assert.equal(f.messages.length, 2)
+  assert.equal(f.messages[1][0].requestId, request.requestId)
+  assert.equal(f.messages[1][0].launch.joy8_launch_code, "fresh-1")
+  assert.equal(f.controller.sendLaunch({ joy8_launch_code: "replay" }, request.requestId), false)
+  f.ready({ data: { ...request, requestId: "reauthorize-00002" } })
+  release()
+  await Promise.all(requests)
+  assert.equal(f.messages.length, 3)
+  assert.equal(f.messages[2][0].requestId, "reauthorize-00002")
+  f.controller.dispose()
+  assert.equal(f.listeners.size, 0)
 })

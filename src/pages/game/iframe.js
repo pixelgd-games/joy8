@@ -32,6 +32,8 @@ export function mountGameFrame({ gameRoot, gameUrl, gameName, launch = null, def
   let stopped = false
   let delivered = false
   let launchPayload = launch
+  let launchRequestId = null
+  let deliveredRequestId = null
   let timeoutId
   const iframe = createGameIframe({ gameUrl, gameName, onLoad: () => { loaded = true; complete() } })
   const gameOrigin = new URL(gameUrl, location.origin).origin
@@ -60,15 +62,19 @@ export function mountGameFrame({ gameRoot, gameUrl, gameName, launch = null, def
     iframe.contentWindow.postMessage(payload, targetOrigin)
     return true
   }
-  function sendLaunch(payload) {
-    if (stopped || delivered || launchPayload && payload !== launchPayload) return false
+  function sendLaunch(payload, requestId = null) {
+    if (requestId !== null && (!deferredLaunch || typeof requestId !== "string" || !ENTRY_REQUEST_ID_PATTERN.test(requestId))) return false
+    if (stopped || (delivered && (!requestId || requestId === deliveredRequestId)) || launchPayload && payload !== launchPayload) return false
     launchPayload = payload
+    launchRequestId = requestId
     if (!ready) return true
     try {
-      if (!sendMessage({ type: JOY8_LAUNCH_MESSAGE_TYPE, launch: launchPayload })) throw new Error("Game frame unavailable")
+      if (!sendMessage({ type: JOY8_LAUNCH_MESSAGE_TYPE, launch: launchPayload,
+        ...(launchRequestId ? { requestId: launchRequestId } : {}) })) throw new Error("Game frame unavailable")
       delivered = true
+      deliveredRequestId = launchRequestId
       launchPayload = null
-      window.removeEventListener("message", receive)
+      if (!deferredLaunch) window.removeEventListener("message", receive)
       complete()
       return true
     } catch {
@@ -80,9 +86,9 @@ export function mountGameFrame({ gameRoot, gameUrl, gameName, launch = null, def
     if (stopped || event.source !== iframe.contentWindow || event.origin !== expectedOrigin) return
     if (event.data?.type === JOY8_LAUNCH_READY_TYPE && event.data.protocol === "server-v1") {
       ready = true
-      if (launchPayload) sendLaunch(launchPayload)
+      if (launchPayload) sendLaunch(launchPayload, launchRequestId)
       complete()
-    } else if (deferredLaunch && !delivered) onMessage?.(event.data)
+    } else if (deferredLaunch) onMessage?.(event.data)
   }
   window.addEventListener("message", receive)
   timeoutId = window.setTimeout(() => fail(loaded ? "handshake" : "load"), timeoutMs)
@@ -99,3 +105,4 @@ function getSandboxTokens(gameUrl) {
 
   return tokens
 }
+import { ENTRY_REQUEST_ID_PATTERN } from "../../lib/entryProtocol.js"
