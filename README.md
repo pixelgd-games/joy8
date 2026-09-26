@@ -126,7 +126,7 @@ Vite declares these entries in `vite.config.js`.
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
 | `src/styles/` | Shared tokens plus theme, Lobby, Loader and error-modal styles |
-| `supabase/functions/joy8-gateway/index.ts` | Gateway Edge Function |
+| `supabase/functions/joy8-gateway/` | Gateway entry, HTTP/auth/RPC policies and route modules |
 | `supabase/migrations/` | Incremental database migrations |
 | `scripts/` | Local verification, operator tools and Supabase routing helpers |
 | `scripts/sql/` | Read-only hosted status queries |
@@ -216,6 +216,20 @@ blocks duplicate submissions and a rejected save permits an explicit retry.
 The front end does not write player, wallet, match, settlement, or session tables directly.
 
 ## Gateway
+
+`supabase/functions/joy8-gateway/index.ts` only registers the request handler.
+`handler.ts` owns dispatch, request correlation and logging; `http.ts` owns CORS,
+bounded JSON parsing and response helpers. `auth.ts` verifies member identity,
+`rpc.ts` owns timed upstream transport and public error mapping, and
+`rate-limit.ts` handles ingress and subject admission. Environment configuration
+lives in `config.ts`. Route behavior is grouped in `member-routes.ts`,
+`mailbox-routes.ts` and `server-routes.ts`.
+
+Server routes keep admission and financial operations inside one
+`joy8_server_request_v1` database call. Member mailbox RPCs use the service role
+with the verified user ID; admin mailbox RPCs preserve the requesting user's JWT
+and anonymous API key, so database admin authorization remains authoritative.
+Tests exercise the actual handler and import HTTP/auth/RPC helpers directly.
 
 The hosted `joy8-gateway` implements these POST routes:
 

@@ -18,7 +18,27 @@ globalThis.Deno = {
 }
 
 try {
-  const { callRpc, resolveAuthUser, SERVER_ERROR_STATUSES } = await import("../supabase/functions/joy8-gateway/index.ts")
+  await import("../supabase/functions/joy8-gateway/index.ts")
+  const { callRpc, SERVER_ERROR_STATUSES } = await import("../supabase/functions/joy8-gateway/rpc.ts")
+  const { resolveAuthUser } = await import("../supabase/functions/joy8-gateway/auth.ts")
+  const { readJsonBody } = await import("../supabase/functions/joy8-gateway/http.ts")
+  const bodyRequest = (body, headers = {}) => new Request("https://gateway.example/member", {
+    method: "POST", body, headers, duplex: "half",
+  })
+  assert.deepEqual(await readJsonBody(bodyRequest('{"slug":"test"}')), { ok: true, value: { slug: "test" } })
+  for (const body of ["[]", "null", '"text"']) {
+    assert.deepEqual(await readJsonBody(bodyRequest(body)), { ok: false, error: "JSON body must be an object" })
+  }
+  assert.deepEqual(await readJsonBody(bodyRequest("{")), { ok: false, error: "Invalid JSON body" })
+  assert.deepEqual(await readJsonBody(bodyRequest("{}", { "content-length": "16385" })), { ok: false, error: "JSON body is too large" })
+  assert.equal((await readJsonBody(bodyRequest(JSON.stringify({ value: "x".repeat(16372) })))).ok, true)
+  let cancelled = false
+  const oversizedStream = new ReadableStream({
+    start(controller) { controller.enqueue(new Uint8Array(16385)) },
+    cancel() { cancelled = true },
+  })
+  assert.deepEqual(await readJsonBody(bodyRequest(oversizedStream)), { ok: false, error: "JSON body is too large" })
+  assert.equal(cancelled, true)
   const integrationContract = await readFile(new URL("../docs/platform/GAME_PLATFORM_INTEGRATION.md", import.meta.url), "utf8")
   const stableErrorTable = integrationContract.split("| HTTP | Stable errors |")[1]?.split("\n\n")[0] || ""
   const documentedServerErrors = [...stableErrorTable.matchAll(/`(JOY8_[A-Z_]+)`/g)].map((match) => match[1]).sort()
@@ -134,6 +154,9 @@ try {
   }))
   assert.equal(preflight.status, 204)
   assert.equal(preflight.headers.get("Access-Control-Max-Age"), "7200")
+  const rejectedMethod = await handleRequest(new Request("https://gateway.example/health"))
+  assert.equal(rejectedMethod.status, 405)
+  assert.equal(rejectedMethod.headers.get("Allow"), "POST, OPTIONS")
   for (const route of ["member", "enroll-member", "create-session", "private-session"]) {
     assert.equal((await request(route, {}, "", "https://evil.example")).status, 403)
     assert.equal((await request(route, {}, "", null)).status, 403)
