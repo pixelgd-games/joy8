@@ -176,7 +176,7 @@ async function dispatchRoute(
     return resolveBrandedEntry(request, headers)
   }
 
-if (route === "balance") {
+  if (route === "balance") {
     return getBalance(request, headers)
   }
 
@@ -553,6 +553,7 @@ function buildCorsHeaders(
 ): Record<string, string> {
   const headers: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Expose-Headers": "Retry-After, X-Joy8-Request-Id",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Max-Age": "7200",
     "Content-Type": "application/json; charset=utf-8",

@@ -63,6 +63,9 @@ try {
   await expectPageText(client, appPort, "/admin/login/", (text) => {
     return text.includes("Joy8 Admin") && text.includes("Google")
   }, "Admin login loads")
+  await expectPageText(client, appPort, "/canonical-host.js", text => text.includes("joy8.pages.dev"), "Isolated browser fixture loads")
+  await expectAdminFormSafety(client)
+  await expectGatewayCors(client)
 
   await showSyntheticError(client)
   await waitForText(client, (text) => {
@@ -476,6 +479,134 @@ async function expectMemberEntry(client, appPort) {
   if (!conflict.result.value) throw new Error("Provider conflict did not preserve the guest")
   await waitForText(client, (text) => text.includes("Player") && text.includes("482731"), "Public player ID appears in the Lobby header")
   console.log("OK Google, Facebook and guest member entry, conflict-safe guest upgrade and responsive layout")
+}
+
+async function expectAdminFormSafety(client) {
+  const result = await client.send("Runtime.evaluate", {
+    awaitPromise: true, returnByValue: true,
+    expression: `(async () => {
+      const { supabase } = await import("/src/lib/supabaseClient.js")
+      const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+      const check = (condition, message) => { if (!condition) throw new Error(message) }
+      const writes = []
+      let resolveRead, resolveWrite
+      supabase.auth.getSession = async () => ({ data: { session: { user: { id: "test-admin" } } }, error: null })
+      supabase.rpc = async () => ({ data: true, error: null })
+      supabase.from = table => {
+        check(table === "games", "Unexpected admin table")
+        return {
+          select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveRead = resolve }) }) }),
+          update: payload => ({ eq: (_, id) => { writes.push({ payload, id }); return new Promise(resolve => { resolveWrite = resolve }) } }),
+          insert: payload => { writes.push({ payload }); return Promise.resolve({ error: { message: "Save rejected" } }) },
+        }
+      }
+      const start = async (name, path) => {
+        document.querySelector(".joy8-error-action")?.click()
+        history.replaceState(null, "", path)
+        document.body.innerHTML = '<div id="admin-form"></div>'
+        resolveRead = null
+        await import("/src/admin/game-form.js?smoke=" + name)
+        await tick()
+        return document.getElementById("gameForm")
+      }
+      const submit = form => form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }))
+      for (const [name, result] of [
+        ["read-error", { error: { message: "Read failed" }, data: null }],
+        ["not-found", { error: null, data: null }],
+      ]) {
+        const form = await start(name, "/admin/games/edit/?id=test-game")
+        check(form.querySelector("fieldset").disabled, "Form enabled before load")
+        submit(form)
+        resolveRead(result)
+        await tick()
+        document.querySelector(".joy8-error-action:last-child")?.click()
+        document.getElementById("name").value = "Manual title"
+        document.getElementById("slug").value = "test-game"
+        submit(form)
+        await tick()
+        check(form.querySelector("fieldset").disabled && writes.length === 0, "Failed load allowed a write")
+      }
+      const form = await start("loaded", "/admin/games/edit/?id=test-game")
+      resolveRead({ error: null, data: { name: "Original", slug: "test-game", thumbnail: "/games/test-game/cover.webp",
+        type: "card", published: true, launch_url: "https://game.example/", sort_order: 7 } })
+      await tick()
+      check(!form.querySelector("fieldset").disabled, "Loaded form stayed disabled")
+      document.getElementById("name").value = "Updated"
+      submit(form)
+      submit(form)
+      check(writes.length === 1 && form.querySelector("fieldset").disabled, "Duplicate save was allowed")
+      check(writes[0].payload.name === "Updated" && writes[0].payload.published === true
+        && writes[0].payload.type === "card" && writes[0].payload.sort_order === 7
+        && writes[0].payload.thumbnail === "/games/test-game/cover.webp"
+        && writes[0].payload.launch_url === "https://game.example/", "Existing metadata was lost")
+      resolveWrite({ error: { message: "Save rejected" } })
+      await tick()
+      check(!form.querySelector("fieldset").disabled, "Failed save prevented retry")
+      document.querySelector(".joy8-error-action:last-child")?.click()
+      submit(form)
+      check(writes.length === 2, "Explicit retry did not run")
+      resolveWrite({ error: { message: "Save rejected" } })
+      await tick()
+      const newForm = await start("new", "/admin/games/new/")
+      check(!newForm.querySelector("fieldset").disabled, "New game form stayed disabled")
+      history.replaceState(null, "", "/admin/login/")
+      return true
+    })()`,
+  })
+  if (result.exceptionDetails || !result.result.value) throw new Error(`Admin form safety failed: ${JSON.stringify(result.exceptionDetails)}`)
+  console.log("OK Admin form rejects unloaded/missing data, preserves metadata, blocks duplicate saves and allows explicit retry")
+}
+
+async function expectGatewayCors(client) {
+  const result = await client.send("Runtime.evaluate", {
+    awaitPromise: true, returnByValue: true,
+    expression: `(async () => {
+      const original = { fetch: window.fetch, deno: window.Deno }
+      let handler
+      window.Deno = { env: { get: name => ({ SUPABASE_URL: "https://fixture.example", SUPABASE_SERVICE_ROLE_KEY: "test" })[name] }, serve: value => { handler = value } }
+      try {
+        await import("/supabase/functions/joy8-gateway/index.ts?cors-smoke")
+        window.fetch = async () => Response.json(true)
+        const request = new Request(location.origin + "/balance", { method: "POST", body: "{}" })
+        Object.defineProperty(request, "headers", { value: new Headers({ Origin: location.origin, "Content-Type": "application/json" }) })
+        const response = await handler(request)
+        return Object.fromEntries(response.headers)
+      } finally {
+        window.fetch = original.fetch
+        if (original.deno === undefined) delete window.Deno
+        else window.Deno = original.deno
+      }
+    })()`,
+  })
+  if (result.exceptionDetails) throw new Error("Cannot capture Gateway CORS headers")
+  const headers = result.result.value
+  const server = http.createServer((request, response) => {
+    response.writeHead(request.method === "OPTIONS" ? 204 : 429, { ...headers, "Retry-After": "60" })
+    response.end(request.method === "OPTIONS" ? undefined : JSON.stringify({ error: "Too many requests" }))
+  })
+  await new Promise(resolve => server.listen(0, host, resolve))
+  try {
+    const check = await client.send("Runtime.evaluate", {
+      awaitPromise: true, returnByValue: true,
+      expression: `(async () => {
+        const { getJoy8Balance } = await import("/packages/joy8-game-sdk/browser.js")
+        try {
+          await getJoy8Balance({ gatewayUrl: "http://${host}:${server.address().port}/joy8-gateway", gatewayToken: "fixture-token" })
+          return false
+        } catch (error) {
+          return { status: error.status, retry: error.retryAfterSeconds, requestId: error.requestId, code: error.code }
+        }
+      })()`,
+    })
+    const observed = check.result.value
+    if (check.exceptionDetails || observed?.status !== 429 || observed.retry !== 60 || !observed.requestId) {
+      throw new Error(`Browser cannot read Gateway retry/correlation headers across origins: ${JSON.stringify(observed)}`)
+    }
+  } finally {
+    server.closeAllConnections()
+    await new Promise(resolve => server.close(resolve))
+  }
+  console.log("OK Cross-origin browser SDK reads Gateway Retry-After and request ID")
 }
 
 async function expectMemberModal(client) {

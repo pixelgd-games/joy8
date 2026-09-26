@@ -11,6 +11,9 @@ const isEditPage = window.location.pathname.startsWith("/admin/games/edit/")
 const gameId = isEditPage ? params.get("id") : null
 document.getElementById("admin-form").innerHTML = renderGameForm(isEditPage)
 const form = document.getElementById("gameForm")
+const fields = form.querySelector("fieldset")
+let canSubmit = false
+form.addEventListener("submit", submitForm)
 
 function slugSanity(slug) {
   const s = String(slug || "").trim()
@@ -52,8 +55,9 @@ async function loadGame() {
       title: "遊戲資料讀取失敗",
       message: "目前無法取得這筆遊戲資料，請稍後再試。",
       error,
+      reload: true,
     })
-    return
+    return false
   }
   if (!data) {
     showFormError({
@@ -67,7 +71,7 @@ async function loadGame() {
         },
       },
     })
-    return
+    return false
   }
 
   document.getElementById("name").value = data.name ?? ""
@@ -80,10 +84,12 @@ async function loadGame() {
 
   const loading = document.getElementById("loading")
   if (loading) loading.style.display = "none"
+  return true
 }
 
 async function submitForm(e) {
   e.preventDefault()
+  if (!canSubmit) return
 
   const name = val("name").trim()
   const slugCheck = slugSanity(val("slug"))
@@ -120,8 +126,8 @@ async function submitForm(e) {
     return showValidationError("已上架遊戲需要符合規格的 Joy8 封面")
   }
 
-  const submitBtn = form.querySelector('button[type="submit"]')
-  if (submitBtn) submitBtn.disabled = true
+  canSubmit = false
+  fields.disabled = true
 
   try {
     if (gameId) {
@@ -140,7 +146,8 @@ async function submitForm(e) {
 
     window.location.href = "/admin/games/"
   } finally {
-    if (submitBtn) submitBtn.disabled = false
+    canSubmit = true
+    fields.disabled = false
   }
 }
 
@@ -164,13 +171,14 @@ async function initFormPage() {
   }
 
   if (gameId) {
-    await loadGame()
+    if (!await loadGame()) return
   } else {
     const loading = document.getElementById("loading")
     if (loading) loading.style.display = "none"
   }
 
-  form.addEventListener("submit", submitForm)
+  canSubmit = true
+  fields.disabled = false
 }
 
 initFormPage()

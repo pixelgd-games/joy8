@@ -135,8 +135,10 @@ belongs to [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.
 
 The deployed `joy8-gateway` still maps the removed `JOY8_PAYOUT_BUDGET_EXCEEDED`
 error to 409; the source no longer does. The database can no longer raise that
-error, so behavior is unaffected. The next reviewed Gateway deployment removes
-the difference.
+error, so that difference does not affect behavior. The source also exposes
+`Retry-After` and `X-Joy8-Request-Id` to cross-origin browser clients; this has
+passed local browser acceptance but needs a reviewed Gateway deployment and
+hosted header verification before it is considered live.
 
 ### Synchronous Gateway Runtime Cleanup
 
@@ -183,7 +185,9 @@ trust, real Auth or production capacity.
 Not automated:
 
 - Loader success from session creation through a real game iframe.
-- Admin create, edit, publish, and ordering flows and admin-form validation.
+- Full Admin create, edit, publish, ordering and form-validation acceptance.
+  Local browser smoke covers load failure, missing records, metadata preservation,
+  duplicate-submit prevention and retry after a rejected save.
 - Browser-level member-versus-guest session behavior.
 - Accessibility behavior for modal focus and keyboard navigation.
 - Hosted Auth, real provider linking, production load and backup restoration.

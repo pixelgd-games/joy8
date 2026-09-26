@@ -96,10 +96,11 @@ Do not send `productParticipants` for a platform-funded game.
 When `settlement` is supplied, Joy8 opens the match and commits settlement 1
 in the same transaction. `final:true` finishes a paid spin; `final:false` keeps
 the match open for later Free Spins. Exact `matchRef` and body retries return
-the saved result; changed content conflicts. The response contains `matchId`,
+the saved first settlement with the current match state; changed content conflicts. The response contains `matchId`,
 `state`, `settlement` (or `null`), and `availableBalance` for one player. For
 multiple players it contains `availableBalances` keyed by player account ID.
-Amounts are two-decimal strings.
+Amounts are two-decimal strings read from the current wallet on each response,
+including retries. Nested `settlement` contains only saved settlement fields.
 
 ### `settleMatch(request)`
 
@@ -120,8 +121,11 @@ Entries are signed nonzero decimal changes. A platform-funded game submits only
 its player/fee results; it never invents a `platform` entry. A zero-change result
 uses an empty entry list. Continuous settlement increments `settlementNo` and
 uses `final:true` only on the last posting.
-The response also contains the post-settlement `availableBalance` string, or
-`availableBalances` for multiple players. While a round remains open, Joy8
+The response also contains the current `availableBalance` string, or
+`availableBalances` for multiple players. Retries retain the saved settlement
+fields but read the available balance again; see the
+[authoritative contract](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#open-and-settle).
+While a round remains open, Joy8
 continues to lock its winnings until the final settlement releases them.
 
 ### `getMatchStatus({ matchRef })`

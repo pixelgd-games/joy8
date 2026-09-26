@@ -81,6 +81,27 @@ describe("seamless wallet platform settlement", () => {
   beforeEach(() => db.exec("begin"))
   afterEach(() => db.exec("rollback"))
 
+  test("a historical retry keeps its settlement result and reports the current available POINT", async () => {
+    const player = await ready()
+    const firstOpen = opening(player, "100.00")
+    await gatewayRpc("server-open-v1", firstOpen)
+    const firstBody = settlement(player, firstOpen.match_ref, "-20.00")
+    const first = (await gatewayRpc("server-settle-v1", firstBody)).result
+    const secondOpen = opening(player, "100.00")
+    await gatewayRpc("server-open-v1", secondOpen)
+    await gatewayRpc("server-settle-v1", settlement(player, secondOpen.match_ref, "-30.00"))
+    const replay = (await gatewayRpc("server-settle-v1", firstBody)).result
+    const { available_balance: firstBalance, ...saved } = first
+    const { available_balance: replayBalance, ...retried } = replay
+    assert.equal(firstBalance, "19980.00")
+    assert.equal(replayBalance, "19950.00")
+    assert.deepEqual(retried, saved)
+    const status = (await gatewayRpc("server-status-v1", { version: 1, match_ref: firstOpen.match_ref })).result
+    assert.deepEqual(status.result, saved)
+    assert.equal((await one("select count(*)::int n from public.joy8_settlements where match_id=$1", [first.match_id])).n, 1)
+    assert.equal((await one("select count(*)::int n from public.wallet_transactions where source_ref=$1", [first.settlement_id])).n, 1)
+  })
+
   test("Gateway open and settle report the new available POINT", async () => {
     const player = await ready()
     const body = opening(player, "100.00")

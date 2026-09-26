@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { spawnSync } from "node:child_process"
+import { createServer } from "node:http"
 import { afterEach, describe, test } from "node:test"
 import { getJoy8Balance, receiveJoy8Launch } from "../packages/joy8-game-sdk/browser.js"
 import { Joy8ApiError, Joy8SdkError } from "../packages/joy8-game-sdk/errors.js"
@@ -63,6 +64,35 @@ function response(body, status = 200, headers = {}) {
 }
 
 describe("Joy8 browser SDK", () => {
+  test("times out while reading a delayed response body after receiving headers", async () => {
+    const body = JSON.stringify({ session_id: sessionId, player_account_ref: playerId,
+      currency: "POINT", balance: "100.00", locked_balance: "0.00" })
+    const server = createServer((request, reply) => {
+      reply.writeHead(200, { "Content-Type": "application/json" })
+      reply.write(body.slice(0, 1))
+      const timer = setTimeout(() => reply.end(body.slice(1)), 1500)
+      reply.on("close", () => clearTimeout(timer))
+    })
+    await new Promise(resolve => server.listen(0, "127.0.0.1", resolve))
+    try {
+      await assert.rejects(getJoy8Balance({
+        gatewayUrl: `http://127.0.0.1:${server.address().port}/joy8-gateway`,
+        gatewayToken: "test-token", timeoutMs: 1000,
+      }), error => error instanceof Joy8SdkError && error.code === "JOY8_REQUEST_TIMEOUT")
+    } finally {
+      server.closeAllConnections()
+      await new Promise(resolve => server.close(resolve))
+    }
+  })
+
+  test("distinguishes malformed JSON and network errors from a timeout", async () => {
+    const options = { gatewayUrl, gatewayToken: "test-token" }
+    await assert.rejects(getJoy8Balance({ ...options, fetch: async () => new Response("{") }),
+      error => error instanceof Joy8ApiError && error.code === "JOY8_INVALID_RESPONSE")
+    await assert.rejects(getJoy8Balance({ ...options, fetch: async () => { throw new TypeError("Connection failed") } }),
+      error => error instanceof Joy8SdkError && error.code === "JOY8_NETWORK_ERROR")
+  })
+
   test("installs first, announces only to exact origins and accepts one trusted in-memory launch", async () => {
     const windowObject = fakeWindow()
     const pending = receiveJoy8Launch({ parentOrigins: [parentOrigin, "https://www.joy8.cc"], expectedGameId: gameId, gatewayUrl, windowObject })

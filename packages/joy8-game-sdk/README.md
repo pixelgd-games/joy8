@@ -122,6 +122,13 @@ settlement also returns its `settlement` result. Multi-player matches return
 the new SDK accepts older responses and returns `null` for missing balance
 fields.
 
+Top-level balances are read from the current wallet on each request, including
+historical retries; they are not immutable settlement snapshots. Saved settlement
+fields stay unchanged and do not post twice. Nested `settlement` and status
+`result` objects contain only the saved settlement, without a live balance.
+The nested SDK settlement therefore has `null` balance fields. See the
+[settlement contract](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#open-and-settle).
+
 Settle a player loss:
 
 ```js
@@ -159,3 +166,4 @@ operation key and request body.
 - `retryAfterSeconds`: rate-limit delay when supplied.
 
 The SDK never includes the Backend Key in error messages.
+HTTP timeouts cover both receiving headers and reading the complete response body.

@@ -142,6 +142,8 @@ try {
   assert.equal(rpcCalls.some(({ name }) => name === "joy8_resolve_member_profile" || name === "joy8_resolve_member" || name === "create_game_session"), false)
   assert.equal((await request("enroll-member", { p_auth_user_id: "victim", account_type: "registered" })).status, 400)
   const memberResponse = await request("member")
+  assert.equal(memberResponse.headers.get("Access-Control-Expose-Headers"), "Retry-After, X-Joy8-Request-Id")
+  assert.ok(memberResponse.headers.get("X-Joy8-Request-Id"))
   assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", public_id: "482731", account_type: "guest" } })
   assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_member_profile", args: { p_auth_user_id: "verified-user", p_enroll: false } })
   assert.equal((await request("enroll-member")).status, 200)

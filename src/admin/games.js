@@ -213,11 +213,6 @@ async function handleListClick(event) {
   gameRows = gameRows.map(game => game.id === id ? { ...game, published: false } : game)
   renderGameList()
   updateStatus()
-
-  if (gameRows.length === 0) {
-    const list = $("#list")
-    if (list) list.textContent = "目前沒有遊戲。"
-  }
 }
 
 function updateStatus() {

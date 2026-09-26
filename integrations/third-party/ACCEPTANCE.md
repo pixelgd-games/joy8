@@ -48,7 +48,7 @@ profile. Passing local tests does not activate a public game.
 - [ ] Wrong origin, wrong Game ID and wrong/revoked/expired key rejection.
 - [ ] Maximum valid bet and over-limit bet rejection.
 - [ ] Player loss, player win, zero-change result and payout-limit rejection.
-- [ ] Exact duplicate settlement returns the saved response without a duplicate ledger entry.
+- [ ] Exact duplicate settlement returns the saved settlement fields without a duplicate ledger entry; its top-level available balance reflects the current wallet, including after later gameplay.
 - [ ] Changed duplicate and out-of-order settlement rejection.
 - [ ] Status recovery after a simulated timeout.
 - [ ] Final settlement and cancellation release reservations correctly.

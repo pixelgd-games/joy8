@@ -202,6 +202,10 @@ applies the one-time top-up when a guest has linked Google.
 3. Authorized users can list, create, edit, publish, and unpublish catalog records.
 4. Public users read only the safe fields exposed by `public_games_v1`.
 
+Catalog forms stay disabled until administrator verification and, for edits,
+successful record loading. Failed reads cannot enable saving; an in-flight save
+blocks duplicate submissions and a rejected save permits an explicit retry.
+
 The front end does not write player, wallet, match, settlement, or session tables directly.
 
 ## Gateway

@@ -3,7 +3,6 @@ import { Joy8SdkError } from "./errors.js"
 import {
   BACKEND_KEY_PATTERN,
   CURRENCY,
-  PROTOCOL,
   isRecord,
   normalizeGatewayUrl,
   requireAllowedKeys,

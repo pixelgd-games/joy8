@@ -429,7 +429,8 @@ number 1 in the same transaction as the opening. It contains `operation_key`,
 and is omitted from this nested object. Use `final:true` for a complete paid
 spin or `final:false` when Free Spins continue on the same match. The combined
 response also includes the first `settlement` result. The same `match_ref` and
-identical full request replay the saved result; changed content conflicts. If
+identical full request replay that saved settlement, with the match's current
+state and current available balance; changed content conflicts. If
 the settlement fails, the opening and its reservation roll back together.
 
 `server-settle-v1` takes the authoritative result from the game backend and
@@ -496,9 +497,16 @@ participants. Player suspension, browser logout or session expiry after opening
 does not erase the authorized match obligation; trusted settlement may complete.
 
 Response fields are `version`, `settlement_id`, `match_id`, `state`,
-`settlement_no`, `final`, `request_hash`, `settled_at`, and the post-settlement
+`settlement_no`, `final`, `request_hash`, `settled_at`, and
 `available_balance` or `available_balances`.
-Exact retries return the saved response.
+Exact retries return the saved settlement fields without posting again. The
+Gateway adds the wallet's current available balance on every open or settle
+response, including a retry. That balance can change after later activity; it
+is not part of the immutable settlement result or a historical balance snapshot.
+Nested `settlement` and status `result` objects contain the saved settlement
+fields without this live balance addition. Request hashes identify the request,
+not the response's live balance. Read balance again when a fresh value is needed;
+concurrent activity can make any returned balance stale after it is read.
 Every settlement transaction stores `game_id` from this trusted match configuration,
 so per-game reporting never depends on a game-supplied wallet choice. The operation
 key is unique within a game; changed content conflicts. Another
@@ -531,8 +539,9 @@ financial match for the entire table and posts each completed hand in order:
   No new session or wallet is created
   between hands. Session expiry, logout or suspension cannot erase an already
   opened obligation; backend authorization and active-wallet checks still apply.
-- Exact historical retries return their original response, even after a later
-  hand or closure. Read `server-status-v1` for the current state, latest result
+- Exact historical retries return their original settlement fields, even after a
+  later hand or closure; the top-level available balance is refreshed as described
+  above. Read `server-status-v1` for the current state, latest result
   and `settlement_count`; never roll the product back to the retried response.
 - Cancel ends only the unfinished remainder, releases current holds and retains
   all earlier payments, fees and immutable hand records. A cancelled table may
@@ -736,6 +745,8 @@ two windows, so these are not rolling-window or requests-per-second guarantees.
 A 429 response includes `Retry-After`. Clients must wait, preserving the original
 idempotency key. Unavailable or malformed admission results fail closed with 503.
 Do not fall back to the old per-IP policy.
+Browser responses expose `Retry-After` and `X-Joy8-Request-Id` through CORS so
+game clients can read the retry delay and support correlation identifier.
 
 The Gateway is deployed with `verify_jwt=false` because it performs these checks itself. Protected RPCs remain granted only to `service_role`.
 

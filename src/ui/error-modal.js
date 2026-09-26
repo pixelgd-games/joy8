@@ -120,7 +120,6 @@ function normalizeOptions(options) {
     code: options.code || "JOY8-UNKNOWN-000",
     title: options.title || "目前無法完成操作",
     message: options.message || "系統暫時無法使用，請稍後再試。",
-    error: options.error,
     reload: options.reload,
     primaryAction: options.primaryAction,
   }
