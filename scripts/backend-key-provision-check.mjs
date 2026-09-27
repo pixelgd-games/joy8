@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
+import { resolve } from "node:path"
 import {
   buildRegisterSql,
   buildRevokeSql,
@@ -35,7 +36,7 @@ const delivery = {
   type: "cloudflare-worker",
   secretName: "JOY8_BACKEND_KEY",
   workerName: "example-api",
-  cwd: "D:/provider/backend",
+  cwd: resolve("provider/backend"),
   deployMode: "immediate",
   environment: null,
   config: null
@@ -82,7 +83,7 @@ test("reports Supabase diagnostics without a connection string or key material",
 })
 
 test("constructs a local Wrangler command without putting the secret in arguments", () => {
-  const args = cloudflareSecretArgs(delivery, "D:/provider/backend/node_modules/wrangler/bin/wrangler.js")
+  const args = cloudflareSecretArgs(delivery, resolve("provider/backend/node_modules/wrangler/bin/wrangler.js"))
   assert.deepEqual(args.slice(1), ["secret", "put", "JOY8_BACKEND_KEY", "--name", "example-api"])
   assert.equal(args.join(" ").includes(secret), false)
   const environmentArgs = cloudflareSecretArgs({ ...delivery, environment: "staging" }, "wrangler.js")
