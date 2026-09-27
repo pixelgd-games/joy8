@@ -97,12 +97,13 @@ The game owns its runtime verification in its own `server/README.md`.
 
 ### Guest Data Growth
 
-Guest entry creates a persistent Auth identity, an enrolled player and a wallet
-holding the 100 POINT guest grant; game launch reuses that wallet. Clearing browser
-data and entering again creates another funded guest. Turnstile protects Auth
-entry, but retention, cleanup and broader abuse controls are not defined.
+Guest entry is disabled while the Google allowlist is active. When it is
+re-enabled, each guest entry creates a persistent Auth identity, an enrolled
+player and a wallet holding the 100 POINT guest grant; clearing browser data and
+entering again creates another funded guest. Turnstile protects Auth entry, but
+retention, cleanup and broader abuse controls are not defined.
 
-Before volume grows materially:
+Before re-enabling guests or before volume grows materially:
 
 - Verify guest continuity across the supported browsers and devices.
 - Define retention for guest players, wallets, sessions, matches, settlements,
@@ -132,14 +133,6 @@ their transaction. GRANT and REVOKE use global validation because event metadata
 omits their target objects, and those changes require READ COMMITTED. Disabling
 the guard or skipping role preflight can stop adapters at runtime. The contract
 belongs to [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#product-schema-registration).
-
-### Synchronous Gateway Runtime Cleanup
-
-After a successful `create-session`, the Gateway also calls
-`joy8_cleanup_gateway_runtime` synchronously, in addition to the scheduled
-pg_cron run. Cleanup cost is part of session-creation latency and grows with the
-session and rate-limit tables. If measurements show pressure, rely on the
-scheduled run and add indexes for the cleanup predicates.
 
 ### External Monitoring Not Configured
 
