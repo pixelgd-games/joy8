@@ -3,7 +3,7 @@ import path from "node:path"
 import { spawnSync } from "node:child_process"
 
 assert.ok(process.env.JOY8_TEST_PG_BIN && path.isAbsolute(process.env.JOY8_TEST_PG_BIN), "Release requires JOY8_TEST_PG_BIN pointing to PostgreSQL 17")
-for (const [script, engine] of [["verify.mjs", "pglite"], ["hardening-postgres-check.mjs", "postgres17"]]) {
+for (const [script, engine] of [["verify.mjs", "pglite"], ["hardening-postgres-check.mjs", "postgres17"], ["database-bootstrap-check.mjs", "postgres17"]]) {
   const result = spawnSync(process.execPath, [`scripts/${script}`], { stdio: "inherit", windowsHide: true,
     env: { ...process.env, JOY8_TEST_ENGINE: engine } })
   if (result.error) throw result.error

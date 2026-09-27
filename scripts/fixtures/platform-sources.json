@@ -56,7 +56,8 @@
     "20260927100000_email_play_allowlist.sql",
     "20260928100000_independent_game_entry.sql",
     "20260928101000_catalog_readiness.sql",
-    "20260928102000_mailbox_and_function_permissions.sql"
+    "20260928102000_mailbox_and_function_permissions.sql",
+    "20260928110000_google_only_members.sql"
   ],
   "drafts": [],
   "excluded": {

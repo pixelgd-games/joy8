@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
@@ -15,9 +16,7 @@ let games
 before(async () => { games = await loadMemberPlatformDatabase(db) })
 after(() => db.close())
 
-async function identity() {
-  return (await one("insert into auth.users (is_anonymous) values (true) returning id")).id
-}
+async function identity() { return googleIdentity(db) }
 
 async function serviceQuery(sql, values) {
   const client = await db.connect()
@@ -74,7 +73,7 @@ test("eight simultaneous enrollments create exactly one player and one wallet", 
   const id = await identity()
   const members = successful(await blockedRace({ hold: lockSql, holdValues: [id], work: resolveSql, workValues: [id] }))
   assert.equal(new Set(members.map((member) => member.player_account_id)).size, 1)
-  assert.ok(members.every((member) => member.account_type === "guest"))
+  assert.ok(members.every((member) => member.account_type === "registered"))
   assert.equal((await one("select count(*)::int as count from public.player_accounts where auth_user_id=$1", [id])).count, 1)
   assert.equal((await one("select count(*)::int n from public.wallet_accounts where player_account_id=$1", [members[0].player_account_id])).n, 1)
 })
@@ -90,7 +89,7 @@ test("membership lookup does not wait for an unrelated update on the player row"
     await reader.query("set role service_role; set statement_timeout=1000")
     const result = await reader.query(lookupSql, [id])
     assert.equal(result.rows[0].player_account_id, member.player_account_id)
-    assert.equal(result.rows[0].account_type, "guest")
+    assert.equal(result.rows[0].account_type, "registered")
   } finally {
     await gate.query("rollback")
     await gate.end()
@@ -112,47 +111,6 @@ for (const slug of ["test-game", "independent-game"]) {
     const ledger = await one("select count(*)::int as count, sum(amount) as amount from public.wallet_transactions where wallet_account_id=$1", [sessions[0].wallet_account_id])
     assert.equal(ledger.count, 0)
     assert.equal(Number((await one("select balance from public.wallet_accounts where id=$1", [sessions[0].wallet_account_id])).balance), 0)
-  })
-
-  test(`${slug}: concurrent promotion preserves the wallet, ledger and reservation`, async () => {
-    const id = await identity()
-    const [member] = await serviceQuery(resolveSql, [id])
-    const policy = games.platformPolicy
-    await db.query("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000 where id=$1", [policy])
-    let session
-    try { [session] = await serviceQuery(launchSql, [id]) }
-    finally { await db.query("update public.joy8_wallet_policies set initial_credit=0,guest_initial_credit=0 where id=$1", [policy]) }
-    await reserveMemberWallet(db, session, games.keys.get(session.game_id))
-    const snapshot = async () => ({
-      wallet: await one("select * from public.wallet_accounts where id=$1", [session.wallet_account_id]),
-      ledger: (await db.query("select * from public.wallet_transactions where wallet_account_id=$1 order by id", [session.wallet_account_id])).rows,
-      reservation: await one("select * from public.joy8_match_participants where wallet_account_id=$1", [session.wallet_account_id]),
-    })
-    const before = await snapshot()
-    assert.equal(Number(before.wallet.balance), 1000)
-    assert.equal(Number(before.wallet.locked_balance), 100)
-    assert.equal(before.ledger.length, 1)
-    assert.ok(before.reservation)
-    const members = successful(await blockedRace({
-      hold: "update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1",
-      holdValues: [id], work: resolveSql, workValues: [id],
-    }))
-    assert.ok(members.every((current) => current.player_account_id === member.player_account_id && current.account_type === "registered"))
-    const [registered] = await serviceQuery(launchSql, [id])
-    assert.equal(registered.wallet_account_id, session.wallet_account_id)
-    assert.deepEqual(await snapshot(), before)
-  })
-
-  test(`${slug}: rolled-back Auth promotion leaves queued launches as the same guest`, async () => {
-    const id = await identity()
-    const [member] = await serviceQuery(resolveSql, [id])
-    const sessions = successful(await blockedRace({
-      hold: "with promoted as (update auth.users set is_anonymous=false, email_confirmed_at=now() where id=$1 returning id) update public.player_accounts set status=status where auth_user_id=$1",
-      holdValues: [id], work: launchSql, workValues: [id], release: "rollback",
-    }))
-    assert.ok(sessions.every((session) => session.player_account_id === member.player_account_id && session.account_type === "guest"))
-    assert.equal((await one("select upgraded_at from public.player_accounts where id=$1", [member.player_account_id])).upgraded_at, null)
-    assert.equal(new Set(sessions.map((session) => session.wallet_account_id)).size, 1)
   })
 
   test(`${slug}: a wallet freeze committed first rejects waiting launches without replacement`, async () => {
@@ -212,7 +170,7 @@ test("locking one identity does not block a different player's enrollment", asyn
     await client.query("set role service_role; set statement_timeout=2000")
     const result = await client.query(resolveSql, [second])
     assert.equal(result.rows.length, 1)
-    assert.equal(result.rows[0].account_type, "guest")
+    assert.equal(result.rows[0].account_type, "registered")
   } finally {
     await gate.query("rollback")
     await gate.end()

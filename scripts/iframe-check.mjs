@@ -165,7 +165,7 @@ test("branded reauthorization accepts a fresh correlated request without replayi
   f.load()
   f.ready()
   f.controller.sendLaunch({ joy8_launch_code: "initial" })
-  const request = { type: "joy8-entry-request-v1", method: "guest", requestId: "reauthorize-00001" }
+  const request = { type: "joy8-entry-request-v1", method: "google", requestId: "reauthorize-00001" }
   f.ready({ data: request, source: {} })
   f.ready({ data: request, origin: "https://attacker.example" })
   f.ready({ data: { ...request, requestId: "invalid" } })

@@ -1,6 +1,7 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
-import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -9,25 +10,25 @@ const one = async (sql, values = []) => (await rows(sql, values))[0]
 let existingPlayerId
 
 before(async () => {
-  await loadPreAllowlistPlatform(db)
-  const auth = await one("insert into auth.users (is_anonymous) values (true) returning id")
-  existingPlayerId = (await one("insert into public.player_accounts (auth_user_id, account_type, member_enrolled_at) values ($1, 'guest', now()) returning id", [auth.id])).id
+  await loadCurrentPlatform(db)
+  const auth = { id: await googleIdentity(db) }
+  existingPlayerId = (await one("insert into public.player_accounts (auth_user_id, account_type, member_enrolled_at) values ($1, 'registered', now()) returning id", [auth.id])).id
 })
 
 after(() => db.close())
 
-test("players receive unique six-digit public IDs that survive promotion", async () => {
+test("players receive unique six-digit public IDs that remain stable", async () => {
   const existing = await one("select public_id from public.player_accounts where id=$1", [existingPlayerId])
   assert.match(existing.public_id, /^[1-9][0-9]{5}$/)
 
   const created = []
   for (let index = 0; index < 100; index++) {
-    created.push((await one("insert into public.player_accounts (account_type) values ('guest') returning public_id")).public_id)
+    created.push((await one("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])).public_id)
   }
   assert.equal(new Set(created).size, created.length)
   assert.ok(created.every((publicId) => /^[1-9][0-9]{5}$/.test(publicId)))
 
-  const registeredAuth = await one("insert into auth.users (is_anonymous, email_confirmed_at) values (false, now()) returning id")
+  const registeredAuth = { id: await googleIdentity(db) }
   await db.query("update public.player_accounts set account_type='registered', auth_user_id=$2 where id=$1", [existingPlayerId, registeredAuth.id])
   assert.equal((await one("select public_id from public.player_accounts where id=$1", [existingPlayerId])).public_id, existing.public_id)
 })

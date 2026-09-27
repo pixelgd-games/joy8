@@ -1,12 +1,13 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createLocalPostgres()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 before(async () => {
-  await loadPreAllowlistPlatform(db)
+  await loadCurrentPlatform(db)
 })
 after(() => db.close())
 
@@ -15,10 +16,10 @@ test("held candidate and former global lock do not block another enrollment", as
   const client = await db.connect()
   try {
     await gate.query("begin; select setseed(0.31)")
-    const held = (await gate.query("insert into public.player_accounts(account_type) values('guest') returning public_id")).rows[0].public_id
+    const held = (await gate.query("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])).rows[0].public_id
     await gate.query("select pg_advisory_xact_lock(75080001)")
     await client.query("set statement_timeout=2000; select setseed(0.31)")
-    const auth = await one("insert into auth.users(is_anonymous) values(true) returning id")
+    const auth = { id: await googleIdentity(db) }
     await client.query("set role service_role")
     const member = (await client.query("select * from public.joy8_resolve_member_profile($1,true)", [auth.id])).rows[0]
     assert.match(member.public_id, /^[1-9][0-9]{5}$/)
@@ -36,7 +37,7 @@ test("concurrent enrollments with identical candidate sequences remain unique", 
   const clients = await Promise.all(Array.from({ length: 12 }, () => db.connect()))
   try {
     const identities = []
-    for (const client of clients) identities.push((await client.query("insert into auth.users(is_anonymous) values(true) returning id")).rows[0])
+    for (const client of clients) identities.push({ id: await googleIdentity(db) })
     await Promise.all(clients.map(client => client.query("begin; set local role service_role; select setseed(0.72)")))
     const members = await Promise.all(clients.map(async (client, index) => {
       const member = (await client.query("select * from public.joy8_resolve_member_profile($1,true)", [identities[index].id])).rows[0]
@@ -56,12 +57,12 @@ test("rolled-back allocation releases its candidate without changing existing ID
   const gate = await db.connect()
   try {
     await gate.query("begin; select setseed(0.19)")
-    const first = (await gate.query("insert into public.player_accounts(account_type) values('guest') returning public_id")).rows[0].public_id
+    const first = (await gate.query("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])).rows[0].public_id
     await gate.query("rollback; select setseed(0.19)")
-    const retry = (await gate.query("insert into public.player_accounts(account_type) values('guest') returning public_id")).rows[0].public_id
+    const retry = (await gate.query("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])).rows[0].public_id
     assert.equal(retry, first)
     await gate.query("select setseed(0.19)")
-    const next = (await gate.query("insert into public.player_accounts(account_type) values('guest') returning public_id")).rows[0].public_id
+    const next = (await gate.query("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])).rows[0].public_id
     assert.notEqual(next, retry)
     assert.equal((await one("select count(*)::int n from public.player_accounts where public_id=$1", [retry])).n, 1)
   } finally { await gate.end() }

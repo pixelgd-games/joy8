@@ -1,7 +1,8 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from 'node:assert/strict'
 import { before, after, test } from 'node:test'
 import { createTestDatabase } from './fixtures/test-database.mjs'
-import { loadPreAllowlistPlatform } from './fixtures/platform-bundle.mjs'
+import { loadCurrentPlatform } from './fixtures/platform-bundle.mjs'
 
 const origin = 'https://joy8.cc'
 let db, game, member, user
@@ -22,9 +23,9 @@ async function denied(action, pattern) {
 
 before(async () => {
   db = await createTestDatabase()
-  await loadPreAllowlistPlatform(db)
+  await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='monster-lab'")).id
-  user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
+  user = await googleIdentity(db)
   member = (await one('select * from public.joy8_resolve_member($1,true)', [user])).player_account_id
 })
 after(async () => db?.close())
@@ -41,7 +42,7 @@ test('public launch still rejects a hidden game', () => isolated(async () => {
   await denied(() => one("select * from public.create_game_session('monster-lab',$1)", [user]), /game is not available/)
 }))
 
-test('guest keeps the same identity and wallet on repeated entry without approval', () => isolated(async () => {
+test('member keeps the same identity and wallet on repeated entry without approval', () => isolated(async () => {
   await db.exec('set role service_role')
   const a = (await launch()).result, b = (await launch()).result
   await db.exec('reset role')
@@ -63,22 +64,22 @@ test('wrong origin, unknown game and disabled entry are rejected', () => isolate
   assert.equal(Number((await one('select count(*) n from public.game_sessions')).n), 0)
 }))
 
-test('any enrolled guest or registered member enters with their own identity and wallet', () => isolated(async () => {
+test('each enrolled Google member enters with their own identity and wallet', () => isolated(async () => {
   const first = (await launch()).result
   for (const anonymous of [true, false]) {
-    const other = (await one('insert into auth.users(is_anonymous,email_confirmed_at) values($1,case when $1 then null else now() end) returning id', [anonymous])).id
+    const other = await googleIdentity(db)
     const otherMember = (await one('select * from public.joy8_resolve_member($1,true)', [other])).player_account_id
     const session = (await launch(other)).result
     assert.equal(session.player_account_ref, otherMember)
     assert.notEqual(session.player_account_ref, first.player_account_ref)
-    assert.equal(session.account_type, anonymous ? 'guest' : 'registered')
+    assert.equal(session.account_type, 'registered')
   }
   assert.equal(Number((await one('select count(distinct player_account_id) n from public.game_sessions')).n), 3)
 }))
 
 test('missing identity and missing enrollment cannot create a wallet or session', () => isolated(async () => {
-  await denied(() => launch(null), /verified member identity is required/)
-  const other = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
+  await denied(() => launch(null), /JOY8_EMAIL_NOT_ALLOWED/)
+  const other = await googleIdentity(db)
   await denied(() => launch(other), /player membership is required/)
   assert.equal(Number((await one('select count(*) n from public.game_sessions')).n), 0)
   assert.equal(Number((await one('select count(*) n from public.player_accounts where auth_user_id=$1', [other])).n), 0)
@@ -110,7 +111,7 @@ test('an exchange/renew-only backend exchanges once, sees the grant and cannot o
   const request = { version: 1, launch_code: session.launch_code }
   const result = (await one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb) result", [key, JSON.stringify(request)])).result
   assert.equal(result.player_account_ref, member)
-  assert.equal(Number((await one('select * from public.wallet_get_balance($1)', [result.gateway_token])).balance), 100)
+  assert.equal(Number((await one('select * from public.wallet_get_balance($1)', [result.gateway_token])).balance), 1000)
   await denied(() => one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [key, JSON.stringify(request)]), /JOY8_SESSION_INVALID/)
   await denied(() => one("select public.joy8_backend_game($1,'open')", [key]), /JOY8_BACKEND_UNAUTHORIZED/)
 }))

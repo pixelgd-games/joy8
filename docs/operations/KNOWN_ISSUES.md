@@ -38,7 +38,7 @@ must still implement and verify authoritative gameplay before activation.
   [mailbox operating procedure](../platform/MAILBOX.md#operator-workflow)
   before operational use. There is no purchase/funding API; immutable gameplay
   records cannot be edited to repair an accounting discrepancy.
-- The six-digit public-ID capacity and guest abuse/retention policy remain
+- The six-digit public-ID capacity and account retention policy remain
   explicit release limits. Do not delete identities, recycle IDs or expand the
   namespace without a reviewed product/database change.
 - Facebook remains disabled; provider sign-in without an email address is not
@@ -85,42 +85,13 @@ Remaining acceptance:
 
 The game owns its runtime verification in its own `server/README.md`.
 
-## Member and Guest Risks
+## Member Risks
 
-- Guest-to-Google linking, provider-conflict preservation and cross-browser guest
-  continuity have not passed hosted acceptance. Isolated SQL tests do not prove
-  real provider linking.
-- Account-deletion requests are not implemented.
-- The identity design and unresolved choices are owned by
-  [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md). Do not invent a
-  game-specific wallet, guest-retention, or currency-conversion policy here.
+Account closure and retention remain product decisions. Google is the only
+supported member provider; Guest/Facebook/linking implementations are removed.
+Real outside-list Google rejection still needs provider acceptance. Automated
+Hook, Gateway and SQL checks do not stand in for that provider interaction.
 
-### Guest Data Growth
-
-Guest entry is disabled while the Google allowlist is active. When it is
-re-enabled, each guest entry creates a persistent Auth identity, an enrolled
-player and a wallet holding the 100 POINT guest grant; clearing browser data and
-entering again creates another funded guest. Turnstile protects Auth entry, but
-retention, cleanup and broader abuse controls are not defined.
-
-Before re-enabling guests or before volume grows materially:
-
-- Verify guest continuity across the supported browsers and devices.
-- Define retention for guest players, wallets, sessions, matches, settlements,
-  and transactions.
-- Define which records may be deleted and which must remain auditable.
-
-### Public Player ID Capacity
-
-`player_accounts.public_id` is a unique six-digit number from `100000` through
-`999999`, so the namespace contains 900,000 values. The allocator tries at most
-128 random candidates with indexed collision checks and candidate-specific locks;
-collision pressure can cause failures before absolute exhaustion.
-
-Before the platform approaches that capacity, approve and migrate to a larger
-public namespace. Public IDs must not be recycled, accepted as credentials, or
-used in place of the internal player UUID for authorization, wallets, settlement,
-or game-owned identity mapping.
 
 ## Scale and Operations
 
@@ -146,8 +117,7 @@ reviewed monitor to the health route, not to session creation, and follow
 
 `create-session` requires an allowed Origin and all routes use database-backed
 rate limits. This blocks common cross-origin misuse but Origin is not an
-unforgeable client identity, and Turnstile protects guest Auth only, not session
-issuance. If production evidence shows Gateway abuse, evaluate edge protection,
+unforgeable client identity. If production evidence shows Gateway abuse, evaluate edge protection,
 device attestation, or a stronger issuance design with a privacy review.
 
 ### Forwarded Client Address Trust Is Unverified
@@ -179,20 +149,17 @@ Not automated:
 - Full Admin create, edit, publish, ordering and form-validation acceptance.
   Local browser smoke covers load failure, missing records, metadata preservation,
   duplicate-submit prevention and retry after a rejected save.
-- Browser-level member-versus-guest session behavior.
 - Accessibility behavior for modal focus and keyboard navigation.
-- Hosted Auth, real provider linking, production load and backup restoration.
+- Hosted Auth, production load and managed backup/PITR restoration.
 
-## Database Recovery Limitation
+## Database Recovery Boundary
 
-The repository intentionally has no baseline migration. Existing migrations
-assume earlier catalog and admin objects already exist. `supabase/config.toml`
-points to a default `./seed.sql` that does not exist. A fresh local project cannot
-be reconstructed from this repository, and disaster recovery depends on Supabase
-backup and restore.
+A current empty-project bootstrap and native schema/data restore verification are
+provided. The hosted snapshot tool restores Auth, platform and registered product
+data locally and checks accounting and permission boundaries. These tools do not
+re-create provider secrets, external game services or managed Supabase backup/PITR.
+See [README.md](../../README.md#fresh-database-and-recovery) for commands and limits.
 
-- Do not create a large baseline migration automatically or reset the hosted database.
-- Before production launch, document and test backup, restore, and disaster-recovery procedures.
 
 ## User Experience and Maintainability
 

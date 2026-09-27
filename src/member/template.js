@@ -21,10 +21,6 @@ export const memberCardMarkup = `
               </span>
               <span id="google-label">使用 Google 登入</span>
             </button>
-            <button id="facebook-button" type="button" class="account-facebook" hidden>
-              <span class="account-button-icon account-facebook-icon" aria-hidden="true">f</span>
-              <span id="facebook-label">使用 Facebook 登入</span>
-            </button>
           </div>
           <p class="account-note">目前僅限白名單 Google 帳號遊玩；大廳開放瀏覽。</p>
         </div>

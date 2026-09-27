@@ -36,7 +36,9 @@
     "test:gateway": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/gateway-unit-check.mjs",
     "test:gateway-rate": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test scripts/gateway-rate-limit-check.mjs",
     "smoke:gateway": "node scripts/gateway-security-smoke.mjs",
-    "verify:release": "node scripts/release-check.mjs"
+    "verify:release": "node scripts/release-check.mjs",
+    "db:bootstrap:export": "node scripts/export-database-bootstrap.mjs",
+    "test:recovery": "node scripts/database-bootstrap-check.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",

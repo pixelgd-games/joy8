@@ -1,12 +1,13 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createLocalPostgres()
 before(async () => {
-  await loadPreAllowlistPlatform(db)
+  await loadCurrentPlatform(db)
 })
 after(() => db.close())
 
@@ -23,7 +24,7 @@ test("a candidate committed between the two reads releases its rejected lock", a
     const candidate = (await gate.query("select (floor(random()*900000)+100000)::int::text id")).rows[0].id
     const pid = (await client.query("select pg_backend_pid() pid")).rows[0].pid
     await client.query("begin; set local statement_timeout=5000; select setseed(0.51)")
-    pending = client.query("insert into public.player_accounts(account_type) values('guest') returning public_id")
+    pending = client.query("insert into public.player_accounts(account_type,auth_user_id) values('registered',$1) returning public_id", [await googleIdentity(db)])
     pending.catch(() => {})
     let waiting = false
     for (let attempt = 0; attempt < 100; attempt++) {
@@ -32,7 +33,7 @@ test("a candidate committed between the two reads releases its rejected lock", a
       await delay(20)
     }
     assert.equal(waiting, true, "allocator must pause after its first candidate lookup")
-    await gate.query("insert into public.player_accounts(account_type,public_id) values('guest',$1)", [candidate])
+    await gate.query("insert into public.player_accounts(account_type,public_id,auth_user_id) values('registered',$1,$2)", [candidate, await googleIdentity(db)])
     await gate.query("select pg_advisory_unlock(75080004)")
     const assigned = (await pending).rows[0].public_id
     assert.notEqual(assigned, candidate)

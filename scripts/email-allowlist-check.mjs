@@ -1,20 +1,20 @@
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { after, before, test } from "node:test"
-import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
 let admin, player, guest
 before(async () => {
-  await loadPreAllowlistPlatform(db)
+  await loadCurrentPlatform(db)
   await db.exec("insert into public.admin_users(email) values('admin@example.test')")
   admin = (await one("insert into auth.users(email,email_confirmed_at) values('admin@example.test',now()) returning id")).id
   player = (await one("insert into auth.users(email,email_confirmed_at) values('Player@Example.test',now()) returning id")).id
   guest = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
   await db.query("insert into auth.identities values($1,'google'),($2,'google')", [admin, player])
-  await db.exec(await readFile("supabase/migrations/20260927100000_email_play_allowlist.sql", "utf8"))
+  await db.exec("insert into public.joy8_email_allowlist(email) values('admin@example.test')")
   await db.exec("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,funding_mode) select g.id,p.id,true,10000,100000,'platform' from public.games g cross join public.joy8_wallet_policies p where g.slug='test-game'")
 })
 after(() => db.close())

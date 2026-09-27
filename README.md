@@ -16,13 +16,13 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
 
 - Public Lobby browsing, Google member entry, six-digit public player IDs,
   the shared POINT wallet and trusted settlement are deployed.
-- Facebook sign-in is implemented but disabled. The sign-in decision is owned by
+- Google is the only supported member provider. The sign-in decision is owned by
   [MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope).
 - The in-app mailbox, administrator composer and claim-once POINT attachments
   are deployed. See [MAILBOX.md](docs/platform/MAILBOX.md) for operation and the
   remaining real-player acceptance boundary.
 - The POINT rules in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md#wallet-and-point-direction)
-  are installed: enrollment grants and one-time Google top-up, per-game minimum
+  are installed: one-time Google enrollment grants, per-game minimum
   bet, maximum bet (at most 10,000 POINT) and per-round payout limit for
   platform-funded games.
 - Game sessions last 12 hours; launch codes last 2 minutes; balance tokens last
@@ -45,7 +45,7 @@ Joy8 currently provides:
   protected game metadata and artwork; Joy8 retains enrollment and session authority.
 - A reusable Lobby dialog for Google entry, with explicit
   player enrollment. `/account/` is a narrow Auth return trampoline back to that
-  dialog. The Facebook button is built but hidden.
+  dialog.
 - A stable six-digit public player ID displayed as `Player 123456`, separate
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
@@ -59,8 +59,8 @@ Joy8 currently provides:
 Joy8 does not currently provide:
 
 - Email/password sign-in or any outbound authentication email.
-- Hosted Facebook sign-in.
-- Hosted guest-to-provider linking or end-to-end public branded-entry acceptance.
+- Other member providers or guest accounts.
+- End-to-end public branded-entry acceptance.
 - POINT purchase, withdrawal, transfer or cash conversion.
 - Full analytics, dashboards, or unattended alerting.
 - A game runtime or game-specific business logic.
@@ -162,8 +162,7 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    label is only a temporary fallback while membership is resolving. The control
    opens the shared member dialog over the unchanged Lobby.
 2. Cards are rendered from database metadata.
-3. Selecting a game checks membership. Enrolled registered players and persistent
-   guests continue to `/game/?slug=<slug>`. Other visitors see the member dialog
+3. Selecting a game checks membership. Enrolled registered players continue to `/game/?slug=<slug>`. Other visitors see the member dialog
    with the chosen game named. Google entry preserves that
    destination; closing cancels it.
 4. Missing cover images use the platform fallback behavior.
@@ -193,8 +192,7 @@ Google uses PKCE and explicit callback exchange. The public member UI does not
 offer Email/password signup, sign-in, verification, or recovery. Guest creation
 is disabled in the prepared frontend; the reviewed signup hook and anonymous
 Auth setting enforce this server-side at rollout. Logout is local to the selected Auth
-session and does not create a replacement guest. Clearing storage can lose guest
-access.
+session and does not create a replacement guest. Guest creation and provider linking are not implemented.
 
 The Auth trampoline forwards the one-use OAuth code from `/account/` in a URL
 fragment, not another query. The Lobby or branded entry removes that fragment
@@ -205,12 +203,12 @@ callback queries in analytics or access-log exports.
 `POST /member` resolves existing enrollment; `POST /enroll-member` explicitly
 enrolls the authenticated identity. Both take an empty JSON object, require an
 allowed Origin and server-verified bearer token, and return
-`{ "member": { "player_account_ref": "...", "public_id": "482731", "account_type": "guest|registered" } }`.
+`{ "member": { "player_account_ref": "...", "public_id": "482731", "account_type": "registered" } }`.
 `player_account_ref` is the internal UUID used for authorization and backend
 mapping. `public_id` is a presentation identifier, not a credential, launch field,
 or settlement key. The read route may return `{ "member": null }` and never
 writes. `enroll-member` creates the player's wallet and enrollment grant, and
-applies the one-time top-up when a guest has linked Google.
+never creates a guest or a promotion grant.
 
 ### Administration
 
@@ -300,9 +298,10 @@ schema registered in `joy8_product_schemas`. pg_cron runs
 `joy8_cleanup_gateway_runtime()` every ten minutes; it expires credentials and
 rate-limit rows without releasing reservations or deleting financial history.
 
-The repository has no baseline migration. Existing migrations are incremental
-and cannot reconstruct the full local database alone. Every migration file on
-disk must match a hosted migration version (`migration list --linked`).
+New projects use `supabase/bootstrap/platform.sql`, a current platform schema
+with the POINT policy and no user, financial, catalog or credential data. Existing
+projects continue using incremental migrations. Applied historical migrations
+remain immutable deployment history; do not replay them into a fresh project.
 
 ## Local Development
 
@@ -315,9 +314,6 @@ Requirements:
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
 ```
-
-Leave `VITE_FACEBOOK_AUTH_ENABLED` unset so Facebook entry stays hidden; see
-[Deployment](#deployment).
 
 Production builds reject missing variables, another Supabase project,
 privileged keys. Google OAuth does not use a client CAPTCHA token; Turnstile
@@ -364,7 +360,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `node --test scripts/email-allowlist-check.mjs scripts/reviewed-cleanup-check.mjs scripts/mahjong-release-policy-check.mjs` | Applied whitelist/cleanup/reserve SQL and pending Mahjong payout/key drafts; isolated fixtures only |
 | `npm run test:member` / `test:iframe` | Member flow and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
-| `npm run test:member-db` / `test:member-pg` | Enrollment, grants, promotion, launch and wallet concurrency |
+| `npm run test:member-db` / `test:member-pg` | Enrollment, one-time grants, launch and wallet concurrency |
 | `npm run test:mailbox` | Mailbox audience snapshot, permissions, read/claim states, atomic credit and retries on the current schema; set `JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN` for competing connections |
 | `npm run test:public-id` / `test:member-product-db` / `test:member-product-pg` | Public IDs and product-schema registration |
 | `npm run test:platform-db` / `test:platform-pg` | Reservation, settlement, fees, frozen wallets and adapter isolation |
@@ -377,7 +373,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `npm run test:sdk` / `test:backend-key` | SDK surface, provider kit and Backend Key operator |
 
 These tests use synthetic data. They do not prove hosted Auth, real provider
-linking, production capacity or backup restoration.
+interaction, production capacity or backup restoration.
 
 `npm run smoke:gateway` checks hosted health and rejection paths. It creates no
 business data but changes rate counters; hosted execution requires
@@ -395,14 +391,38 @@ failure, never an automatic PGlite fallback.
 
 ### Fresh database and recovery
 
-The synthetic platform bundle is an isolated contract fixture, not a production
-bootstrap. A new Supabase project requires an exported current schema and roles,
-reviewed extension/product dependencies, and separately recreated Auth, Hook,
-Gateway secrets and catalog policies. Restore schema and any approved data into
-an isolated project, then check grants, identity references and ledger totals.
-Never replay historical cleanup or credential migrations into a new project.
-Do not replace the live database to remove migration history. The hosted recovery
-acceptance remains open until a real isolated restore succeeds.
+`supabase/bootstrap/platform.sql` installs the current Joy8 platform on an empty
+Supabase database with its vendor Auth schema and roles already present. It
+refuses an existing Joy8 catalog. It is deliberately outside automatic migration
+discovery. Regenerate it with `npm run db:bootstrap:export` after runtime SQL changes.
+`npm run test:recovery` installs it from scratch, creates a synthetic Google
+member, dumps schema/data, restores a second native PostgreSQL 17 database and
+checks identity, balances, ledger, permissions and grant idempotency.
+
+Both commands require `JOY8_TEST_PG_BIN`; `JOY8_PG_CLIENT_BIN` may specify a
+separate PostgreSQL 17 directory containing `pg_dump`. Release verification also
+runs the bootstrap/restore check. CI runs normal verification, native PostgreSQL
+and recovery on every main push and pull request. Cloudflare's Git deployment is
+independent of CI; the operator must pass `verify:release` before pushing.
+
+For a real read-only hosted snapshot, run the project check and
+`scripts/supabase-joy8.cmd recovery-snapshot`. The wrapper verifies the Joy8 project;
+the tool uses a consistent PostgreSQL snapshot, verifies TLS and saves Auth,
+platform and registered product schemas/data plus permission metadata under
+`.recovery.local/`. It immediately restores to an isolated local PostgreSQL 17
+process and checks row counts, product permissions, DDL guards and financial
+reconciliation. `node scripts/restore-snapshot.mjs <snapshot-directory>` repeats
+only the local restore. Snapshot files contain sensitive data: they remain
+ignored, local and outside source control. This does not test Supabase's managed
+backup/PITR service or re-create its infrastructure.
+
+A fresh hosted project still needs separately provisioned administrator and
+allowlist entries, catalog/policies, game-owned schemas, Backend Keys, Auth
+provider/Hook settings, Gateway secrets, Edge deployment and DNS/redirect settings.
+Use the owning product's current schema; never replay old activation, credential
+or player-cleanup migrations. Enable the runtime cleanup job with the reviewed
+pg_cron schedule only after platform installation. Never reset the live database
+to simplify its history.
 
 The migration owner creates new functions without implicit PUBLIC, anon,
 authenticated or service-role execution in `public`; each exposed function must
@@ -496,8 +516,6 @@ for the complete safety rules.
 - Build command: `npm run build`.
 - Output directory: `dist`.
 - Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-- Set `VITE_FACEBOOK_AUTH_ENABLED=true` only after the hosted Facebook provider
-  and its conflict-safe sign-in/linking flow pass acceptance. Omit it otherwise.
 - `public/_headers` denies framing, limits scripts to this origin and API
   connections to Joy8 Supabase, disables objects/base overrides, and sends no
   referrer. Game frames allow HTTPS because approved games use separate hosts.
@@ -524,7 +542,7 @@ for the complete safety rules.
 | `README.md` | Current repository implementation and operation |
 | `docs/product/PRODUCT_SCOPE.md` | Product boundaries, approved direction, POINT rules and priorities |
 | `docs/platform/GAME_PLATFORM_INTEGRATION.md` | Joy8-to-game runtime contract |
-| `docs/platform/MEMBER_AUTH_PLAN.md` | Sign-in decision, member, persistent guest and branded-entry identity |
+| `docs/platform/MEMBER_AUTH_PLAN.md` | Google sign-in, member and branded-entry identity |
 | `docs/platform/MAILBOX.md` | In-app mailbox, administrator workflow, claim accounting and activation procedure |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |

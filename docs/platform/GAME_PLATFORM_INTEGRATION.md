@@ -53,7 +53,7 @@ CrazyGames-specific requirements are in `CRAZYGAMES_INTEGRATION.md`.
 | Concern | Joy8 Platform | Game |
 | --- | --- | --- |
 | Game catalog and published status | Owns | Does not own |
-| Member or guest identity | Owns | Does not own |
+| Member identity | Owns | Does not own |
 | Session and token issuance | Owns | Consumes |
 | Wallet balance and transactions | Owns | Reads through authorized sessions; operational mutations require a trusted backend |
 | Loader iframe shell | Owns | Does not own |
@@ -134,9 +134,8 @@ itself when withdrawing access.
 
 Joy8's `/entry/?slug=...` is a platform-controlled shell with no visible Joy8
 lobby. It authenticates Google and checks the email allowlist before loading the game iframe.
-The iframe sends `{type:"joy8-entry-request-v1",method:"google",requestId}` or the
-same message with `method:"guest"`, from the configured frame window and origin.
-Guest requests are rejected with `JOY8_GUEST_DISABLED` during the whitelist phase.
+The iframe sends `{type:"joy8-entry-request-v1",method:"google",requestId}`
+from the configured frame window and origin. Other methods are ignored.
 `requestId` is a fresh in-memory random identifier of 16–80 ASCII letters, digits,
 underscores or hyphens for each explicit login/relogin action. The parent permits
 only one in-flight request and ignores immediate duplicates. It retains the
@@ -263,7 +262,7 @@ Relevant response fields:
   "player_account_ref": "...",
   "launch_code": "...",
   "launch_code_expires_at": "...",
-  "account_type": "guest",
+  "account_type": "registered",
   "currency": "POINT",
   "protocol": "server-v1",
   "expires_at": "..."
@@ -782,8 +781,8 @@ On failure:
 ## Member and Direct Entry Boundary
 
 The source requires an authenticated, enrolled, allowlisted Google member before
-launch. Guest entry is suspended. Authentication, provider login, guest identity,
-linking and branded entry are platform responsibilities.
+launch. Only Google members are supported. Authentication and branded entry are
+platform responsibilities.
 
 Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Joy8 session contract without copying identity-provider logic into the game.
 

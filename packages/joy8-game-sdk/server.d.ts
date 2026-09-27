@@ -3,7 +3,7 @@ export interface Joy8Session {
   readonly sessionId: string
   readonly gameId: string
   readonly playerAccountRef: string
-  readonly accountType: string
+  readonly accountType: "registered"
   readonly walletScope: "platform"
   readonly currency: "POINT"
   readonly gatewayToken: string

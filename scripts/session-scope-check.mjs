@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, afterEach, before, beforeEach, test } from "node:test"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
@@ -10,7 +11,7 @@ const active = async (...args) => (await db.query(`select * from public.joy8_act
 
 before(async () => {
   const games = await loadMemberPlatformDatabase(db)
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
   session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   const access = await one("select public.joy8_server_session_v1($1,'exchange',$2::jsonb) result", [games.keys.get(games.game), JSON.stringify({ version: 1, launch_code: session.launch_code })])

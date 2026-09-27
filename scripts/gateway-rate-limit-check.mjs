@@ -16,7 +16,7 @@ const admit = (route, request = {}, key = secret, auth = null, client = db) => c
 before(async () => {
   await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("update public.joy8_wallet_policies set enabled=true,initial_credit=1000,guest_initial_credit=1000 returning id")).id
+  const policy = (await one("update public.joy8_wallet_policies set enabled=true,initial_credit=1000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount) values($1,$2,true,1000,1000)", [game, policy])
   for (const key of [secret, rotated]) await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'])", [game,key])
   const otherGame = (await one("select id from public.games where slug='hidden-game'")).id
@@ -284,6 +284,6 @@ test("session creation returns database allowlist and guest denials through the 
   await db.query("update auth.users set is_anonymous=true where id=$1", [auth])
   const guestDenied = await launch()
   assert.equal(guestDenied.status, 403)
-  assert.deepEqual(await guestDenied.json(), { error: "verified member identity is required" })
+  assert.deepEqual(await guestDenied.json(), { error: "JOY8_GUEST_DISABLED" })
   assert.equal((await one("select count(*)::int n from public.game_sessions s join public.player_accounts p on p.id=s.player_account_id where p.auth_user_id=$1", [auth])).n, 1)
 })

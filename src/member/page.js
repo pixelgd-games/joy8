@@ -1,31 +1,27 @@
 import { createMemberAuthFlow } from "./auth-flow.js"
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
-import { createMemberService, memberErrorMessage, providerLabel } from "./service.js"
+import { createMemberService, memberErrorMessage } from "./service.js"
 
 export function initMemberPanel(root, options = {}) {
   const $ = (id) => root.querySelector(`#${id}`)
   const params = options.params ?? new URLSearchParams()
-  const facebookEnabled = options.facebookEnabled ?? import.meta.env.VITE_FACEBOOK_AUTH_ENABLED === "true"
-  const providerParam = params.get("provider")
-  const callbackProvider = providerParam === "google" || (facebookEnabled && providerParam === "facebook") ? providerParam : null
   const authCode = params.get("code")
   const callbackError = params.has("error") || params.has("error_code")
   const service = createMemberService(memberSupabase, {
     origin: location.origin,
     next: params.get("next"),
   })
-  const memberFlow = createMemberAuthFlow(service, { isActive: () => !disposed, onRetained: async () => { status("已保留目前的訪客帳號，沒有合併或轉移任何資料。"); await refresh() } })
+  const memberFlow = createMemberAuthFlow(service, { isActive: () => !disposed })
   const entryDescription = $("account-description").textContent
   let user = null
   let busy = false
   let disposed = false
 
-  $("facebook-button").hidden = !facebookEnabled
 
 
   if (authCode || callbackError) {
-    const label = providerLabel(callbackProvider)
+    const label = "Google"
     $("account-title").textContent = callbackError ? "登入沒有完成" : "正在完成登入"
     $("account-description").textContent = callbackError ? "你可以重新選擇登入方式。" : "請稍候，馬上帶你回到 Joy8。"
     $("account-description").hidden = false
@@ -46,7 +42,7 @@ export function initMemberPanel(root, options = {}) {
       await action()
     } catch (error) {
       if (!disposed) {
-        status(memberErrorMessage(error, callbackProvider), true)
+        status(memberErrorMessage(error), true)
         $("account-status").focus()
       }
     } finally {
@@ -61,19 +57,14 @@ export function initMemberPanel(root, options = {}) {
   async function refresh() {
     user = (await service.session())?.user ?? null
     if (disposed) return
-    const guest = user?.is_anonymous === true
-    $("account-title").textContent = guest ? "訪客帳號" : user ? "我的帳號" : "登入 Joy8"
-    $("account-description").textContent = guest
-      ? `綁定 ${facebookEnabled ? "Google 或 Facebook" : "Google"} 後，可在其他裝置找回進度。`
-      : user ? "" : entryDescription
+    $("account-title").textContent = user ? "我的帳號" : "登入 Joy8"
+    $("account-description").textContent = user ? "" : entryDescription
     $("account-description").hidden = !$("account-description").textContent
     $("identity-summary").hidden = !user
-    $("signin-options").hidden = Boolean(user && !guest)
+    $("signin-options").hidden = Boolean(user)
     $("continue-link").hidden = true
     $("enroll-button").hidden = true
-    $("google-label").textContent = guest ? "綁定 Google，保留進度" : "使用 Google 登入"
-    $("facebook-label").textContent = guest ? "綁定 Facebook，保留進度" : "使用 Facebook 登入"
-    $("identity-label").textContent = guest ? "目前以訪客身分登入" : user?.email || "已登入 Joy8"
+    $("identity-label").textContent = user?.email || "已登入 Joy8"
     if (!user) return
     const member = await service.membership()
     if (disposed) return
@@ -87,7 +78,6 @@ export function initMemberPanel(root, options = {}) {
   }
 
   $("google-button").addEventListener("click", () => startProvider("google"))
-  if (facebookEnabled) $("facebook-button").addEventListener("click", () => startProvider("facebook"))
 
   $("enroll-button").addEventListener("click", () => run(async () => {
     await service.membership(true)
@@ -100,7 +90,6 @@ export function initMemberPanel(root, options = {}) {
   }))
 
   $("signout-button").addEventListener("click", () => run(async () => {
-    if (user?.is_anonymous && !window.confirm("登出後可能無法找回這個訪客進度。建議先綁定 Google，確定仍要登出？")) return
     await memberFlow.signOut()
     await refresh()
     status("已登出，請選擇登入方式。")

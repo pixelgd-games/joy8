@@ -93,6 +93,11 @@ if (!$isProjectsList) {
 
 $isDbQuery = $SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "db" -and $SupabaseArgs[1] -eq "query"
 
+if ($SupabaseArgs[0] -eq "recovery-snapshot") {
+  & node (Join-Path $PSScriptRoot "recovery-snapshot.mjs")
+  exit $LASTEXITCODE
+}
+
 if ($SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "auth-config") {
   & node (Join-Path $PSScriptRoot "auth-config-joy8.mjs") @($SupabaseArgs | Select-Object -Skip 1)
   exit $LASTEXITCODE

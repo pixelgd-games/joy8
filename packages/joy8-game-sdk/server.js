@@ -154,7 +154,7 @@ function sessionResponse(payload, expectedGameId) {
   return validateResponse("session", () => {
     requireAllowedKeys(payload, ["version", "session_id", "game_id", "player_account_ref", "account_type", "wallet_scope", "currency", "gateway_token", "gateway_token_expires_at", "expires_at", "scopes"], ["version", "session_id", "game_id", "player_account_ref", "account_type", "wallet_scope", "currency", "gateway_token", "gateway_token_expires_at", "expires_at", "scopes"], "session response")
     if (payload.version !== 1 || requireUuid(payload.game_id, "game_id") !== expectedGameId
-      || !["guest", "registered"].includes(payload.account_type)
+      || payload.account_type !== "registered"
       || payload.wallet_scope !== "platform" || payload.currency !== CURRENCY
       || !Array.isArray(payload.scopes) || payload.scopes.length !== 1 || payload.scopes[0] !== "balance") {
       throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 session response does not match trusted configuration")

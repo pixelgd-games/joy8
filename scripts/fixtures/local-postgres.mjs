@@ -66,11 +66,23 @@ export async function createLocalPostgres() {
     await command("initdb", ["-D", data, "-U", "joy8_test", "-A", "scram-sha-256", "--pwfile", passwordFile, "--encoding=UTF8", "--locale=C"])
     await rm(passwordFile)
     startAttempted = true
-    await command("pg_ctl", ["-D", data, "-l", path.join(directory, "server.log"), "-o", `-h 127.0.0.1 -p ${port}`, "-w", "-t", "20", "start"])
+    const socket = process.platform === "win32" ? "" : ` -k ${directory}`
+    await command("pg_ctl", ["-D", data, "-l", path.join(directory, "server.log"), "-o", `-h 127.0.0.1 -p ${port}${socket}`, "-w", "-t", "20", "start"])
     const client = await connect()
     const version = (await client.query("show server_version_num")).rows[0].server_version_num
     assert.ok(Number(version) >= 170000 && Number(version) < 180000)
-    return { exec: (sql) => client.query(sql), query: (sql, values) => client.query(sql, values), connect, close }
+    return {
+      exec: (sql) => client.query(sql), query: (sql, values) => client.query(sql, values), connect, close,
+      dump: async (args = []) => {
+        const clientBin = process.env.JOY8_PG_CLIENT_BIN || bin
+        const result = await run(path.join(clientBin, process.platform === "win32" ? "pg_dump.exe" : "pg_dump"),
+          ["--no-owner", "--no-comments", ...args], {
+            windowsHide: true, timeout: 60000, maxBuffer: 32 * 1024 * 1024,
+            env: { ...process.env, PGHOST: "127.0.0.1", PGPORT: String(port), PGDATABASE: "postgres", PGUSER: "joy8_test", PGPASSWORD: password, PGSSLMODE: "disable" },
+          })
+        return result.stdout
+      },
+    }
   } catch (error) {
     try { await close() } catch (cleanupError) { throw new AggregateError([error, cleanupError], `Local PostgreSQL startup or cleanup failed; inspect ${directory}`) }
     throw error

@@ -145,7 +145,7 @@ describe("Joy8 server SDK", () => {
       calls.push({ route, body, headers: options.headers })
       if (route === "server-exchange-v1" || route === "server-renew-v1") return response({
         version: 1, session_id: sessionId, game_id: gameId, player_account_ref: playerId,
-        account_type: "guest", wallet_scope: "platform", currency: "POINT",
+        account_type: "registered", wallet_scope: "platform", currency: "POINT",
         gateway_token: "gateway-token", gateway_token_expires_at: "2026-09-21T01:15:00Z",
         expires_at: "2026-09-21T02:00:00Z", scopes: ["balance"],
       })
@@ -206,7 +206,7 @@ describe("Joy8 server SDK", () => {
     assert.throws(() => new Joy8ServerClient({ gatewayUrl, backendKey: "bad", gameId }), error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
     const wrongGame = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({
       version: 1, session_id: sessionId, game_id: "99999999-9999-4999-8999-999999999999", player_account_ref: playerId,
-      account_type: "guest", wallet_scope: "platform", currency: "POINT", gateway_token: "token",
+      account_type: "registered", wallet_scope: "platform", currency: "POINT", gateway_token: "token",
       gateway_token_expires_at: "later", expires_at: "later", scopes: ["balance"],
     }) })
     await assert.rejects(wrongGame.exchangeLaunchCode({ launchCode }), error => error.code === "JOY8_INVALID_RESPONSE")

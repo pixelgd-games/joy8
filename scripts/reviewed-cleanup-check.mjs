@@ -1,7 +1,8 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { readFile } from "node:fs/promises"
 import { after, before, test } from "node:test"
-import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -9,11 +10,11 @@ const admin = "ac5cb167-7cdc-4e49-ba50-47a8a5220b88"
 const one = async (sql, args = []) => (await db.query(sql, args)).rows[0]
 let source
 before(async () => {
-  await loadPreAllowlistPlatform(db)
+  await loadCurrentPlatform(db)
   await db.exec(`insert into auth.users(id,email,email_confirmed_at) values('${admin}','pixelgd.games@gmail.com',now());
     insert into auth.identities values('${admin}','google');
     alter table auth.identities add foreign key(user_id) references auth.users(id) on delete cascade;
-    insert into public.admin_users values('pixelgd.games@gmail.com');
+    insert into public.admin_users(email) values('pixelgd.games@gmail.com');
     create table auth.sessions(id uuid primary key default gen_random_uuid(),user_id uuid references auth.users on delete cascade);
     create table auth.refresh_tokens(id uuid default gen_random_uuid(),user_id text);
     create table auth.flow_state(id uuid default gen_random_uuid(),user_id uuid);
@@ -21,7 +22,7 @@ before(async () => {
     insert into auth.sessions(user_id) values('${admin}');
     insert into auth.refresh_tokens(user_id) values('${admin}');
     insert into auth.flow_state(user_id) values('${admin}')`)
-  const player = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const player = await googleIdentity(db)
   await one("select * from public.joy8_resolve_member($1,true)", [player])
   const game = (await one("select id from public.games where slug='test-game'")).id
   const policy = (await one("select id from public.joy8_wallet_policies")).id
@@ -36,7 +37,7 @@ before(async () => {
   await db.query("insert into auth.refresh_tokens(user_id) values($1)", [player])
   await db.query("insert into auth.flow_state(user_id) values($1)", [player])
   await db.exec("insert into auth.mfa_amr_claims(session_id) select id from auth.sessions")
-  await db.exec(await readFile("supabase/migrations/20260927100000_email_play_allowlist.sql", "utf8"))
+
   const snapshot = (await db.query((await readFile("scripts/sql/whitelist-cleanup-snapshot.sql", "utf8")).replace("begin read only;", "").replace("commit;", ""))).rows[0].snapshot
   source = (await readFile("supabase/migrations/20260927110000_clear_reviewed_test_players.sql", "utf8"))
     .replace(/expected jsonb:='.*?'::jsonb;/, `expected jsonb:='${JSON.stringify(snapshot)}'::jsonb;`)

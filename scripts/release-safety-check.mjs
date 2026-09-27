@@ -14,7 +14,7 @@ let game
 before(async () => {
   await loadCurrentPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
-  const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000,guest_initial_credit=20000 returning id")).id
+  const policy = (await one("update public.joy8_wallet_policies set initial_credit=20000 returning id")).id
   await db.query("insert into public.joy8_game_policies(game_id,wallet_policy_id,enabled,max_bet_amount,max_payout_amount,max_participants,funding_mode) values($1,$2,true,10000,1000000,1,'platform')", [game, policy])
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','open','settle','cancel','status'])", [game, secret])
   await loadProductAccounting(db)

@@ -94,8 +94,8 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 ### First Release and Entry Models
 
 - First release: H5. Android and iOS are later work, not first-release gates.
-- Approved release entry: allowlisted Google accounts. Persistent guest entry is
-  disabled until formal operation is explicitly approved. Facebook stays disabled.
+- Approved release entry: allowlisted Google accounts. Guest, Facebook and
+  provider-linking implementations are removed; no legacy compatibility is required.
   [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md#release-identity-scope)
   owns the sign-in decision and identity design.
 - Mahjong Clash is the first adopter, not the architectural center of Joy8.
@@ -155,10 +155,7 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   | Player | Grant |
   | --- | --- |
   | New Google member | 1,000 POINT |
-  | New guest | 100 POINT |
-  | Guest who links Google | One 900 POINT top-up, reaching the 1,000 POINT member grant |
 
-  Guest grant/promotion rules are dormant while guest creation is disabled.
   Grants are platform transactions and carry no originating game. Do not
   maintain an old Demo runtime or an old/new compatibility branch.
 - POINT is intended for operational play, not a disposable Demo-only design.

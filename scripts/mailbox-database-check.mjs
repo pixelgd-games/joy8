@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
 import { after, before, beforeEach, test } from "node:test"
@@ -9,7 +10,7 @@ const one = async (sql, args = [], connection = db) => (await connection.query(s
 let game, keys, adminId
 before(async () => {
   ;({ game, keys } = await loadMemberPlatformDatabase(db))
-  await db.exec("update public.joy8_wallet_policies set initial_credit=1000,guest_initial_credit=1000")
+  await db.exec("update public.joy8_wallet_policies set initial_credit=1000")
   adminId = (await one("insert into auth.users(email,email_confirmed_at) values('mail-admin@example.test',now()) returning id")).id
   await db.query("insert into auth.identities values($1,'google')", [adminId])
   await db.exec("insert into public.admin_users(email) values('mail-admin@example.test')")
@@ -29,7 +30,7 @@ async function member(player, action, request = {}, connection = db) {
   finally { await connection.query("reset role") }
 }
 async function player(launch = false) {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   const p = await one("select * from public.joy8_resolve_member_profile($1,true)", [auth])
   const session = launch ? await one("select * from public.create_game_session('test-game',$1)", [auth]) : null
   return { ...p, auth, session }
@@ -189,7 +190,7 @@ test("oversized audience aborts the entire draft and leaves no partial recipient
   const p = await player(), request = body(p, { audience: "all", public_id: "" })
   await db.exec("begin")
   try {
-    await db.exec("with users as (insert into auth.users(is_anonymous) select true from generate_series(1,5001) returning id) insert into public.player_accounts(auth_user_id,account_type,member_enrolled_at) select id,'guest',now() from users")
+    await db.exec("insert into auth.users(email,email_confirmed_at) select 'bulk-'||i||'@example.test',now() from generate_series(1,5001) i; insert into auth.identities select id,'google' from auth.users where email like 'bulk-%'; insert into public.joy8_email_allowlist(email) select email from auth.users where email like 'bulk-%'; insert into public.player_accounts(auth_user_id,account_type,member_enrolled_at) select id,'registered',now() from auth.users where email like 'bulk-%'")
     await db.exec("savepoint before_preview")
     await assert.rejects(db.query("select public.joy8_admin_mail('prepare',$1)", [request]), /JOY8_MAIL_AUDIENCE_LIMIT/)
     await db.exec("rollback to savepoint before_preview")

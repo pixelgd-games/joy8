@@ -36,6 +36,6 @@ insert into public.games (name, slug, type, published, launch_url) values
   ('Missing URL', 'missing-url', 'casual', false, null);
 
 create table auth.identities(user_id uuid,provider text);
-create table public.admin_users(email text);
+create table public.admin_users(id uuid primary key default gen_random_uuid(),email text not null unique,created_at timestamptz default now());
 create function auth.uid() returns uuid language sql as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 create function auth.jwt() returns jsonb language sql as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;

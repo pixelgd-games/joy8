@@ -50,7 +50,7 @@ export async function resolveMember(request: Request, headers: HeadersInit, enro
     if (enroll) return jsonResponse({ error: "Gateway returned an empty member" }, 502, headers)
     return jsonResponse({ member: null }, 200, headers)
   }
-  if (!row.player_account_id || !["guest", "registered"].includes(row.account_type) || !/^[1-9][0-9]{5}$/.test(row.public_id)) {
+  if (!row.player_account_id || row.account_type !== "registered" || !/^[1-9][0-9]{5}$/.test(row.public_id)) {
     return jsonResponse({ error: "Gateway returned an invalid member" }, 502, headers)
   }
   return jsonResponse({ member: { player_account_ref: row.player_account_id, public_id: row.public_id, account_type: row.account_type } }, 200, headers)

@@ -1,0 +1,29 @@
+name: Verify platform
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      JOY8_TEST_PG_BIN: /usr/lib/postgresql/17/bin
+      JOY8_PG_CLIENT_BIN: /usr/lib/postgresql/17/bin
+      SMOKE_BROWSER_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: |
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get update
+          sudo apt-get install -y postgresql-17
+      - run: npm ci
+      - run: npm run verify
+      - run: npm run test:hardening-pg
+      - run: npm run test:recovery

@@ -37,10 +37,3 @@ export async function loadCurrentPlatform(db) {
   for (const source of (await buildPlatformBundle()).sources) await db.exec(source.sql)
   await db.exec("update public.games set published=true where slug in ('test-game','missing-url')")
 }
-
-export async function loadPreAllowlistPlatform(db) {
-  for (const source of (await buildPlatformBundle()).sources) {
-    if (!source.path.endsWith('/20260927100000_email_play_allowlist.sql')) await db.exec(source.sql)
-  }
-  await db.exec("update public.games set published=true where slug in ('test-game','missing-url')")
-}

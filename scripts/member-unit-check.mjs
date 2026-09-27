@@ -1,13 +1,12 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, providerLabel, safeReturnPath } from "../src/member/service.js"
+import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 import { enterBrandedMember } from "../src/member/branded-entry.js"
 import { gameFailure } from "../src/pages/game/errors.js"
 
 const origin = "https://joy8.example"
-const guestUser = { id: "guest-1", is_anonymous: true }
-const registeredUser = { id: "guest-1", is_anonymous: false, email_confirmed_at: "2026-09-16" }
+const registeredUser = { id: "member-1", is_anonymous: false, email_confirmed_at: "2026-09-16" }
 
 test("branded registered entry enrolls explicitly without linking or guest conversion", async () => {
   const f = fixture(registeredUser)
@@ -16,20 +15,10 @@ test("branded registered entry enrolls explicitly without linking or guest conve
   await enterBrandedMember({ ...options, method: "google" })
   assert.deepEqual(launched, [true])
   assert.deepEqual(f.calls, [["rpc", "joy8-gateway/enroll-member", { body: {} }]])
-  await assert.rejects(enterBrandedMember({ ...options, method: "guest" }), { code: "JOY8_GUEST_DISABLED" })
-  await assert.rejects(f.service.guest(), { code: "JOY8_GUEST_DISABLED" })
+  await enterBrandedMember({ ...options, method: "guest" })
   assert.equal(f.calls.length, 1)
 })
 
-test("provider conflict preserves the guest unless the same guest explicitly switches", async () => {
-  const f = fixture(guestUser)
-  assert.equal(await f.service.switchGuestProvider("google", guestUser.id, () => false), null)
-  assert.deepEqual(f.calls, [])
-  await assert.rejects(f.service.switchGuestProvider("google", "wrong", () => true), { code: "identity_conflict" })
-  assert.deepEqual(f.calls, [])
-  assert.equal((await f.service.switchGuestProvider("google", guestUser.id, () => true)).expectedUserId, null)
-  assert.deepEqual(f.calls.map(call => call[0]), ["signout", "oauth"])
-})
 
 test("Loader distinguishes inactive accounts, throttling, unavailable games and outages without exposing diagnostics", async () => {
   for (const [status, error, expected] of [[403,"JOY8_PLAYER_INACTIVE","007"],[429,"Too many requests","008"],[403,"JOY8_GAME_NOT_READY","009"],[401,"unknown","010"],[503,"internal secret","011"]]) {
@@ -57,21 +46,14 @@ function fixture(initialUser = null) {
   const client = {
     auth: {
       getSession: async () => ok({ session: user ? { user } : null }),
-      signInAnonymously: async (args) => {
-        calls.push(["anonymous", args])
-        await new Promise((resolve) => setTimeout(resolve, 5))
-        user = guestUser
-        return ok({ user })
-      },
       signInWithOAuth: async (args) => { calls.push(["oauth", args]); return ok({ url: "https://provider.example" }) },
-      linkIdentity: async (args) => { calls.push(["link", args]); return ok({ url: "https://provider.example" }) },
       exchangeCodeForSession: async (code) => { calls.push(["exchange", code]); user = registeredUser; return ok({ user }) },
       signOut: async (args) => { calls.push(["signout", args]); user = null; return ok() },
     },
     functions: {
       invoke: async (...args) => {
         calls.push(["rpc", ...args])
-        return ok({ member: { player_account_ref: "player-1", account_type: user?.is_anonymous ? "guest" : "registered" } })
+        return ok({ member: { player_account_ref: "player-1", account_type: "registered" } })
       },
     },
   }
@@ -107,8 +89,8 @@ test("game selection opens membership on the Lobby with the selected game's safe
   assert.deepEqual(navigated, [])
 })
 
-test("both enrolled guests and registered players enter directly without opening a login dialog", async () => {
-  for (const type of ["guest", "registered"]) {
+test("enrolled registered players enter directly without opening a login dialog", async () => {
+  for (const type of ["registered"]) {
     const paths = []
     const enter = createGameEntry({ origin, membership: async () => ({ account_type: type, player_account_ref: "player-1" }), openMember: () => assert.fail("Unexpected login dialog"), navigate: (path) => paths.push(path) })
     await enter({ next: "/game/?slug=game-a" })
@@ -169,60 +151,17 @@ test("reading membership never creates a guest or enrolls an existing Auth user"
   assert.deepEqual(signedIn.calls, [["rpc", "joy8-gateway/member", { body: {} }]])
 })
 
-test("guest entry is disabled for new, existing and registered sessions without Auth calls", async () => {
-  for (const user of [null, guestUser, registeredUser]) {
-    const f = fixture(user)
-    await assert.rejects(f.service.guest(), { code: "JOY8_GUEST_DISABLED" })
-    assert.deepEqual(f.calls, [])
-  }
-})
 
-test("Google and Facebook link new identities to guests and never replace conflicts", async () => {
-  for (const provider of ["google", "facebook"]) {
-    const f = fixture(guestUser)
-    assert.equal((await f.service.oauth(provider)).expectedUserId, guestUser.id)
-    assert.equal(f.calls[0][0], "link")
-    assert.equal(f.calls[0][1].provider, provider)
-    const callback = new URL(f.calls[0][1].options.redirectTo)
-    assert.equal(callback.searchParams.get("flow"), "link")
-    assert.equal(callback.searchParams.get("provider"), provider)
-    f.client.auth.linkIdentity = async () => ({ error: { code: "identity_already_exists" } })
-    await assert.rejects(f.service.oauth(provider), { code: "identity_already_exists" })
-    assert.equal((await f.service.session()).user.id, guestUser.id)
-    assert.equal(f.calls.some(([name]) => name === "signout"), false)
-    const signedOut = fixture()
-    await signedOut.service.oauth(provider)
-    assert.equal(signedOut.calls[0][0], "oauth")
-    assert.equal(signedOut.calls[0][1].provider, provider)
-  }
-  await assert.rejects(fixture().service.oauth("unknown"), /Unsupported authentication provider/)
-})
 
-test("provider link callbacks require the original guest identity", async () => {
-  const f = fixture(guestUser)
-  assert.equal((await f.service.completeCallback("one-use-code", null, "link")).user.id, guestUser.id)
-  await assert.rejects(f.service.completeCallback("another-code", "wrong-user", "link"), { code: "identity_conflict" })
-  assert.equal(await f.service.session(), null)
-  const lostGuest = fixture()
-  await assert.rejects(lostGuest.service.completeCallback("code", null, "link"), { code: "identity_conflict" })
-  assert.deepEqual(lostGuest.calls, [])
-})
 
 test("invalid or replayed callbacks cannot enroll or fall back to a new guest", async () => {
   const f = fixture()
-  await assert.rejects(f.service.completeCallback("code", null, "unknown"))
+  await assert.rejects(f.service.completeCallback("code", "unknown"))
   f.client.auth.exchangeCodeForSession = async () => ({ error: { code: "flow_state_not_found" } })
-  await assert.rejects(f.service.completeCallback("used-code", null, "signin"), { code: "flow_state_not_found" })
+  await assert.rejects(f.service.completeCallback("used-code", "signin"), { code: "flow_state_not_found" })
   assert.deepEqual(f.calls, [])
 })
 
-test("callback and provider-link errors use safe messages", () => {
-  assert.equal(providerLabel("google"), "Google")
-  assert.equal(providerLabel("facebook"), "Facebook")
-  assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "google"), "這個 Google 已綁定其他玩家，不能合併目前的訪客資料。")
-  assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "facebook"), "這個 Facebook 已綁定其他玩家，不能合併目前的訪客資料。")
-  assert.equal(memberErrorMessage({ code: "flow_state_not_found" }), "這個驗證連結已使用或已失效，請重新操作。")
-})
 
 test("sign-out does not auto-create guests", async () => {
   const f = fixture(registeredUser)
@@ -244,4 +183,16 @@ test("inactive membership and upstream failures fail closed without exposing raw
   f.client.functions.invoke = async () => ({ error: new Error("secret diagnostic") })
   await assert.rejects(f.service.membership(), { code: "member_unavailable" })
   assert.equal(memberErrorMessage(new Error("secret diagnostic")).includes("secret"), false)
+})
+
+test("Google is the sole sign-in method and never links identities", async () => {
+  for (const user of [null, registeredUser]) {
+    const f = fixture(user)
+    await f.service.oauth()
+    assert.equal(f.calls[0][0], "oauth")
+    assert.equal(f.calls[0][1].provider, "google")
+    assert.equal(new URL(f.calls[0][1].options.redirectTo).searchParams.get("flow"), "signin")
+    for (const provider of ["facebook", "guest", "unknown"]) await assert.rejects(f.service.oauth(provider), /Unsupported/)
+    assert.equal(f.service.guest, undefined)
+  }
 })

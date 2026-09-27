@@ -112,9 +112,9 @@ When a non-gambling game ships to both Joy8 and CrazyGames, read both platform i
 - Before changing the database, prepare a small, reviewable SQL migration and ask the user to confirm it.
 - Do not leave unconfirmed baseline or large-rebuild migrations in the active migration folder.
 - `.env.supabase.local` is local-only. Never commit it or expose access tokens, service-role keys, or database passwords in code, documents, logs, or chat.
-- The repository intentionally has no baseline migration. Future changes use small incremental migrations.
+- Empty projects use the reviewed `supabase/bootstrap/platform.sql`, outside migration discovery. Existing projects use small incremental migrations; never apply the bootstrap to the live project.
 - Do not revive `players`, `player_balances`, the legacy `access_whitelist`, `site_settings`, or `ensure_my_player_v1()`.
-- The approved Google email gate uses the new `joy8_email_allowlist`, managed by verified administrators. Public Lobby browsing stays open; signup and new game sessions require an allowlisted Google identity. Guests stay disabled until the user approves formal operation.
+- The approved Google email gate uses the new `joy8_email_allowlist`, managed by verified administrators. Public Lobby browsing stays open; signup and new game sessions require an allowlisted Google identity. Only registered Google members are supported; do not retain Guest or provider-linking compatibility.
 - Add allowlisted emails through the Joy8 admin page at `/admin/access/`. Do not put individual email additions into new SQL migrations; existing applied migrations remain unchanged deployment history.
 - Every hosted SQL migration requires separate user confirmation before application. Player-test cleanup requires an exact table/count review, preserves administrators, and never resets the database. Monster Lab D1 is outside this cleanup.
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.

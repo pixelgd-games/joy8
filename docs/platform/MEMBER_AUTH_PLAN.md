@@ -1,267 +1,92 @@
 # Joy8 Member and Authentication Plan
 
-Status: The approved release uses allowlisted Google accounts on the production
-site. Guest entry is suspended until formal operation is approved. Implementation
-and hosted rollout state are recorded in [README.md](../../README.md) and the
-[release review](../operations/WHITELIST_RELEASE.md).
-Last reviewed: 2026-09-27.
-
-This document owns authentication, persistent guests, account lifecycle, and
-branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
-owns release scope, the shared POINT wallet, POINT policy, environment
-direction, and the platform -> product -> integration delivery order.
-[GAME_PLATFORM_INTEGRATION.md](GAME_PLATFORM_INTEGRATION.md) owns launch,
-authorization, wallet, and settlement contracts. [README.md](../../README.md)
-owns the current implementation and operations.
+This document owns member identity, account lifecycle and branded entry.
+[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md) owns product and POINT rules;
+[GAME_PLATFORM_INTEGRATION.md](GAME_PLATFORM_INTEGRATION.md) owns game sessions,
+authorization and settlement. [README.md](../../README.md) owns operations.
 
 ## Release Identity Scope
 
-This section is the single record of the sign-in decision.
+The release supports allowlisted Google accounts only. Guest creation, guest
+promotion, Facebook sign-in and provider linking are removed from the frontend,
+member resolver, wallet policy and SDK contract. Returning those features is a
+new product decision and implementation, not an environment flag. Anonymous
+identities are rejected; `JOY8_GUEST_DISABLED` remains a rejection code only.
+Email/password, SMTP, outbound authentication email, LINE and Apple are outside
+scope. Native clients are deferred. The existing unpublished Meta app is not
+part of the Joy8 runtime and is not deleted by this change.
 
-| Method | Decision |
-| --- | --- |
-| Google | Only allowlisted emails may register or start games |
-| Persistent guest | Disabled until formal operation is explicitly approved |
-| Facebook | Implemented but disabled; see [Provider and Abuse Protection](#provider-and-abuse-protection) |
-| Email/password | Not offered; no public UI |
-| Hosted Email provider | Disable before public release; the user has deferred the timing, so it stays enabled until the user schedules the change |
-| SMTP / outbound email | None; do not configure |
-| Username credentials, LINE, Apple, Email OTP | Not planned |
-
-Android and iOS are deferred. Reintroducing any email-based sign-in is a new
-product decision; do not revive it from historical code or documentation.
-
-A player can enter through the public Joy8 Lobby or a Joy8-controlled branded
-game entry. Both resolve the same Joy8 player and require the same allowlisted Google
-identity. Mahjong Clash uses the public Joy8 Lobby. The Joy8 surface owns authentication;
-the gameplay runtime never implements it or receives member/provider credentials.
-This contract is reusable across games and is not Mahjong-specific.
-
-External platform channels follow their own identity contract. They must not
-initialize Joy8 identity merely because the game also has a Joy8 build.
+Public Lobby browsing remains open. Both Lobby and Joy8-controlled branded entry
+use the same Google identity, player and shared POINT wallet. Games never log
+players in, hold member credentials or modify player balances.
 
 ## Email Access Gate
 
-`joy8_email_allowlist` is a new platform table, not the retired `access_whitelist`.
-Emails are unique after trimming and lowercasing; no Gmail dot/plus rewriting is
-performed. Only verified Google administrators can list, add or remove entries
-through `/admin/access/`. Current administrator emails are seeded by the migration
-and cannot be removed. Changing administrator assignments remains a separate
-reviewed operation and must keep their allowlist entries synchronized.
+`joy8_email_allowlist` stores trimmed, lowercase email addresses without Gmail
+dot/plus rewriting. Verified Google administrators manage it at `/admin/access/`.
+Current administrator entries cannot be removed. Administrator assignments are
+separate from player enrollment and require consistent allowlist provisioning.
 
-Supabase Before User Created Hook rejects anonymous identities, non-Google signup
-and emails absent from the allowlist. It checks the incoming user because the new
-Auth row does not exist yet. The hook runs as `supabase_auth_admin`; browser and
-game roles cannot invoke it. Anonymous Auth is also disabled in hosted settings.
+The Supabase Before User Created Hook rejects anonymous, non-Google and
+outside-list signup. It runs as `supabase_auth_admin`; browser and game roles
+cannot invoke it. The hosted provider configuration is recorded in README.
 
-The Gateway verifies the bearer on `enroll-member`, `create-session`,
-`private-session` and `branded-entry`. SQL insert guards check the current database
-identity/email when creating player accounts and sessions. `branded-entry` creates
-neither, so it retains its explicit Gateway access check. Removal denies future
-sessions, including existing Google accounts; it does not cancel committed match
-obligations or revoke previously issued sessions. The Lobby stays public.
-Errors are `JOY8_EMAIL_NOT_ALLOWED` and `JOY8_GUEST_DISABLED`, both HTTP 403.
-
-## Responsibility Boundary
-
-| Concern | Owner |
-| --- | --- |
-| Credentials, provider identity and verification | Supabase Auth through Joy8-controlled flows |
-| Stable player, membership eligibility, guest upgrade and account lifecycle | Joy8 backend |
-| H5 sign-in, callback and account-status UI | Joy8-controlled entry surface |
-| Product classification and wallet resolution | Joy8 trusted configuration and backend |
-| Game session and launch handoff | Joy8 integration contract |
-| Game-side player mapping, progress and gameplay data | Product backend and schema |
-
-Fix the production origin and hosting owner of each branded entry before
-activation. The reusable H5 route is `/entry/?slug=...`; visual placement in a
-game's login screen does not transfer Auth
-ownership into its gameplay runtime. Native return/storage wiring is later work
-in the owning repository, not a first-release platform dependency.
-
-## Current Gaps
-
-- Guest-to-provider linking remains pending hosted acceptance.
-  [README.md](../../README.md) owns the implementation details and test limits.
-- Self-service deletion and ongoing retention are not implemented. The one-time
-  reviewed test-data cleanup is in the release review.
-- The branded entry accepts only a configured game slug, exact trusted
-  parent/game origins, Google requests, and in-memory launch
-  messages. `/account/` returns callbacks only to the Lobby or validated `/game/`,
-  `/play-test/`, and `/entry/` routes. Public branded-entry acceptance needs a
-  reviewed production game origin and real provider/game testing.
-- The `/play-test/?slug=...` entry uses the same membership: allowlisted registered
-  members enter only when backend entry configuration also permits them.
-  Mahjong's current entry state is tracked in
-  [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md#mahjong-activation).
-- Consume the platform wallet contract rather than introducing wallet logic into
-  login screens.
+The Gateway verifies the bearer. Member lookup and enrollment require a current,
+verified, active Google Auth user with an allowlisted email. Player/session insert
+triggers enforce the same rule. Removal blocks future entry but does not cancel
+an already committed match or revoke an already issued game session.
 
 ## Identity Invariants
 
-- `player_accounts.id` remains stable through login, guest restoration, upgrade,
-  entry-point changes, and session refresh.
-- `player_accounts.public_id` is a unique six-digit presentation identifier.
-  It may be shown as `Player 123456`, but must never replace the internal UUID
-  for authentication, authorization, launch, wallet, settlement, or game mapping.
-- Credentials and provider identities belong to Auth. Auth identity, player
-  membership, and administrator authorization are separate concepts.
-- Resolve exactly one player and that player's existing shared POINT wallet through
-  trusted backend operations. Retries and simultaneous callbacks must not create
-  duplicate players, wallets, or initial grants.
-- A provider identity must not silently merge two existing Joy8 players or
-  their wallets based on email, display name, or client-supplied similarity.
-- Supabase provider linking within one Auth user is different from merging
-  existing Joy8 players. A new Google/Facebook identity may upgrade the current
-  guest. If the provider identity already belongs to another Joy8 player, linking
-  must fail: the player may keep the guest or explicitly leave it and sign in to
-  the existing account. No POINT, wallet, transaction or game progress moves
-  between them. Test both provider conflicts before accepting promotion.
-- Browser storage separation alone does not authorize membership. An
-  administrator-only session must not silently enroll a player.
-
-## Persistent Guests and Promotion
-
-A guest restores the same player while its approved local session remains valid.
-Clearing browser data or changing devices cannot guarantee guest recovery.
-Explain this limitation and provide an upgrade path to Google.
-Signing out must return to an explicit entry choice, not silently create a guest.
-
-Guest creation stays disabled. The retained anonymous identity/linking code is
-dormant and does not authorize reopening guest access. Prior hosted guest
-acceptance does not satisfy the current release policy. Anonymous Auth users
-have user IDs and use the `authenticated` role. Classify them using verified
-anonymous status rather than interpreting every Auth ID as a registered member.
-Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
-
-Promotion changes the sign-in method, not the player. Preserve the shared wallet,
-transactions, and game mappings; the only balance change is the one-time
-registration top-up defined in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction). If the provider already belongs to another
-Joy8 player, return a recoverable conflict and require verification of that
-account; do not silently transfer assets. Full registered-player merging remains
-outside this release.
+- Each Auth user resolves to at most one player. `account_type` is `registered`.
+- `player_accounts.id` is the stable internal identity. The unique six-digit
+  `public_id` is presentation only and never a credential or settlement key.
+- Explicit enrollment grants the configured initial POINT amount once. Retries
+  and concurrent callbacks preserve one player, one wallet and one grant.
+- Member lookup is read-only. Signing into an administrator session does not
+  silently enroll a player; browser storage separation is not authorization.
+- Email or display-name similarity never merges different players or wallets.
+- Browser and game roles cannot invoke enrollment/session RPCs directly.
 
 ## H5 Entry and Handoff
 
-The Lobby is public and never requires a login just to browse. Selecting a game
-checks existing player enrollment: an enrolled player proceeds to the Loader
-access check; an unenrolled visitor gets the shared member dialog
-over the unchanged Lobby. The dialog offers Google entry; guest buttons are removed.
-Successful entry continues to the selected game. Dismissal cancels
-that selection; opening another game or the top-bar account entry must not reuse
-the previous destination. A service failure must not silently create a guest.
+Selecting a game checks membership. An enrolled member continues to the Loader;
+an unenrolled visitor sees the Google dialog over the public Lobby. Closing the
+dialog cancels the pending game. Account entry clears the prior destination.
+Network failure never creates a replacement player.
 
-Direct published-game URLs follow the same membership policy and return missing members
-to the Lobby dialog. `/account/` is the callback trampoline, not the default
-platform entrance or a second account page. Callback destinations are validated
-game paths, never arbitrary URLs. The branded H5 entry completes Google Auth
-before fetching protected entry
-metadata or loading the game-owned iframe. An unauthenticated visitor sees a
-Joy8-controlled Google button. Guest iframe requests are explicitly rejected.
-An existing eligible member can continue automatically. Native implementation remains deferred.
+`/account/` is a PKCE callback trampoline. Return paths are limited to the Lobby
+and validated `/game/`, `/play-test/` and `/entry/` slugs. Callback forwarding
+uses a fragment, removed immediately by the receiving page. The initial provider
+request still carries its one-use code in a query; exclude callback queries from
+analytics and access-log exports. Only `provider=google&flow=signin` callbacks
+are accepted. Replay, cancellation and invalid callbacks fail closed.
 
-The callback passes OAuth parameters through `/account/`. Lobby flows continue
-to `/?member=callback#code=...`; a validated branded flow returns directly to
-`/entry/?slug=...#code=...`. Callback fields are forwarded only in the fragment,
-which is removed immediately with `history.replaceState`. The initial provider
-request to `/account/` still contains its OAuth code; exclude callback queries
-from access-log exports and analytics.
+`/entry/?slug=...` completes Google authentication before retrieving protected
+metadata or loading a game. Explicit backend entry configuration and exact
+origin checks apply whether the catalog game is published or unpublished.
+The iframe protocol accepts only `method:"google"` and validated request IDs.
+Auth, access/refresh tokens and provider tokens remain platform-owned. Launch
+codes and Gateway tokens are delivered once in memory to the checked iframe.
 
-After successful enrollment, the member service dispatches the window event
-`joy8:membership`. Its `detail` is the Gateway member object containing
-`player_account_ref`, `account_type` and `public_id`. The Lobby uses it to refresh
-the account label without a second enrollment. This is an in-page UI notification,
-not an authorization signal; session issuance still verifies identity server-side.
-
-```text
-Public Lobby or branded home -> select a game / start playing
-  -> Joy8 Google sign-in and email allowlist check
-  -> backend player and wallet resolution
-  -> authorized game-session handoff
-  -> game runtime
-```
-
-Use approved HTTPS origins and callback allowlists, provider anti-forgery
-protection, and safe return destinations. Handle callback replay, cancellation,
-expired sessions, and identity conflicts without creating replacement accounts.
-The current `create-session` route expects an allowed browser Origin; arbitrary
-game URLs or originless native calls are not an alternate authentication path.
-
-The entry may retain Auth session material only in approved platform-controlled
-storage. Provider tokens, member access/refresh tokens and service-role keys
-never enter the game, URL logs, Analytics, or game saves.
-Launch-code redemption and short-lived game-token rules are owned exclusively by
-[GAME_PLATFORM_INTEGRATION.md](GAME_PLATFORM_INTEGRATION.md).
+Successful enrollment dispatches `joy8:membership` containing the member object
+for Lobby presentation. This browser event grants no authorization.
 
 ## Account Lifecycle
 
-- **Sign-out:** end the current device's Auth session without deleting the
-  player, wallet, history, or an already active match's accounting obligation.
-- **Recovery:** Google accounts use provider recovery. Guests are recoverable
-  only while their approved browser session survives; linking to Google is the
-  intended continuity path, but hosted linking remains unverified.
-- **Email delivery:** Joy8 sends no authentication email.
-- **Closure/deletion:** expose a request flow, and separately define Auth/profile
-  deletion or anonymization, transaction retention, game-data coordination, and
-  waiting/recovery periods. Do not directly delete Auth users: current player
-  constraints and wallet/session relationships require an ordered backend policy.
+Sign-out ends the selected local Auth session without deleting the player,
+wallet, history or active accounting obligations. Recovery belongs to Google.
+Self-service account closure and retention are not implemented; never delete Auth
+users directly without an ordered backend policy for financial and product data.
 
-## Platform-Stage Implementation and Acceptance
+## Acceptance
 
-1. Finalize guest mechanism, linking/conflict rules, administrator separation,
-   H5 entry ownership, callback routes, and lifecycle/retention policies.
-2. Specify state transitions and failure responses; prepare small reviewed
-   migrations under [AGENTS.md](../../AGENTS.md) before database changes.
-3. Implement backend player resolution, guest restoration/promotion, and lifecycle
-   operations, then the reusable H5 UI and session handoff.
-4. Verify Google/guest entry (and Facebook before enabling it), sign-out, refresh, callback replay,
-   simultaneous requests, guest loss, guest linking and provider conflicts.
-   Verify game selection, cancellation/reselection, late responses after closing
-   a dialog, callback destination preservation, and direct-link entry.
-5. Verify direct and Lobby entries preserve the same player and product progress;
-   test the shared wallet across multiple simulated games through the platform contract.
-6. Verify that no game receives member credentials or protected table access.
+Automated checks cover Google callback routing, invalid providers/flows, callback
+replay, one-time grants, concurrent enrollment, player/wallet stability, session
+permissions and rejected anonymous/outside-list identities. Native PostgreSQL
+checks are required for releases. Local fixtures do not prove a real Google
+provider interaction. Production provider acceptance requires an appropriate
+real account; see [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).
 
-The product stage consumes this tested contract. Real service integration is the
-third stage; no product needs a separate temporary membership system.
-
-## Remaining Decisions
-
-- Exact guest-session retention/cleanup and account-closure retention periods.
-- Validate implemented linking/conflict handling and member/admin isolation with
-  real providers before release; separate-player merging remains unsupported.
-- Player nickname rules, moderation and whether or when the six-digit public-ID
-  namespace must be extended beyond its 900,000 available values.
-- Production branded H5 origin/hosting assignment, copy/localization and
-  end-to-end acceptance of the active `/entry/?slug=...` implementation.
-- When to disable the hosted Email provider.
-- Whether future POINT purchases require guest promotion before checkout.
-
-First-release platforms and sign-in methods are already decided; do not reopen
-them as a provider-selection task. Native callbacks and extra providers are
-deferred. Purchase launch timing belongs in the product plan.
-
-## Provider and Abuse Protection
-
-Hosted Turnstile configuration remains provider-side. The Google-only frontend
-no longer loads CAPTCHA or requires a site key. Reopening guest Auth requires
-explicitly restoring and testing protection; dormant linking support does not
-provide anonymous sign-in.
-Guest-to-provider linking and provider-conflict preservation remain pending and
-must not be inferred from a standalone provider sign-in.
-
-Facebook sign-in, guest linking and existing-account conflict handling are
-implemented, but the hosted provider and the `VITE_FACEBOOK_AUTH_ENABLED`
-build flag stay off. The operator is an individual without an appropriate
-registered business, so keep the Joy8 Meta app unpublished and store no Meta App
-Secret. Enable Facebook only after Meta business verification/review,
-privacy/data-deletion requirements, hosted provider configuration and real
-sign-in/linking acceptance. Do not delete the app or fabricate a business
-portfolio.
-
-## Technical References
-
-- [Supabase anonymous sign-in](https://supabase.com/docs/guides/auth/auth-anonymous)
-- [Supabase identity linking](https://supabase.com/docs/guides/auth/auth-identity-linking)
-
-These explain vendor behavior; they do not approve configuration changes.
+Turnstile is not a frontend dependency. Existing hosted Auth configuration is
+separate from the Google-only member implementation.

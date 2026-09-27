@@ -127,7 +127,7 @@ try {
     body: [{ result: "ok" }],
   })
 
-  let memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
+  let memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "registered" }]
   let memberError = null
   let sessionError = null
   let accessError = null
@@ -146,7 +146,7 @@ try {
     }
     if (name === "create_game_session") return sessionError ? Response.json(sessionError, { status: 400 }) : Response.json([{
       session_id: "session-1", player_account_id: "player-1", game_id: "game-1",
-      launch_code: "one-use-code", account_type: "guest", currency: "POINT", protocol: "server-v1",
+      launch_code: "one-use-code", account_type: "registered", currency: "POINT", protocol: "server-v1",
     }])
     if (name === "joy8_cleanup_gateway_runtime") return Response.json([])
     if (name === "joy8_create_private_session") return sessionError ? Response.json(sessionError, { status: 403 }) : Response.json({
@@ -181,7 +181,7 @@ try {
   const memberResponse = await request("member")
   assert.equal(memberResponse.headers.get("Access-Control-Expose-Headers"), "Retry-After, X-Joy8-Request-Id")
   assert.ok(memberResponse.headers.get("X-Joy8-Request-Id"))
-  assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", public_id: "482731", account_type: "guest" } })
+  assert.deepEqual(await memberResponse.json(), { member: { player_account_ref: "player-1", public_id: "482731", account_type: "registered" } })
   assert.deepEqual(rpcCalls.at(-1), { name: "joy8_resolve_member_profile", args: { p_auth_user_id: "verified-user", p_enroll: false } })
   assert.equal((await request("enroll-member")).status, 200)
   assert.equal(rpcCalls.at(-1).args.p_enroll, true)
@@ -201,13 +201,13 @@ try {
   assert.deepEqual(await (await request("member")).json(), { error: "Gateway RPC failed" })
   memberError = null
   sessionError = null
-  memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
+  memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "registered" }]
   for (const extra of [{auth_user_id:"victim"},{currency:"POINT"},{expires_in_seconds:3600},{display_name:"unused"}]) assert.equal((await request("create-session", {slug:"test",...extra})).status,400)
   rpcCalls.length = 0
   const launched = await request("create-session", { slug: "test" })
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")
-  assert.equal((await launched.json()).account_type, "guest")
+  assert.equal((await launched.json()).account_type, "registered")
   assert.deepEqual(rpcCalls.find(({ name }) => name === "create_game_session").args, { p_game_slug: "test", p_auth_user_id: "verified-user" })
   assert.deepEqual(rpcCalls.map(({ name }) => name), ["joy8_consume_gateway_rate_limit", "joy8_admit_gateway_request", "create_game_session"])
   for (const route of ["member", "enroll-member", "create-session"]) {

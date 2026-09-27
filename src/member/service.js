@@ -29,28 +29,13 @@ function checked(result) {
   return result.data
 }
 
-const oauthProviders = new Set(["google", "facebook"])
-
-export function providerLabel(provider) {
-  return provider === "facebook" ? "Facebook" : provider === "google" ? "Google" : "第三方帳號"
-}
-
-function checkedProvider(provider) {
-  if (!oauthProviders.has(provider)) throw new Error("Unsupported authentication provider")
-  return provider
-}
-
-export function memberErrorMessage(error, provider) {
+export function memberErrorMessage(error) {
   const code = error?.code
-  const label = providerLabel(provider)
   const messages = {
     JOY8_EMAIL_NOT_ALLOWED: "尚未開放，目前僅限白名單 Google 帳號遊玩。",
     JOY8_GUEST_DISABLED: "訪客入口暫停開放，請使用白名單 Google 帳號登入。",
-    identity_already_exists: `這個 ${label} 已綁定其他玩家，不能合併目前的訪客資料。`,
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
     verification_required: "目前的登入身分無法通過驗證，請重新登入。",
-    identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
-    registered_session: "目前已登入正式帳號，請使用 Google 繼續啟用玩家身分。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
     flow_state_not_found: "這個驗證連結已使用或已失效，請重新操作。",
     flow_state_expired: "這個驗證連結已失效，請重新操作。",
@@ -61,7 +46,7 @@ export function memberErrorMessage(error, provider) {
 
 export function createMemberService(client, { origin, next = "/" } = {}) {
   const returnPath = safeReturnPath(next, origin)
-  const callbackUrl = (flow, provider) => `${origin}${accountPath(returnPath, origin)}&flow=${flow}&provider=${provider}`
+  const callbackUrl = `${origin}${accountPath(returnPath, origin)}&flow=signin&provider=google`
 
   async function session() {
     return checked(await client.auth.getSession()).session
@@ -89,34 +74,20 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     return member
   }
 
-  async function guest() {
-    throw Object.assign(new Error("Guest entry is disabled"), { code: "JOY8_GUEST_DISABLED" })
-  }
-
-  async function oauth(provider) {
-    checkedProvider(provider)
-    const current = await session()
-    const options = { redirectTo: callbackUrl(current ? "link" : "signin", provider), skipBrowserRedirect: true }
-    const data = checked(current
-      ? await client.auth.linkIdentity({ provider, options })
-      : await client.auth.signInWithOAuth({ provider, options }))
+  async function oauth(provider = "google") {
+    if (provider !== "google") throw new Error("Unsupported authentication provider")
+    const options = { redirectTo: callbackUrl, skipBrowserRedirect: true }
+    const data = checked(await client.auth.signInWithOAuth({ provider: "google", options }))
     if (!data?.url) throw new Error("Missing provider redirect")
-    return { url: data.url, expectedUserId: current?.user?.id ?? null, provider }
+    return { url: data.url }
   }
 
-  async function completeCallback(code, expectedUserId, flow) {
-    if (!["signin", "link"].includes(flow)) {
-      throw new Error("Unknown authentication callback")
-    }
-    const linking = flow === "link"
-    const expected = linking ? expectedUserId || (await session())?.user?.id : null
-    if (linking && !expected) {
-      throw Object.assign(new Error("Original identity unavailable"), { code: "identity_conflict" })
-    }
+  async function completeCallback(code, flow) {
+    if (flow !== "signin") throw new Error("Unknown authentication callback")
     const data = checked(await client.auth.exchangeCodeForSession(code))
-    if (expected && data.user?.id !== expected) {
+    if (!data.user || data.user.is_anonymous === true) {
       await client.auth.signOut({ scope: "local" })
-      throw Object.assign(new Error("Identity changed during linking"), { code: "identity_conflict" })
+      throw Object.assign(new Error("Verified identity required"), { code: "verification_required" })
     }
     return data
   }
@@ -125,16 +96,5 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  async function switchGuestProvider(provider, expectedUserId, confirmSwitch) {
-    checkedProvider(provider)
-    const current = await session()
-    if (!current?.user?.is_anonymous || !expectedUserId || current.user.id !== expectedUserId) {
-      throw Object.assign(new Error("Original guest identity unavailable"), { code: "identity_conflict" })
-    }
-    if (!await confirmSwitch()) return null
-    await signOut()
-    return oauth(provider)
-  }
-
-  return { session, membership, guest, oauth, completeCallback, signOut, switchGuestProvider, returnPath }
+  return { session, membership, oauth, completeCallback, signOut, returnPath }
 }

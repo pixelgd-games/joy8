@@ -1,6 +1,7 @@
 import { runPostgresChecks } from "./fixtures/postgres-check-runner.mjs"
 
 runPostgresChecks([
+  "scripts/google-member-check.mjs",
   "scripts/review-hardening-check.mjs",
   "scripts/mailbox-database-check.mjs",
   "scripts/seamless-wallet-check.mjs",
