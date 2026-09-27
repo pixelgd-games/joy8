@@ -16,16 +16,23 @@ must still implement and verify authoritative gameplay before activation.
 
 ### Release Gates
 
+- The whitelist SQL, reviewed cleanup and Mahjong reserve release are applied;
+  the Before User Created Hook, Gateway and Pages controls are deployed.
+  Inside-list Google signup is verified for Johnny; fresh outside-list Google
+  rejection still needs a designated test account. Acceptance gates are owned by
+  [WHITELIST_RELEASE.md](WHITELIST_RELEASE.md).
+
 - Monster Lab is published in the public catalog with its private entry disabled;
-  Mahjong remains hidden with its private entry paused. Monster Lab's hosted
+  Mahjong is also published with its localhost private entry disabled. Monster Lab's hosted
   launch, bets, win/loss settlement and complete Free Spins rounds were
   verified, with each round's player settlement total matching the game's round
   win minus the bet. Refresh during Free Spins, timeout and restart recovery,
   physical-device QA, and release math/compliance review remain open. Do not treat publication as completion of those checks.
-- The hosted Email provider still accepts verified API signup. Disable only the
-  Email provider before public release; the user controls the timing and
+- The hosted Email provider switch remains enabled, but the Hook rejects new
+  non-Google signup. Any separate decision to disable only the
+  Email provider remains under user control;
   [README.md](../../README.md#hosted-auth-configuration) owns the procedure. Do
-  not disable all signup, which would also stop Google and guest entry.
+  not disable all signup, which would also stop Google entry.
 - The mailbox compensation path is deployed; issuing and claiming a real hosted
   test reward still requires a designated player and approved amount. Follow the
   [mailbox operating procedure](../platform/MAILBOX.md#operator-workflow)
@@ -44,21 +51,21 @@ POINT rules belong in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-
 ### Mahjong Activation
 
 Mahjong Clash (`D:/Studio/Project-Gaming/production/table/products/mahjong-clash`)
-has a hidden catalog entry, a 25-table private `mahjong_clash` schema, a
-registered accounting adapter and an identity-only game policy: full-balance
-table reservation with a 1-POINT `max_reserve_amount` guard. A player with more
-than 1 available POINT cannot open a table under this policy; it is not a funded
-configuration. Its private entry is paused and bound only to
-`http://localhost:5173` -> `http://localhost:4391/`. It has no cloud build,
-production URL or public entry.
+has a published catalog entry, a 25-table private `mahjong_clash` schema, a
+registered accounting adapter and full-balance table reservation without a
+`max_reserve_amount` cap. The 100,000,000-POINT payout safety ceiling and reviewed
+financial key scopes are active. Its localhost private entry remains disabled.
+The production URL is `https://mahjong-clash.pages.dev/`; the local authority
+connects through the Windows Tunnel service at `wss://mahjong-clash.joy8.cc/`.
+Correct-Origin WebSocket upgrade and wrong/missing-Origin blocking are verified.
 
-Its restricted `mahjong_clash_runtime` login and game-scoped exchange/renew-only
+Its restricted database login and game-scoped exchange/renew/open/settle/status/cancel
 Backend Key have no expiry; they stay valid until revoked.
 Replacement requires a reviewed operator action through the
 [credential workflow](../../integrations/third-party/README.md#platform-operator-flow)
 or a secret manager; never write plaintext credential files into this repository.
 
-Open items before activation:
+Remaining acceptance:
 
 - `20260924150000_mahjong_per_table_storage.sql` (applied) moved the
   schema to 25 tables with per-table storage, the quarantined-table void and the
@@ -66,10 +73,12 @@ Open items before activation:
   login needs a separate reviewed credential action.
 - Economy operations lock one singleton `economy_state` row, serializing them
   across tables. Measure hosted capacity before funded or public activation.
-- Re-enabling the entry needs a reviewed audience and activation change, then:
-  real Joy8 sign-in reaching the game with the same player and balance; funded
-  limits and financial key scopes; AI funding and full gameplay acceptance; a
-  reviewed production origin and launch URL migration; and game hosting.
+- Real allowlisted Joy8 sign-in must reach the game with the same player and
+  balance, followed by one played hand and reconciliation of human POINT and
+  product-owned AI funding. Published infrastructure is not proof of settlement.
+- The game server runs in a visible local terminal and needs manual restart after
+  reboot. Only the Tunnel is an automatic Windows service. Per-IP connection
+  limits remain deferred until public operation, as explicitly requested.
 - To withdraw activation, disable the entry and keys first and preserve
   committed hands and audit data. Verify hosted backup availability before
   operating.

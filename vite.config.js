@@ -30,6 +30,7 @@ export default defineConfig(({ command, mode }) => {
           account: resolve(__dirname, "account/index.html"),
           mailbox: resolve(__dirname, "mailbox/index.html"),
           adminMail: resolve(__dirname, "admin/mail/index.html"),
+          adminAccess: resolve(__dirname, "admin/access/index.html"),
           adminLogin: resolve(__dirname, "admin/login/index.html"),
           adminGames: resolve(__dirname, "admin/games/index.html"),
           adminGamesNew: resolve(__dirname, "admin/games/new/index.html"),

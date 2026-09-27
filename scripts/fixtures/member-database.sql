@@ -1,6 +1,7 @@
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
+create role supabase_auth_admin nologin;
 grant usage on schema public to anon, authenticated, service_role;
 
 create schema auth;

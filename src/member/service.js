@@ -44,6 +44,8 @@ export function memberErrorMessage(error, provider) {
   const code = error?.code
   const label = providerLabel(provider)
   const messages = {
+    JOY8_EMAIL_NOT_ALLOWED: "尚未開放，目前僅限白名單 Google 帳號遊玩。",
+    JOY8_GUEST_DISABLED: "訪客入口暫停開放，請使用白名單 Google 帳號登入。",
     identity_already_exists: `這個 ${label} 已綁定其他玩家，不能合併目前的訪客資料。`,
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
     captcha_failed: "安全驗證失敗，請重新驗證後再試。",
@@ -77,6 +79,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
       let code = "member_unavailable"
       try {
         const body = await result.error.context?.json()
+        if (["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"].includes(body?.error)) code = body.error
         if (body?.error === "player account is not active") code = "member_inactive"
         if (body?.error === "verified member identity is required") code = "verification_required"
       } catch {}
@@ -91,13 +94,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
   }
 
   async function guest(captchaToken) {
-    if (!guestLock) throw Object.assign(new Error("Web Locks unavailable"), { code: "guest_lock_unavailable" })
-    return guestLock(async () => {
-      const current = await session()
-      if (current && !current.user?.is_anonymous) throw Object.assign(new Error("Registered session cannot enter as guest"), { code: "registered_session" })
-      if (!current) checked(await client.auth.signInAnonymously(captchaToken ? { options: { captchaToken } } : undefined))
-      return membership(true)
-    })
+    throw Object.assign(new Error("Guest entry is disabled"), { code: "JOY8_GUEST_DISABLED" })
   }
 
   async function oauth(provider) {

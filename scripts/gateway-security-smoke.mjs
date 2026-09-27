@@ -30,9 +30,8 @@ assert.equal((await post("private-session", { slug: "mahjong-clash" }, "http://l
 assert.equal((await post("branded-entry", { slug: "mahjong-clash" }, "https://not-joy8.example")).status, 403)
 assert.equal((await post("branded-entry", { slug: "mahjong-clash" })).status, 403)
 const brandedEntry = await post("branded-entry", { slug: "mahjong-clash" }, "http://localhost:5173")
-assert.equal(brandedEntry.status, 403)
-assert.equal((await brandedEntry.json()).error, "JOY8_PRIVATE_ENTRY_DENIED")
-assert.equal((await post("branded-entry", { slug: "monster-lab" }, origin)).status, 403)
+assert.equal(brandedEntry.status, 401)
+assert.equal((await post("branded-entry", { slug: "monster-lab" }, origin)).status, 401)
 assert.equal((await post("", {}, origin)).status, 404)
 assert.equal((await post("branded-session", { slug: "mahjong-clash" }, "http://localhost:5173")).status, 404)
 for (const route of ["exchange", "bet", "payout", "refund", "close-round"]) {

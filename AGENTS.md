@@ -113,7 +113,9 @@ When a non-gambling game ships to both Joy8 and CrazyGames, read both platform i
 - Do not leave unconfirmed baseline or large-rebuild migrations in the active migration folder.
 - `.env.supabase.local` is local-only. Never commit it or expose access tokens, service-role keys, or database passwords in code, documents, logs, or chat.
 - The repository intentionally has no baseline migration. Future changes use small incremental migrations.
-- Do not revive `players`, `player_balances`, `access_whitelist`, `site_settings`, or `ensure_my_player_v1()`.
+- Do not revive `players`, `player_balances`, the legacy `access_whitelist`, `site_settings`, or `ensure_my_player_v1()`.
+- The approved Google email gate uses the new `joy8_email_allowlist`, managed by verified administrators. Public Lobby browsing stays open; signup and new game sessions require an allowlisted Google identity. Guests stay disabled until the user approves formal operation.
+- Every hosted SQL migration requires separate user confirmation before application. Player-test cleanup requires an exact table/count review, preserves administrators, and never resets the database. Monster Lab D1 is outside this cleanup.
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
 - Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.

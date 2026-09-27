@@ -27,6 +27,13 @@ type BalanceRow = {
   locked_balance: number | string
 }
 
+async function enforcePlayAccess(userId: string, headers: HeadersInit): Promise<Response | null> {
+  const result = await callRpc("joy8_assert_play_access", { p_auth_user_id: userId })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  if (result.body !== true) return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 503, headers)
+  return null
+}
+
 export async function resolveMember(request: Request, headers: HeadersInit, enroll: boolean): Promise<Response> {
   const auth = await resolveAuthUser(request)
   if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
@@ -36,6 +43,10 @@ export async function resolveMember(request: Request, headers: HeadersInit, enro
   if (Object.keys(body.value).length) return jsonResponse({ error: "Member request must be empty" }, 400, headers)
   const admission = await enforceSubjectRateLimit(enroll ? "enroll-member" : "member", {}, headers, null, auth.userId)
   if (admission) return admission
+  if (enroll) {
+    const denied = await enforcePlayAccess(auth.userId, headers)
+    if (denied) return denied
+  }
   const result = await callRpc("joy8_resolve_member_profile", { p_auth_user_id: auth.userId, p_enroll: enroll })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
   const row = firstRpcRow<{ player_account_id: string; account_type: string; public_id: string }>(result.body)
@@ -61,6 +72,8 @@ export async function createPrivateSession(request: Request, headers: HeadersIni
   }
   const admission = await enforceSubjectRateLimit("private-session", {}, headers, null, auth.userId)
   if (admission) return admission
+  const denied = await enforcePlayAccess(auth.userId, headers)
+  if (denied) return denied
   const result = await callRpc("joy8_create_private_session", {
     p_game_slug: slug, p_auth_user_id: auth.userId, p_origin: request.headers.get("origin"),
   })
@@ -73,12 +86,17 @@ export async function createPrivateSession(request: Request, headers: HeadersIni
 }
 
 export async function resolveBrandedEntry(request: Request, headers: HeadersInit): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   const slug = body.value.slug
   if (Object.keys(body.value).length !== 1 || typeof slug !== "string" || !GAME_SLUG_PATTERN.test(slug)) {
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
+  const denied = await enforcePlayAccess(auth.userId, headers)
+  if (denied) return denied
   const result = await callRpc("joy8_resolve_branded_entry", {
     p_game_slug: slug, p_origin: request.headers.get("origin"),
   })
@@ -114,6 +132,8 @@ export async function createSession(request: Request, headers: HeadersInit): Pro
 
   const admission = await enforceSubjectRateLimit("create-session", {}, headers, null, auth.userId)
   if (admission) return admission
+  const denied = await enforcePlayAccess(auth.userId, headers)
+  if (denied) return denied
   const memberResult = await callRpc("joy8_resolve_member", { p_auth_user_id: auth.userId, p_enroll: false })
   if (!memberResult.ok) {
     return jsonResponse(toPublicRpcError(memberResult.body), statusFromRpcError(memberResult.body), headers)

@@ -2,7 +2,7 @@
 
 This document defines what Joy8 is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-24.
+Last reviewed: 2026-09-27.
 
 ## Product Definition
 
@@ -94,8 +94,8 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 ### First Release and Entry Models
 
 - First release: H5. Android and iOS are later work, not first-release gates.
-- Current sign-in: Google and persistent guest access. Facebook is implemented
-  but disabled and is not a current-release gate.
+- Approved release entry: allowlisted Google accounts. Persistent guest entry is
+  disabled until formal operation is explicitly approved. Facebook stays disabled.
   [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md#release-identity-scope)
   owns the sign-in decision and identity design.
 - Mahjong Clash is the first adopter, not the architectural center of Joy8.
@@ -103,7 +103,7 @@ The runtime contract is in `../platform/GAME_PLATFORM_INTEGRATION.md`. CrazyGame
 
 | Product model | Entry and release | Wallet | Game data |
 | --- | --- | --- | --- |
-| Independently operated game, such as Mahjong Clash | Own branded entry may launch before the public Joy8 Lobby | The player's shared Joy8 POINT wallet | Game-owned schema and authoritative backend |
+| Independently operated game | May support a reviewed branded entry; Mahjong Clash enters through the Joy8 Lobby | The player's shared Joy8 POINT wallet | Game-owned schema and authoritative backend |
 | Joy8-native game, such as a platform slot or compact table game | Operates with the platform and its shared services | The player's shared Joy8 POINT wallet | Game-owned or intentionally shared family schema and backend |
 
 Both use the same Joy8 membership on Joy8-operated surfaces. Independent
@@ -143,6 +143,12 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   match. That reservation is not a single bet and is not limited by the 10,000
   POINT ceiling. For such a game the minimum bet is the minimum available
   balance required to join the table.
+- Mahjong Clash retains full-balance reservations and removes its temporary
+  1-POINT reserve guard through a reviewed migration. Its game server enforces
+  low/middle/high table thresholds of 300/800/3,000 POINT. AI funds remain in
+  Mahjong-owned `ai_accounts`, initially 10,000 POINT per AI; Joy8 creates no
+  human wallets for AI. Financial Backend Key scopes require separate credential
+  review and use the existing controlled settlement adapter.
 - Starting POINT is granted once per player when the player enrolls, not per
   title and not at game launch:
 
@@ -152,6 +158,7 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   | New guest | 100 POINT |
   | Guest who links Google | One 900 POINT top-up, reaching the 1,000 POINT member grant |
 
+  Guest grant/promotion rules are dormant while guest creation is disabled.
   Grants are platform transactions and carry no originating game. Do not
   maintain an old Demo runtime or an old/new compatibility branch.
 - POINT is intended for operational play, not a disposable Demo-only design.
@@ -183,11 +190,9 @@ Detailed trust, wallet-lifecycle, and atomic-settlement requirements belong in
 
 ## Data and Environment Direction
 
-Use one codebase with a local test environment and one hosted operational
-environment initially. A permanently hosted staging site is not required for
-the initial solo-operator workflow; a temporary isolated preview can be added
-when an integration or release needs it. Different URLs against the same live
-database do not provide test isolation.
+Use one codebase with isolated local tests and the production hosted site only.
+The approved pre-release audience is controlled by the Google email allowlist.
+Different URLs against the same live database do not provide test isolation.
 
 Local tests use separate data, credentials, and configuration. Do not promote
 test balances, transactions, or fee totals into operational accounts. Any reset

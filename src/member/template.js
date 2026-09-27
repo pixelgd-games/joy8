@@ -3,7 +3,7 @@ export const memberCardMarkup = `
       <header class="account-heading">
         <span class="account-kicker">JOY8 PLAYER</span>
         <h1 id="account-title">登入 Joy8</h1>
-        <p id="account-description" class="muted">選擇登入方式，立即開始遊玩。</p>
+        <p id="account-description" class="muted">使用白名單 Google 帳號登入。</p>
       </header>
       <p id="account-status" role="status" aria-live="polite" tabindex="-1">正在確認登入狀態…</p>
       <div id="account-actions" hidden>
@@ -26,15 +26,7 @@ export const memberCardMarkup = `
               <span id="facebook-label">使用 Facebook 登入</span>
             </button>
           </div>
-          <div class="account-divider" aria-hidden="true"><span>或</span></div>
-          <div id="member-captcha" class="account-captcha" aria-label="安全驗證"></div>
-          <button id="guest-button" type="button" class="account-secondary">
-            <span class="account-button-icon" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><path d="M12 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 7c.8-3.1 3.5-5 7-5s6.2 1.9 7 5"/></svg>
-            </span>
-            <span>先以訪客遊玩</span>
-          </button>
-          <p id="guest-notice" class="account-note"><span class="account-note-icon" aria-hidden="true">i</span><span id="guest-notice-text">訪客登入憑證只保留在目前瀏覽器；換裝置前，記得綁定 Google。</span></p>
+          <p class="account-note">目前僅限白名單 Google 帳號遊玩；大廳開放瀏覽。</p>
         </div>
       </div>
     </section>

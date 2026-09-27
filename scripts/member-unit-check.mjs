@@ -16,8 +16,8 @@ test("branded registered entry enrolls explicitly without linking or guest conve
   await enterBrandedMember({ ...options, method: "google" })
   assert.deepEqual(launched, [true])
   assert.deepEqual(f.calls, [["rpc", "joy8-gateway/enroll-member", { body: {} }]])
-  await assert.rejects(enterBrandedMember({ ...options, method: "guest" }), { code: "registered_session" })
-  await assert.rejects(f.service.guest(), { code: "registered_session" })
+  await assert.rejects(enterBrandedMember({ ...options, method: "guest" }), { code: "JOY8_GUEST_DISABLED" })
+  await assert.rejects(f.service.guest(), { code: "JOY8_GUEST_DISABLED" })
   assert.equal(f.calls.length, 1)
 })
 
@@ -37,6 +37,16 @@ test("Loader distinguishes inactive accounts, throttling, unavailable games and 
     assert.equal(result.code, `JOY8-GAME-${expected}`)
     assert.equal(JSON.stringify(result).includes("internal secret"), false)
     if (status === 429) assert.match(result.message, /30/)
+  }
+})
+
+test("Loader uses explicit whitelist and guest-disabled errors", async () => {
+  for (const code of ["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"]) {
+    const result = await gameFailure({ context: Response.json({ error: code }, { status: 403 }) })
+    assert.equal(result.code, code)
+    assert.equal(result.title, "尚未開放")
+    assert.equal(result.reload, false)
+    assert.notEqual(memberErrorMessage({ code }), memberErrorMessage({ code: "unknown" }))
   }
 })
 
@@ -165,21 +175,12 @@ test("reading membership never creates a guest or enrolls an existing Auth user"
   assert.deepEqual(signedIn.calls, [["rpc", "joy8-gateway/member", { body: {} }]])
 })
 
-test("concurrent guest entry creates one Auth guest and preserves its player", async () => {
-  const f = fixture()
-  const otherTab = createMemberService(f.client, f.options)
-  const members = await Promise.all([f.service.guest(), otherTab.guest(), f.service.guest()])
-  assert.equal(f.calls.filter(([name]) => name === "anonymous").length, 1)
-  assert.deepEqual(members.map((member) => member.player_account_ref), ["player-1", "player-1", "player-1"])
-})
-
-test("unsupported guest locking and Auth failure stop enrollment", async () => {
-  const f = fixture()
-  const service = createMemberService(f.client, { origin })
-  await assert.rejects(service.guest(), { code: "guest_lock_unavailable" })
-  f.client.auth.signInAnonymously = async () => ({ error: { code: "over_request_rate_limit" } })
-  await assert.rejects(f.service.guest(), { code: "over_request_rate_limit" })
-  assert.deepEqual(f.calls, [])
+test("guest entry is disabled for new, existing and registered sessions without Auth calls", async () => {
+  for (const user of [null, guestUser, registeredUser]) {
+    const f = fixture(user)
+    await assert.rejects(f.service.guest("captcha"), { code: "JOY8_GUEST_DISABLED" })
+    assert.deepEqual(f.calls, [])
+  }
 })
 
 test("Google and Facebook link new identities to guests and never replace conflicts", async () => {
@@ -227,12 +228,6 @@ test("callback and provider-link errors use safe messages", () => {
   assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "google"), "這個 Google 已綁定其他玩家，不能合併目前的訪客資料。")
   assert.equal(memberErrorMessage({ code: "identity_already_exists" }, "facebook"), "這個 Facebook 已綁定其他玩家，不能合併目前的訪客資料。")
   assert.equal(memberErrorMessage({ code: "flow_state_not_found" }), "這個驗證連結已使用或已失效，請重新操作。")
-})
-
-test("anonymous entry forwards captcha tokens", async () => {
-  const f = fixture()
-  await f.service.guest("captcha-guest")
-  assert.deepEqual(f.calls[0], ["anonymous", { options: { captchaToken: "captcha-guest" } }])
 })
 
 test("sign-out does not auto-create guests", async () => {

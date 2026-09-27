@@ -8,6 +8,7 @@ import net from "node:net"
 import { fileURLToPath } from "node:url"
 import WebSocket from "ws"
 import { expectMailbox } from "./mailbox-browser-check.mjs"
+import { expectAllowlistAdmin } from "./allowlist-browser-check.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const host = "127.0.0.1"
@@ -74,6 +75,8 @@ try {
   }, "Shared error modal shows code")
   await expectErrorPresentation(client)
   await expectMailbox(client, appPort)
+  await expectAllowlistAdmin(client, appPort)
+  await expectPageText(client, appPort, "/account/?error=access_denied&error_description=JOY8_EMAIL_NOT_ALLOWED&provider=google&flow=signin", text => text.includes("尚未開放") && text.includes("白名單 Google"), "Signup-hook rejection survives the Auth trampoline")
 
   client.ws.close()
   console.log("Smoke check passed.")
@@ -417,7 +420,7 @@ async function expectErrorPresentation(client) {
 
 async function expectMemberEntry(client, appPort) {
   await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
-    return text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩")
+    return text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("白名單")
   }, "Account entry returns to the Lobby member dialog")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
@@ -429,10 +432,10 @@ async function expectMemberEntry(client, appPort) {
     expression: `(() => {
       const google = document.getElementById("google-button").getBoundingClientRect()
       const facebook = document.getElementById("facebook-button").getBoundingClientRect()
-      const guest = document.getElementById("guest-button").getBoundingClientRect()
+
       return document.getElementById("account-title").textContent === "登入 Joy8"
         && facebook.top > google.bottom
-        && guest.top > facebook.bottom
+        && !document.getElementById("guest-button")
         && document.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
         && !document.getElementById("email-form")
         && !document.getElementById("register-button")
@@ -445,7 +448,7 @@ async function expectMemberEntry(client, appPort) {
     await client.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: width < 600 })
     const layout = await client.send("Runtime.evaluate", {
       returnByValue: true,
-      expression: `document.documentElement.scrollWidth <= innerWidth && document.getElementById("facebook-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 9 && document.getElementById("guest-button").getBoundingClientRect().top > document.getElementById("facebook-button").getBoundingClientRect().bottom`,
+      expression: `document.documentElement.scrollWidth <= innerWidth && document.getElementById("facebook-button").getBoundingClientRect().top - document.getElementById("google-button").getBoundingClientRect().bottom >= 9 && !document.getElementById("guest-button")`,
     })
     if (!layout.result.value) throw new Error(`Member layout failed at ${width}px`)
     if (process.env.SMOKE_MEMBER_SCREENSHOT && width === 390) {
@@ -474,7 +477,7 @@ async function expectMemberEntry(client, appPort) {
   await waitForText(client, (text) => text.includes("目前以訪客身分登入") && text.includes("繼續遊玩"), "Persistent guest account UI")
   const guestControls = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `document.getElementById("guest-button").hidden && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("facebook-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
+    expression: `!document.getElementById("guest-button") && !document.getElementById("email-form") && document.getElementById("google-label").textContent.includes("綁定") && document.getElementById("facebook-label").textContent.includes("綁定") && document.getElementById("continue-link").getAttribute("href") === "/game/?slug=test"`,
   })
   if (!guestControls.result.value) throw new Error("Guest upgrade controls are unsafe")
   await client.send("Runtime.evaluate", { expression: 'document.getElementById("facebook-button").click()' })
@@ -615,7 +618,7 @@ async function expectGatewayCors(client) {
 
 async function expectMemberModal(client) {
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Member dialog opens on the Lobby")
+  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("使用 Facebook 登入") && text.includes("白名單"), "Member dialog opens on the Lobby")
   const opened = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
@@ -638,7 +641,7 @@ async function expectMemberModal(client) {
         const dialog = document.querySelector("#member-dialog")
         const overflow = dialog.scrollHeight - dialog.clientHeight
         dialog.scrollTop = dialog.scrollHeight
-        const footerVisible = dialog.querySelector("#guest-notice").getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1
+        const footerVisible = dialog.querySelector(".account-note").getBoundingClientRect().bottom <= dialog.getBoundingClientRect().bottom + 1
         dialog.scrollTop = 0
         return { overflow, horizontal: dialog.scrollWidth > dialog.clientWidth, scrollbar: getComputedStyle(dialog).scrollbarWidth, footerVisible }
       })()`,
@@ -708,7 +711,7 @@ async function expectGameSelection(client, appPort) {
   })
   for (let index = 0; index < games.length; index++) {
     await client.send("Runtime.evaluate", { expression: `document.querySelectorAll("#gameGrid .game-tile-poster")[${index}].click()` })
-    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Selected game opens login over the Lobby")
+    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("使用 Facebook 登入") && text.includes("白名單"), "Selected game opens login over the Lobby")
     const path = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
     if (path.result.value !== "/") throw new Error("Selecting a game removed the Lobby")
     const provider = index % 2 === 0 ? "google" : "facebook"
@@ -733,7 +736,7 @@ async function expectGameSelection(client, appPort) {
     console.log("OK Game selection, callback destination, cancellation and empty-catalog direct-link rejection")
     return
   }
-  await expectPageText(client, appPort, liveGame.path, (text) => text.includes(`遊玩「${liveGame.name}」`) && text.includes("使用 Facebook 登入") && text.includes("先以訪客遊玩"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, liveGame.path, (text) => text.includes(`遊玩「${liveGame.name}」`) && text.includes("使用 Facebook 登入") && text.includes("白名單"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
@@ -775,43 +778,10 @@ async function expectMemberContinuation(client) {
         return { root, panel, continued }
       }
       try {
-        const guest = mount("/game/?slug=guest-game")
-        await guest.panel.ready
-        guest.root.querySelector("#guest-button").click()
-        await guest.continued
-        guest.panel.dispose()
-        user = null
-        let challenge
-        window.turnstile = { render: (_, options) => { challenge = options; return 0 }, execute() {}, remove() {} }
-        window.setTimeout = (fn, delay, ...args) => originalSetTimeout(fn, delay === 45000 ? 20 : delay, ...args)
-        const recovering = mount("/game/?slug=recovered-game", {}, null)
-        await recovering.panel.ready
-        recovering.root.querySelector("#guest-button").click()
-        await new Promise(resolve => originalSetTimeout(resolve, 60))
-        const captchaRecovered = recovering.root.querySelector("#account-status").textContent.includes("安全驗證逾時")
-          && recovering.root.querySelector(".account-card").getAttribute("aria-busy") === "false"
-          && [...recovering.root.querySelectorAll("button")].every(button => !button.disabled)
-          && user === null
-        window.turnstile.execute = () => challenge.callback("fixture-retry")
-        recovering.root.querySelector("#guest-button").click()
-        await recovering.continued
-        recovering.panel.dispose()
-        window.turnstile = originalTurnstile
-        window.setTimeout = originalSetTimeout
-        user = null
-        let release
-        let didStart
-        const started = new Promise(resolve => { didStart = resolve })
-        auth.signInAnonymously = () => { didStart(); return new Promise(resolve => { release = () => { user = { id: "late-guest", is_anonymous: true }; resolve({ data: { user }, error: null }) } }) }
-        const cancelled = mount("/game/?slug=cancelled-game")
-        await cancelled.panel.ready
-        cancelled.root.querySelector("#guest-button").click()
-        await started
-        cancelled.panel.dispose()
-        cancelled.root.remove()
-        release()
-        await new Promise(resolve => setTimeout(resolve, 0))
-        auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
+        const restricted = mount("/game/?slug=restricted-game")
+        await restricted.panel.ready
+        const guestAbsent = !restricted.root.querySelector("#guest-button")
+        restricted.panel.dispose()
         user = null
         const callback = mount("/game/?slug=callback-game", { code: "fixture-code", flow: "signin" })
         await callback.panel.ready
@@ -821,7 +791,7 @@ async function expectMemberContinuation(client) {
         const retiredFlowRejected = retired.root.querySelector("#account-status").dataset.error === "true"
           && retired.root.querySelector("#account-status").textContent.includes("目前無法完成操作")
         retired.panel.dispose()
-        return { paths, retiredFlowRejected, captchaRecovered }
+        return { paths, retiredFlowRejected, guestAbsent }
       } finally {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
@@ -833,12 +803,12 @@ async function expectMemberContinuation(client) {
       }
     })`,
   })
-  const expectedPaths = ["/game/?slug=guest-game", "/game/?slug=recovered-game", "/game/?slug=callback-game"]
+  const expectedPaths = ["/game/?slug=callback-game"]
   const value = result.result.value
-  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.captchaRecovered) {
+  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.guestAbsent) {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
-  console.log("OK Guest and provider continuation, captcha timeout unlocks controls and permits retry, invalid callbacks and cancelled entry fail closed")
+  console.log("OK Google callback continuation, guest entry absent, invalid callbacks fail closed")
 }
 
 async function expectGameIframeSecurity(client) {

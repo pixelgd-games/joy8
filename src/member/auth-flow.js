@@ -29,7 +29,8 @@ export function createMemberAuthFlow(service, { storage = sessionStorage, naviga
   async function complete(params) {
     const provider = params.get("provider")
     const flow = params.get("flow")
-    const error = params.get("error_code") || (params.has("error") ? "auth_callback_failed" : null)
+    const restriction = ["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"].find(code => params.get("error_description")?.includes(code))
+    const error = restriction || params.get("error_code") || (params.has("error") ? "auth_callback_failed" : null)
     if (error) {
       if (error === "identity_already_exists" && flow === "link" && ["google", "facebook"].includes(provider)) {
         await switchProvider(provider)

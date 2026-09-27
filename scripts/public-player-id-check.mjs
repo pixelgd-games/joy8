@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
-import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 
 const db = await createTestDatabase()
@@ -9,7 +9,7 @@ const one = async (sql, values = []) => (await rows(sql, values))[0]
 let existingPlayerId
 
 before(async () => {
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
   const auth = await one("insert into auth.users (is_anonymous) values (true) returning id")
   existingPlayerId = (await one("insert into public.player_accounts (auth_user_id, account_type, member_enrolled_at) values ($1, 'guest', now()) returning id", [auth.id])).id
 })

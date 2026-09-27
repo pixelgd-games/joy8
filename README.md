@@ -6,7 +6,15 @@ This file is the source of truth for the repository's current implementation and
 
 ## Current State
 
-- Public Lobby browsing, Google/guest member entry, six-digit public player IDs,
+The approved whitelist SQL, reviewed test-player cleanup and Mahjong reserve
+release are installed. The Before User Created Hook is enabled in Dashboard;
+other Auth settings were preserved. The admin allowlist page, Gateway checks
+and guest-button removal are deployed. The requested Johnny Google account is
+allowlisted and its verified Google signup is recorded in hosted Auth. A fresh
+outside-list Google signup still needs real-provider acceptance.
+See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
+
+- Public Lobby browsing, Google member entry, six-digit public player IDs,
   the shared POINT wallet and trusted settlement are deployed.
 - Facebook sign-in is implemented but disabled. The sign-in decision is owned by
   [MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope).
@@ -20,8 +28,8 @@ This file is the source of truth for the repository's current implementation and
 - Game sessions last 12 hours; launch codes last 2 minutes; balance tokens last
   at most 15 minutes and are renewed by the game backend.
 - Monster Lab is published in the public catalog with a production Backend Key;
-  its private entry is disabled. Mahjong remains hidden with its private entry
-  paused. Monster Lab has verified hosted launch, bets, win/loss settlement and
+  its private entry is disabled. Mahjong is published at its production Pages URL
+  with its localhost private entry disabled. Monster Lab has verified hosted launch, bets, win/loss settlement and
   complete Free Spins rounds reconciled against Joy8 settlements; the remaining
   hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
@@ -33,9 +41,9 @@ Joy8 currently provides:
 - A public mobile-first game Lobby.
 - A database-backed game catalog exposed through `public_games_v1`.
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
-- A reusable branded game-entry shell whose visible login is game artwork while
-  Joy8 retains Auth, enrollment, session issuance, and callback ownership.
-- A reusable Lobby dialog for Google and persistent guest entry, with explicit
+- A reusable branded game-entry shell with Joy8-controlled Google entry before
+  protected game metadata and artwork; Joy8 retains enrollment and session authority.
+- A reusable Lobby dialog for Google entry, with explicit
   player enrollment. `/account/` is a narrow Auth return trampoline back to that
   dialog. The Facebook button is built but hidden.
 - A stable six-digit public player ID displayed as `Player 123456`, separate
@@ -81,7 +89,8 @@ The front end is a Vite multi-page application written in vanilla JavaScript and
 CSS. Admin uses its Auth client; public catalog reads use a non-persistent client
 with no administrator session. Member entry and launch use a separate PKCE client
 with storage key `joy8-member-auth-v1`; Auth session storage is platform-owned and
-never passed into games. The Gateway is the only public path to protected player,
+never passed into games. The prepared Gateway checks current Google email access before enrollment and
+all public/private/branded entry routes. The Gateway is the only public path to protected player,
 game-session, and wallet RPCs. Separate browser storage does not grant
 administrator or player eligibility.
 
@@ -97,10 +106,11 @@ game-facing protocol is `server-v1`, defined in
 | `/` | `index.html` | Public Lobby |
 | `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog or a validated branded entry |
 | `/mailbox/` | `mailbox/index.html` | Member announcements, notifications and reward claims |
+| `/admin/access/` | `admin/access/index.html` | Google email allowlist management |
 | `/admin/mail/` | `admin/mail/index.html` | Administrator compose, preview, send and recipient audit |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
-| `/entry/` | `entry/index.html` | Joy8-controlled, game-branded Google/guest entry and in-memory launch handoff |
-| `/play-test/` | `play-test/index.html` | Hidden-game test entry using normal membership and the shared Loader; no player allowlist |
+| `/entry/` | `entry/index.html` | Joy8-controlled Google entry and branded game shell and in-memory launch handoff |
+| `/play-test/` | `play-test/index.html` | Hidden-game entry using the shared Loader and the same email access gate |
 | `/admin/login/` | `admin/login/index.html` | Google OAuth entry |
 | `/admin/games/` | `admin/games/index.html` | Game list |
 | `/admin/games/new/` | `admin/games/new/index.html` | Create game |
@@ -115,8 +125,9 @@ Vite declares these entries in `vite.config.js`.
 | `src/main.js` | Lobby bootstrap |
 | `src/pages/lobby/` | Lobby data loading, rendering, and layout |
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
-| `src/pages/entry/` | Branded iframe entry, Google/guest orchestration and callback completion |
+| `src/pages/entry/` | Branded iframe entry, Google orchestration and callback completion |
 | `src/admin/` | Admin authentication and game CRUD |
+| `src/admin/access.js` | Verified-admin email allowlist management |
 | `src/admin/mail.js` | Administrator mailbox composer and delivery audit |
 | `src/mailbox/` | Member inbox and shared mailbox presentation/service |
 | `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
@@ -152,7 +163,7 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 2. Cards are rendered from database metadata.
 3. Selecting a game checks membership. Enrolled registered players and persistent
    guests continue to `/game/?slug=<slug>`. Other visitors see the member dialog
-   with the chosen game named. Google or explicit guest entry preserves that
+   with the chosen game named. Google entry preserves that
    destination; closing cancels it.
 4. Missing cover images use the platform fallback behavior.
 
@@ -179,10 +190,8 @@ into the iframe.
 
 Google uses PKCE and explicit callback exchange. The public member UI does not
 offer Email/password signup, sign-in, verification, or recovery. Guest creation
-uses Cloudflare Turnstile and Web Locks across tabs, and fails closed without the
-required browser capability. Turnstile script loading is bounded to 15 seconds and
-the complete token attempt to 45 seconds; failure permits an explicit retry, and
-closing the dialog cancels the attempt. Logout is local to the selected Auth
+is disabled in the prepared frontend; the reviewed signup hook and anonymous
+Auth setting enforce this server-side at rollout. Logout is local to the selected Auth
 session and does not create a replacement guest. Clearing storage can lose guest
 access.
 
@@ -203,7 +212,8 @@ applies the one-time top-up when a guest has linked Google.
 
 ### Administration
 
-1. An administrator signs in with Google OAuth.
+1. An administrator signs in with Google OAuth. The reviewed whitelist SQL
+   seeds every current administrator email and prevents its removal.
 2. The browser calls `is_joy8_admin()`, which requires a verified active Google
    Auth identity listed in `admin_users`.
 3. Authorized users can list, create, edit, publish, and unpublish catalog records.
@@ -337,6 +347,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 
 | Command | Covers |
 | --- | --- |
+| `node --test scripts/email-allowlist-check.mjs scripts/reviewed-cleanup-check.mjs scripts/mahjong-release-policy-check.mjs` | Applied whitelist/cleanup/reserve SQL and pending Mahjong payout/key drafts; isolated fixtures only |
 | `npm run test:member` / `test:captcha` / `test:iframe` | Member flow, Turnstile handling and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, grants, promotion, launch and wallet concurrency |
@@ -393,22 +404,28 @@ for the complete safety rules.
   It is not granted to anon, authenticated, service_role or game runtimes. Never
   put the project administrator password or player credentials in command
   arguments or chat.
+- **Whitelist rollout and reviewed cleanup.** Follow
+  [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md); drafts are not
+  installed until individually approved. The enabled Before User Created Hook
+  rejects guests and nonlisted/non-Google signup. Provider settings are unchanged.
 - **Backend Keys.** Use `npm run key:backend`; the operator flow is in
   [integrations/third-party/README.md](integrations/third-party/README.md).
 
 ### Hosted Auth Configuration
 
-- The public member UI uses Google and anonymous Auth only. Anonymous sign-in
-  and manual identity linking are enabled.
+- The enabled `public.joy8_before_user_created` Postgres Hook accepts only
+  allowlisted Google signup and rejects anonymous account creation. The provider
+  switches and manual identity linking settings were left unchanged. The local
+  member UI and hosted Pages build remove guest entry.
 - The Email provider is enabled: public Auth settings report `external.email=true`,
-  `disable_signup=false` and `mailer_autoconfirm=false`, so Email API signup is
-  possible and requires verification. Disabling it is a pending release step
+  `disable_signup=false` and `mailer_autoconfirm=false`. The Hook rejects new
+  Email-provider accounts. Disabling the provider is a separate release step
   whose timing the user controls. When approved, run
   `scripts/supabase-joy8.cmd auth-config disable-email --apply`; it disables only
-  the Email provider and keeps Google and anonymous signup. Never set the global
+  the Email provider and preserves Google and the current anonymous setting. Never set the global
   `disable_signup` flag. The local Joy8 access token currently receives HTTP 403
-  `Missing required permission(s): auth_config_read` and needs Auth configuration
-  read/write permission first.
+  `Missing required permission(s): auth_config_read`. Hook activation used the
+  signed-in Dashboard without updating, creating or displaying a token.
 - Facebook is disabled. The Joy8 Meta app (`1385504273217738`) is unpublished
   with no business portfolio, and no Meta App Secret is stored in this
   repository or hosted Auth.
@@ -471,6 +488,7 @@ for the complete safety rules.
 | `docs/platform/MAILBOX.md` | In-app mailbox, administrator workflow, claim accounting and activation procedure |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |
+| `docs/operations/WHITELIST_RELEASE.md` | Pending whitelist rollout, exact cleanup review and activation gates |
 | `docs/operations/KNOWN_ISSUES.md` | Active limitations, risks, and launch blockers |
 | `docs/operations/ANALYTICS_MONITORING.md` | Analytics, KPI, logging, dashboards, and alerts |
 

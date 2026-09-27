@@ -52,7 +52,8 @@
     "20260925120000_monster_lab_round_payout.sql",
     "20260925150000_single_trip_server_requests.sql",
     "20260925170000_open_settle_balance_response.sql",
-    "20260926100000_in_app_mailbox.sql"
+    "20260926100000_in_app_mailbox.sql",
+    "20260927100000_email_play_allowlist.sql"
   ],
   "drafts": [],
   "excluded": {
@@ -85,6 +86,12 @@
     "20260924150000_mahjong_per_table_storage.sql": "Product-owned forward upgrade to per-table storage and quarantined-table resolution; fresh Mahjong fixtures install its current product SQL.",
     "20260925130000_monster_lab_private_entry_activation.sql": "Hosted Monster Lab private-entry activation; synthetic fixtures keep private entries paused.",
     "20260925140000_publish_monster_lab.sql": "Hosted Monster Lab public catalog release; synthetic fixtures keep games unpublished.",
-    "20260925160000_operator_point_credit.sql": "Hosted single-player POINT adjustment; synthetic fixtures have no matching player."
+    "20260925160000_operator_point_credit.sql": "Hosted single-player POINT adjustment; synthetic fixtures have no matching player.",
+    "20260927110000_clear_reviewed_test_players.sql": "Reviewed hosted test-player deletion; never apply hosted identities or fingerprints to synthetic fixtures.",
+    "20260927120000_mahjong_release_reserve.sql": "Hosted Mahjong policy update; exercised against the registered product in mahjong-release-policy-check.",
+    "20260927120500_mahjong_payout_safety_limit.sql": "Hosted Mahjong payout policy; exercised by mahjong-release-policy-check.",
+    "20260927121000_mahjong_reviewed_key_scopes.sql": "Reviewed hosted key scope activation; synthetic key fixture tests the same SQL.",
+    "20260927122000_allow_johnny_google.sql": "User-authorized hosted email allowlist entry; synthetic fixtures use example.test identities.",
+    "20260927123000_publish_mahjong_clash.sql": "Hosted Mahjong catalog activation at the verified Pages URL; synthetic fixtures keep games unpublished."
   }
 }

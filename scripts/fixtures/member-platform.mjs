@@ -1,8 +1,8 @@
 import { randomBytes } from "node:crypto"
-import { loadCurrentPlatform } from "./platform-bundle.mjs"
+import { loadPreAllowlistPlatform } from "./platform-bundle.mjs"
 
 export async function loadMemberPlatformDatabase(db) {
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
   const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
   const game = (await one("select id from public.games where slug='test-game'")).id
   const shared = (await one("insert into public.games(name,slug,type,published,launch_url) values('Shared','shared-game','casual',true,'https://game.example/') returning id")).id

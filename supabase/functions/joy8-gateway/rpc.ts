@@ -30,6 +30,7 @@ export const SERVER_ERROR_STATUSES: Readonly<Record<string, number>> = Object.fr
   JOY8_UPSTREAM_UNAVAILABLE: 503,
 })
 const PUBLIC_RPC_MESSAGES = new Set([
+  "JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED",
   "game is not available", "game session is not active", "player account is not active",
   "player membership is required", "verified member identity is required",
   "JOY8_GAME_NOT_READY", "JOY8_PLAYER_INACTIVE", "JOY8_WALLET_INACTIVE", "JOY8_INVALID_REQUEST",

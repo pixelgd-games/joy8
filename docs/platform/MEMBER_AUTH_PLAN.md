@@ -1,13 +1,10 @@
 # Joy8 Member and Authentication Plan
 
-Status: Google and persistent guest entry are live and passed hosted acceptance.
-Facebook is implemented but disabled. Stable six-digit public player IDs are
-deployed. Guest-to-Google linking, guest continuity and end-to-end public
-branded-entry acceptance remain open. The reusable branded H5 shell, Mahjong
-message contract, service-only resolver and Gateway routes are implemented; the
-current Mahjong binding remains localhost-only. [README.md](../../README.md#hosted-auth-configuration)
-owns the verified hosted Auth state.
-Last reviewed: 2026-09-24.
+Status: The approved release uses allowlisted Google accounts on the production
+site. Guest entry is suspended until formal operation is approved. Implementation
+and hosted rollout state are recorded in [README.md](../../README.md) and the
+[release review](../operations/WHITELIST_RELEASE.md).
+Last reviewed: 2026-09-27.
 
 This document owns authentication, persistent guests, account lifecycle, and
 branded-entry identity handoff. [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md)
@@ -23,8 +20,8 @@ This section is the single record of the sign-in decision.
 
 | Method | Decision |
 | --- | --- |
-| Google | Live |
-| Persistent guest | Live |
+| Google | Only allowlisted emails may register or start games |
+| Persistent guest | Disabled until formal operation is explicitly approved |
 | Facebook | Implemented but disabled; see [Provider and Abuse Protection](#provider-and-abuse-protection) |
 | Email/password | Not offered; no public UI |
 | Hosted Email provider | Disable before public release; the user has deferred the timing, so it stays enabled until the user schedules the change |
@@ -35,13 +32,34 @@ Android and iOS are deferred. Reintroducing any email-based sign-in is a new
 product decision; do not revive it from historical code or documentation.
 
 A player can enter through the public Joy8 Lobby or a Joy8-controlled branded
-game entry. Both resolve the same Joy8 player. A branded entry can open before
-the public Lobby and remain available afterward. It presents authentication;
+game entry. Both resolve the same Joy8 player and require the same allowlisted Google
+identity. Mahjong Clash uses the public Joy8 Lobby. The Joy8 surface owns authentication;
 the gameplay runtime never implements it or receives member/provider credentials.
 This contract is reusable across games and is not Mahjong-specific.
 
 External platform channels follow their own identity contract. They must not
 initialize Joy8 identity merely because the game also has a Joy8 build.
+
+## Email Access Gate
+
+`joy8_email_allowlist` is a new platform table, not the retired `access_whitelist`.
+Emails are unique after trimming and lowercasing; no Gmail dot/plus rewriting is
+performed. Only verified Google administrators can list, add or remove entries
+through `/admin/access/`. Current administrator emails are seeded by the migration
+and cannot be removed. Changing administrator assignments remains a separate
+reviewed operation and must keep their allowlist entries synchronized.
+
+Supabase Before User Created Hook rejects anonymous identities, non-Google signup
+and emails absent from the allowlist. It checks the incoming user because the new
+Auth row does not exist yet. The hook runs as `supabase_auth_admin`; browser and
+game roles cannot invoke it. Anonymous Auth is also disabled in hosted settings.
+
+The Gateway verifies the bearer and checks the current database identity/email on
+`enroll-member`, `create-session`, `private-session` and `branded-entry`. The SQL
+session/enrollment insert guards provide a second boundary. Removal denies future
+sessions, including existing Google accounts; it does not cancel committed match
+obligations or revoke previously issued sessions. The Lobby stays public.
+Errors are `JOY8_EMAIL_NOT_ALLOWED` and `JOY8_GUEST_DISABLED`, both HTTP 403.
 
 ## Responsibility Boundary
 
@@ -64,15 +82,15 @@ in the owning repository, not a first-release platform dependency.
 
 - Guest-to-provider linking remains pending hosted acceptance.
   [README.md](../../README.md) owns the implementation details and test limits.
-- Deletion requests and cleanup/retention are not implemented.
+- Self-service deletion and ongoing retention are not implemented. The one-time
+  reviewed test-data cleanup is in the release review.
 - The branded entry accepts only a configured game slug, exact trusted
-  parent/game origins, Google or explicit guest requests, and in-memory launch
+  parent/game origins, Google requests, and in-memory launch
   messages. `/account/` returns callbacks only to the Lobby or validated `/game/`,
   `/play-test/`, and `/entry/` routes. Public branded-entry acceptance needs a
   reviewed production game origin and real provider/game testing.
-- The `/play-test/?slug=...` entry uses the same membership: active registered
-  members and persistent guests enter without per-player approval, and
-  authorization belongs to verified membership and backend entry configuration.
+- The `/play-test/?slug=...` entry uses the same membership: allowlisted registered
+  members enter only when backend entry configuration also permits them.
   Mahjong's current entry state is tracked in
   [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md#mahjong-activation).
 - Consume the platform wallet contract rather than introducing wallet logic into
@@ -108,8 +126,9 @@ Clearing browser data or changing devices cannot guarantee guest recovery.
 Explain this limitation and provide an upgrade path to Google.
 Signing out must return to an explicit entry choice, not silently create a guest.
 
-Supabase anonymous sign-in is the selected mechanism and is enabled in hosted
-Auth; hosted guest entry has passed acceptance testing. Anonymous Auth users
+Guest creation stays disabled. The retained anonymous identity/linking code is
+dormant and does not authorize reopening guest access. Prior hosted guest
+acceptance does not satisfy the current release policy. Anonymous Auth users
 have user IDs and use the `authenticated` role. Classify them using verified
 anonymous status rather than interpreting every Auth ID as a registered member.
 Define session storage, refresh, expiry, abuse controls, and cleanup before shipping.
@@ -124,9 +143,9 @@ outside this release.
 ## H5 Entry and Handoff
 
 The Lobby is public and never requires a login just to browse. Selecting a game
-checks existing player enrollment: an active registered player or persistent
-guest proceeds directly; an unenrolled visitor gets the shared member dialog
-over the unchanged Lobby. The dialog offers Google and explicit guest play.
+checks existing player enrollment: an enrolled player proceeds to the Loader
+access check; an unenrolled visitor gets the shared member dialog
+over the unchanged Lobby. The dialog offers Google entry; guest buttons are removed.
 Successful entry continues to the selected game. Dismissal cancels
 that selection; opening another game or the top-bar account entry must not reuse
 the previous destination. A service failure must not silently create a guest.
@@ -134,10 +153,11 @@ the previous destination. A service failure must not silently create a guest.
 Direct published-game URLs follow the same membership policy and return missing members
 to the Lobby dialog. `/account/` is the callback trampoline, not the default
 platform entrance or a second account page. Callback destinations are validated
-game paths, never arbitrary URLs. The implemented branded H5 entry loads the
-game-owned login artwork before identity, accepts only Google or persistent
-guest selection from the trusted iframe, and auto-continues an existing enrolled
-member. Native implementation remains deferred.
+game paths, never arbitrary URLs. The branded H5 entry completes Google Auth
+before fetching protected entry
+metadata or loading the game-owned iframe. An unauthenticated visitor sees a
+Joy8-controlled Google button. Guest iframe requests are explicitly rejected.
+An existing eligible member can continue automatically. Native implementation remains deferred.
 
 The callback passes OAuth parameters through `/account/`. Lobby flows continue
 to `/?member=callback&code=...`; a validated branded flow returns directly to
@@ -152,7 +172,7 @@ not an authorization signal; session issuance still verifies identity server-sid
 
 ```text
 Public Lobby or branded home -> select a game / start playing
-  -> Joy8 sign-in or persistent guest restoration
+  -> Joy8 Google sign-in and email allowlist check
   -> backend player and wallet resolution
   -> authorized game-session handoff
   -> game runtime

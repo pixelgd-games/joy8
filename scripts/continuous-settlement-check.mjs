@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, afterEach, before, beforeEach, describe, test } from "node:test"
 import { randomBytes, randomUUID } from "node:crypto"
@@ -86,7 +87,7 @@ async function rpc(name, args, role = "service_role") {
 const call = (name, body, key = secret) => rpc(name, [key, JSON.stringify(body)])
 const denied = (promise, code) => assert.rejects(promise, error => error.message.includes(code))
 async function ready() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   const p = await one("select * from public.joy8_resolve_member($1,true)", [auth])
   const s = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await db.query("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: s.launch_code })])

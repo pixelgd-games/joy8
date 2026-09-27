@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, test } from "node:test"
 import { buildPlatformBundle, validatePlatformBundle } from "./fixtures/platform-bundle.mjs"
@@ -33,11 +34,11 @@ test("the complete exported fixture installs current member, session, accounting
   for (const name of ["joy8_product_ddl_guard", "joy8_product_drop_guard"]) {
     assert.equal((await one(`select exists(select 1 from pg_event_trigger where evtname='${name}' and evtenabled='O') value`)).value, true)
   }
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   assert.equal((await db.query("select * from public.joy8_resolve_member($1,false)", [auth])).rows.length, 0)
   const member = (await db.query("select * from public.joy8_resolve_member_profile($1,true)", [auth])).rows[0]
   assert.match(member.public_id, /^\d{6}$/)
-  assert.deepEqual(await one("select count(*)::int n,sum(balance)::text balance from public.wallet_accounts"), { n: 1, balance: "100.00" })
+  assert.deepEqual(await one("select count(*)::int n,sum(balance)::text balance from public.wallet_accounts"), { n: 1, balance: "1000.00" })
   assert.deepEqual(await one("select initial_credit::text member,guest_initial_credit::text guest from public.joy8_wallet_policies"), { member: "1000.00", guest: "100.00" })
   assert.equal((await one("select to_regclass('public.joy8_payout_budgets') value")).value, null)
   assert.equal((await one("select exists(select 1 from pg_attribute where attrelid='public.joy8_game_policies'::regclass and attname='min_bet_amount' and not attisdropped) value")).value, true)

@@ -7,6 +7,7 @@ import { createMemberService, memberErrorMessage } from "../../member/service.js
 import { createMemberAuthFlow } from "../../member/auth-flow.js"
 import { createBrandedEntryRequests, enterBrandedMember } from "../../member/branded-entry.js"
 import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/policy.js"
+import { gameFailure } from "../game/errors.js"
 
 const params = new URLSearchParams(location.search)
 const slug = params.get("slug")
@@ -49,13 +50,27 @@ const handleRequest = createBrandedEntryRequests({
     await enterBrandedMember({ method, service, captcha, onGoogle: () => memberFlow.begin("google"),
       onLaunch: () => deliverSession(requestId) })
   },
-  onError: (error, requestId) => showStatus(memberErrorMessage(error, "google"), true, requestId),
+  onError: async (error, requestId) => showStatus(error.context ? (await gameFailure(error)).message : memberErrorMessage(error, "google"), true, requestId),
 })
 
 async function main() {
   if (!GAME_SLUG_PATTERN.test(slug || "")) throw new Error("Invalid game slug")
   const callback = params.has("code") || params.has("error") || params.has("error_code")
   if (callback) history.replaceState(null, "", next)
+  if (callback && !await memberFlow.complete(params)) return
+  if (!await service.session()) {
+    showStatus("目前僅限白名單 Google 帳號遊玩。")
+    const login = document.createElement("button")
+    login.type = "button"
+    login.textContent = "使用 Google 登入"
+    login.addEventListener("click", async () => {
+      login.disabled = true
+      try { await memberFlow.begin("google") }
+      catch (error) { showStatus(memberErrorMessage(error), true); login.disabled = false }
+    })
+    status.append(login)
+    return
+  }
   const { data, error } = await memberSupabase.functions.invoke("joy8-gateway/branded-entry", { body: { slug } })
   if (error || !data?.launch_url || data.protocol !== "server-v1") throw error || new Error("Invalid branded entry")
   const gameUrl = normalizeLaunchUrl(data.launch_url)
@@ -67,9 +82,7 @@ async function main() {
     onTimeout: () => { failed = true; showStatus("遊戲連線未完成，請重新整理後再試。", true) },
     onMessage: data => { void handleRequest(data) },
   })
-  if (callback) {
-    if (await memberFlow.complete(params)) await deliverSession()
-  } else if (await service.membership()) await deliverSession()
+  if (await service.membership()) await deliverSession()
 }
 
-main().catch(error => showStatus(memberErrorMessage(error), true)).finally(() => { busy = false })
+main().catch(async error => showStatus(error.context ? (await gameFailure(error)).message : memberErrorMessage(error), true)).finally(() => { busy = false })

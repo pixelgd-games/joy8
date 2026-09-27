@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { readFile } from "node:fs/promises"
@@ -28,7 +29,7 @@ async function denied(action, pattern) {
   await db.exec("rollback to savepoint rejection; release savepoint rejection")
 }
 async function player() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
   const session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await rpc("joy8_server_session_v1", { version: 1, launch_code: session.launch_code }, "exchange")

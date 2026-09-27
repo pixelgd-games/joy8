@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { before, after, test } from 'node:test'
 import { createTestDatabase } from './fixtures/test-database.mjs'
-import { loadCurrentPlatform } from './fixtures/platform-bundle.mjs'
+import { loadPreAllowlistPlatform } from './fixtures/platform-bundle.mjs'
 
 const origin = 'https://joy8.cc'
 let db, game, member, user
@@ -22,7 +22,7 @@ async function denied(action, pattern) {
 
 before(async () => {
   db = await createTestDatabase()
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
   game = (await one("select id from public.games where slug='monster-lab'")).id
   user = (await one('insert into auth.users(is_anonymous) values(true) returning id')).id
   member = (await one('select * from public.joy8_resolve_member($1,true)', [user])).player_account_id

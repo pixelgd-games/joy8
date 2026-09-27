@@ -25,9 +25,7 @@ export function initMemberPanel(root, options = {}) {
   let disposed = false
 
   $("facebook-button").hidden = !facebookEnabled
-  $("guest-notice-text").textContent = facebookEnabled
-    ? "訪客登入憑證只保留在目前瀏覽器；換裝置前，記得綁定 Google 或 Facebook。"
-    : "訪客登入憑證只保留在目前瀏覽器；換裝置前，記得綁定 Google。"
+
 
   if (authCode || callbackError) {
     const label = providerLabel(callbackProvider)
@@ -78,8 +76,6 @@ export function initMemberPanel(root, options = {}) {
     $("enroll-button").hidden = true
     $("google-label").textContent = guest ? "綁定 Google，保留進度" : "使用 Google 登入"
     $("facebook-label").textContent = guest ? "綁定 Facebook，保留進度" : "使用 Facebook 登入"
-    $("guest-button").hidden = Boolean(user)
-    $("guest-notice").hidden = Boolean(user)
     $("identity-label").textContent = guest ? "目前以訪客身分登入" : user?.email || "已登入 Joy8"
     if (!user) return
     const member = await service.membership()
@@ -95,15 +91,6 @@ export function initMemberPanel(root, options = {}) {
 
   $("google-button").addEventListener("click", () => startProvider("google"))
   if (facebookEnabled) $("facebook-button").addEventListener("click", () => startProvider("facebook"))
-
-  $("guest-button").addEventListener("click", () => run(async () => {
-    try {
-      await service.guest(await captcha.token())
-      continuePlaying()
-    } finally {
-      captcha.reset()
-    }
-  }))
 
   $("enroll-button").addEventListener("click", () => run(async () => {
     await service.membership(true)

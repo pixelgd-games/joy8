@@ -1,13 +1,13 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
-import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createTestDatabase()
 const one = async (sql, values = []) => (await db.query(sql, values)).rows[0]
 let existing
 before(async () => {
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
   existing = await one("insert into public.player_accounts(account_type) values('guest') returning id,public_id")
 })
 after(() => db.close())

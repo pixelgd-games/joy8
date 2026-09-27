@@ -2,11 +2,11 @@ import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout as delay } from "node:timers/promises"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
-import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
 
 const db = await createLocalPostgres()
 before(async () => {
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
 })
 after(() => db.close())
 

@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { randomBytes, randomUUID } from "node:crypto"
@@ -22,7 +23,7 @@ before(async () => {
 after(() => db.close())
 
 async function identity() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   const member = await one("select * from public.joy8_resolve_member($1,true)", [auth])
   return { auth, id: member.player_account_id }
 }

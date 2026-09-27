@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, afterEach, before, beforeEach, test } from "node:test"
 import { randomBytes } from "node:crypto"
@@ -47,7 +48,7 @@ async function rpc(name, args, role = "service_role") {
 const call = async (name, body, key = secret) => (await rpc(name, [key, JSON.stringify(body)]))[name]
 const denied = (operation, message) => assert.rejects(operation, (error) => message ? error.message.includes(message) : Boolean(error.code))
 async function player() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   const member = await rpc("joy8_resolve_member", [auth, true])
   return { auth, id: member.player_account_id }
 }
@@ -331,7 +332,7 @@ test("keys cannot cross games, exceed scopes or outlive revocation", async () =>
 
 test("new accounting tables and internal helpers have no public or service bypass", async () => {
   for (const role of ["anon", "authenticated", "service_role"]) {
-    const grants = await one("select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relname like 'joy8_%' and has_table_privilege($1,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')", [role])
+    const grants = await one("select count(*)::int n from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind='r' and c.relname like 'joy8_%' and c.relname<>'joy8_email_allowlist' and has_table_privilege($1,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE')", [role])
     assert.equal(grants.n, 0, role)
     await denied(rpc("joy8_backend_game", [secret, "settle"], role))
   }

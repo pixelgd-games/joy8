@@ -2,6 +2,9 @@ export async function gameFailure(error) {
   let code = error?.code
   const status = error?.context?.status
   try { code = (await error.context.clone().json()).error || code } catch {}
+  if (["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"].includes(code)) {
+    return { code, title: "尚未開放", message: code === "JOY8_GUEST_DISABLED" ? "訪客入口暫停開放，請使用白名單 Google 帳號登入。" : "目前僅限白名單 Google 帳號遊玩，你仍可返回大廳瀏覽。", reload: false }
+  }
   if (["member_inactive", "JOY8_PLAYER_INACTIVE", "player account is not active", "JOY8_WALLET_INACTIVE"].includes(code)) {
     return { code: "JOY8-GAME-007", title: "玩家目前無法進入", message: "玩家帳號或錢包目前無法使用，請聯絡平台。", reload: false }
   }

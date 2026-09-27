@@ -1,7 +1,7 @@
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
-import { loadCurrentPlatform } from "./fixtures/platform-bundle.mjs"
+import { loadPreAllowlistPlatform } from "./fixtures/platform-bundle.mjs"
 
 let db
 let game
@@ -14,7 +14,7 @@ async function denied(action, pattern) {
 
 before(async () => {
   db = await createTestDatabase()
-  await loadCurrentPlatform(db)
+  await loadPreAllowlistPlatform(db)
   game = (await one("select id from public.games where slug='test-game'")).id
   await db.query("update public.games set published=false,launch_url=null where id=$1", [game])
   await db.query("insert into public.joy8_private_entries(game_id,entry_origin,launch_url,enabled) values($1,'http://localhost:5173','http://localhost:4391/',true)", [game])

@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { after, before, test } from "node:test"
 import { setTimeout } from "node:timers/promises"
@@ -21,8 +22,7 @@ before(async () => {
   const otherGame = (await one("select id from public.games where slug='hidden-game'")).id
   await db.query("insert into public.joy8_backend_keys(game_id,key_hash,scopes) values($1,public.joy8_hash_secret($2),array['exchange','renew','open','settle','status','cancel'])", [otherGame,otherSecret])
   for (let index = 0; index < 31; index++) {
-    const { rows } = await db.query("insert into auth.users(is_anonymous) values(true) returning id")
-    identities.set(`test-member-${index}`, rows[0].id)
+    identities.set(`test-member-${index}`, await googleIdentity(db))
   }
   globalThis.Deno = {
     env: { get: name => ({ SUPABASE_URL: "https://supabase.example", SUPABASE_SERVICE_ROLE_KEY: "test-service", SUPABASE_ANON_KEY: "test-anon" })[name] },
@@ -36,6 +36,7 @@ before(async () => {
     }
     const name = url.split("/").at(-1)
     const args = JSON.parse(options.body)
+    if (name === "joy8_assert_play_access") return Response.json(true)
     if (name === "joy8_consume_gateway_rate_limit") {
       if (unavailable) return Response.json({}, { status: 503 })
       const { rows } = await db.query("select public.joy8_consume_gateway_rate_limit($1,$2,$3) allowed", [args.p_key, args.p_limit, args.p_window_seconds])
@@ -94,7 +95,7 @@ async function assertSameWindow(start, seconds) {
 }
 
 async function freshSession() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
   return one("select * from public.create_game_session('test-game',$1)", [auth])
 }

@@ -1,3 +1,4 @@
+import { googleIdentity } from "./fixtures/google-identity.mjs"
 import assert from "node:assert/strict"
 import { randomBytes, randomUUID } from "node:crypto"
 import { after, afterEach, before, beforeEach, describe, test } from "node:test"
@@ -52,7 +53,7 @@ async function deniedQuery(sql, values, code) {
 }
 
 async function ready() {
-  const auth = (await one("insert into auth.users(is_anonymous) values(true) returning id")).id
+  const auth = await googleIdentity(db)
   const player = await one("select * from public.joy8_resolve_member($1,true)", [auth])
   const session = await one("select * from public.create_game_session('test-game',$1)", [auth])
   await db.query("select public.joy8_server_session_v1($1,'exchange',$2::jsonb)", [secret, JSON.stringify({ version: 1, launch_code: session.launch_code })])

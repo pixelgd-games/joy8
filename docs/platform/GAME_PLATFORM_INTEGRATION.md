@@ -94,7 +94,7 @@ automatically or replace this authoritative wire specification.
 3. It normalizes the `launch_url`. Root-relative platform paths and HTTPS URLs are accepted. HTTP is accepted only between loopback hosts during local development.
 4. It calls `joy8-gateway/create-session`.
 5. The Gateway requires a verified Supabase user session and existing enrollment,
-   including a persistent anonymous Auth session for guests.
+   and a verified Google identity whose email is in `joy8_email_allowlist`.
 6. The reviewed session RPC resolves the enrolled platform player and configured wallet.
 7. The Loader creates the iframe from the catalog URL without launch parameters.
 8. The game announces a ready Joy8 Client from an approved parent origin; the
@@ -111,15 +111,14 @@ The current Loader requests `POINT` with a 12-hour session expiry.
 Joy8's `/play-test/?slug=...` uses the same member flow and iframe shell.
 `POST /private-session` accepts only `{ "slug": "..." }` with a verified member
 bearer and an allowed browser Origin. Its service-only RPC checks backend entry
-configuration, exact Origin and hidden catalog status. Every active enrolled
-member, including a persistent guest, can enter; there is no per-player allowlist.
+configuration, exact Origin and hidden catalog status. Only enrolled Google members whose current email is allowlisted can enter.
 Only then does the shared internal session issuer resolve a wallet and issue a
 one-use launch code. The response additionally includes backend-owned `game_name`
 and `launch_url`; the browser cannot select the URL or identity. It uses no-store.
 The public `create-session` path remains restricted to published games.
 
-Here “private” means a hidden catalog integration entry, not tester-only access.
-Any enrolled member or guest can request it when enabled. Origin validation is a
+“Private” identifies the hidden catalog entry; the platform email gate still applies.
+Only allowlisted Google members can request it when enabled. Origin validation is a
 browser boundary, not unforgeable identity proof; localhost bindings do not isolate
 the hosted database. Public access requires explicit entry activation review.
 
@@ -129,19 +128,21 @@ backend-controlled and changed only through a reviewed migration.
 ### Branded H5 entry
 
 Joy8's `/entry/?slug=...` is a platform-controlled shell with no visible Joy8
-lobby. It loads the game iframe first so the player sees the game's login art.
+lobby. It authenticates Google and checks the email allowlist before loading the game iframe.
 The iframe sends `{type:"joy8-entry-request-v1",method:"google",requestId}` or the
 same message with `method:"guest"`, from the configured frame window and origin.
+Guest requests are rejected with `JOY8_GUEST_DISABLED` during the whitelist phase.
 `requestId` is a fresh in-memory random identifier of 16–80 ASCII letters, digits,
 underscores or hyphens for each explicit login/relogin action. The parent permits
 only one in-flight request and ignores immediate duplicates. It retains the
 verified frame listener after launch so a later explicit request can issue a fresh
 session without rebuilding the game iframe. Readiness messages never replay a
 delivered credential. Normal lobby/private game frames still deliver only once.
-Joy8 performs Auth, Turnstile, enrollment and OAuth callback completion in the
+Joy8 performs Auth, enrollment and OAuth callback completion in the
 parent. The game never receives provider or member tokens.
 
-`POST /branded-entry` resolves only `game_id`, `game_name`, `launch_url` and
+`POST /branded-entry` requires a verified bearer and allowlisted Google identity;
+it resolves only `game_id`, `game_name`, `launch_url` and
 `protocol` from trusted backend configuration and exact Origin. After verified
 membership, `POST /private-session` uses the same hidden-game session authority
 as the private entry. The resulting launch is delivered through the normal
@@ -240,8 +241,9 @@ Rules:
 - `slug` must identify an available published game.
 - The browser sends only `slug`; unknown fields are rejected. Currency is fixed to `POINT` and session lifetime to 12 hours by the Gateway. The internal database issuer remains service-only; its arguments are not browser configuration.
 - A valid Supabase bearer token and explicit player enrollment are required.
-- A missing bearer token or anonymous-key bearer returns 401. A Supabase anonymous
-  user's own verified session is supported and remains a guest. Missing enrollment
+- A missing bearer token or anonymous-key bearer returns 401. A verified guest
+  session returns `JOY8_GUEST_DISABLED`; an email outside the list returns
+  `JOY8_EMAIL_NOT_ALLOWED` (both 403). Missing enrollment
   or an inactive player blocks launch; it never creates a replacement guest.
 - The route requires an allowed Joy8 origin. Localhost development ports are accepted.
 
@@ -314,9 +316,10 @@ entire available balance while holding the wallet lock. An optional
 `max_reserve_amount` can retain a temporary product guard. In this mode
 `min_bet_amount` is the minimum available balance required to join; a lower
 balance returns `JOY8_INSUFFICIENT_BALANCE`. The default `capped` mode continues
-to enforce the minimum and maximum bet, including the 10,000 POINT ceiling. Mahjong selects `full_balance` but retains a 1-POINT reserve guard and
-its exchange/renew-only key; funded play remains
-inactive.
+to enforce the minimum and maximum bet, including the 10,000 POINT ceiling. Mahjong selects `full_balance`; the approved
+release removes the temporary reserve guard. Its game owns table thresholds
+(300/800/3,000 POINT) and AI accounts (initially 10,000 POINT). The pending
+policy and credential activation review is in [WHITELIST_RELEASE.md](../operations/WHITELIST_RELEASE.md).
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
@@ -771,8 +774,8 @@ On failure:
 
 ## Member and Direct Entry Boundary
 
-The source requires an authenticated, enrolled Joy8 player before launch, whether
-registered or a persistent guest. Authentication, provider login, guest identity,
+The source requires an authenticated, enrolled, allowlisted Google member before
+launch. Guest entry is suspended. Authentication, provider login, guest identity,
 linking and branded entry are platform responsibilities.
 
 Their plan is owned by `MEMBER_AUTH_PLAN.md`. Game integration work should consume the resulting Joy8 session contract without copying identity-provider logic into the game.
