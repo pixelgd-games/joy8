@@ -88,7 +88,7 @@ function setupMemberEntry(appRoot) {
       renderAccount("登入")
       return
     }
-    const fallback = user.is_anonymous ? "訪客帳號" : "我的帳號"
+    const fallback = "我的帳號"
     if (knownMember?.public_id) {
       renderAccount("", knownMember.public_id)
       return

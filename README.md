@@ -336,7 +336,9 @@ npm run preview
 `npm run verify` is the combined local acceptance command. It checks literal SQL
 dependency paths, runs the unit and database suites on PGlite, checks the
 Gateway, builds optimized smoke assets and runs browser smoke. It stops at the
-first failure. Chrome or Edge is required for smoke. It never applies SQL or
+first failure. Chrome or Edge is required for smoke. Browser smoke supplies fixed mock API
+settings and intercepts Supabase requests, so it does not need local credentials
+or a reachable hosted catalog. It never applies SQL or
 publishes code. Smoke assets are written to
 `.smoke-dist.local`, never the production `dist`; run `npm run build` separately
 to validate production configuration.

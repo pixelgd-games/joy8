@@ -17,7 +17,10 @@ const cdpTimeoutMs = 8000
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
 const viteBin = path.join(cwd, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite")
-const smokeEnv = { ...process.env }
+const smokeEnv = { ...process.env,
+  VITE_SUPABASE_URL: "https://lsazydefvnuqglultqii.supabase.co",
+  VITE_SUPABASE_ANON_KEY: "sb_publishable_joy8_smoke_only",
+}
 
 let devServer
 let browser
@@ -39,6 +42,16 @@ try {
   browser = await startBrowser(browserPath, cdpPort)
   console.log("Opening browser client...")
   const client = await openBrowserClient(cdpPort)
+  await client.send("Page.enable")
+  await client.send("Page.addScriptToEvaluateOnNewDocument", { source: `
+    const smokeFetch = window.fetch;
+    window.fetch = (input, options) => {
+      const url = new URL(typeof input === 'string' ? input : input.url || input.href, location.origin);
+      if (!url.hostname.endsWith('.supabase.co')) return smokeFetch(input, options);
+      if (url.pathname === '/rest/v1/public_games_v1') return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({error:'Smoke external request blocked'}, {status:403}));
+    };
+  ` })
 
   await expectPageText(client, appPort, "/", (text) => {
     const normalizedText = text.toLowerCase()
