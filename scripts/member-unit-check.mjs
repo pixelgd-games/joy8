@@ -12,7 +12,7 @@ const registeredUser = { id: "guest-1", is_anonymous: false, email_confirmed_at:
 test("branded registered entry enrolls explicitly without linking or guest conversion", async () => {
   const f = fixture(registeredUser)
   const launched = []
-  const options = { service: f.service, captcha: { token: () => assert.fail("Unexpected captcha") }, onGoogle: () => assert.fail("Unexpected linking"), onLaunch: () => launched.push(true) }
+  const options = { service: f.service, onGoogle: () => assert.fail("Unexpected linking"), onLaunch: () => launched.push(true) }
   await enterBrandedMember({ ...options, method: "google" })
   assert.deepEqual(launched, [true])
   assert.deepEqual(f.calls, [["rpc", "joy8-gateway/enroll-member", { body: {} }]])
@@ -52,7 +52,6 @@ test("Loader uses explicit whitelist and guest-disabled errors", async () => {
 
 function fixture(initialUser = null) {
   let user = initialUser
-  let lock = Promise.resolve()
   const calls = []
   const ok = (data = {}) => ({ data, error: null })
   const client = {
@@ -79,11 +78,6 @@ function fixture(initialUser = null) {
   const options = {
     origin,
     next: "/game/?slug=mahjong-clash&token=discard",
-    guestLock: (action) => {
-      const result = lock.then(action)
-      lock = result.catch(() => {})
-      return result
-    },
   }
   return { client, calls, service: createMemberService(client, options), options }
 }
@@ -178,7 +172,7 @@ test("reading membership never creates a guest or enrolls an existing Auth user"
 test("guest entry is disabled for new, existing and registered sessions without Auth calls", async () => {
   for (const user of [null, guestUser, registeredUser]) {
     const f = fixture(user)
-    await assert.rejects(f.service.guest("captcha"), { code: "JOY8_GUEST_DISABLED" })
+    await assert.rejects(f.service.guest(), { code: "JOY8_GUEST_DISABLED" })
     assert.deepEqual(f.calls, [])
   }
 })

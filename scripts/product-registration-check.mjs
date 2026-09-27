@@ -77,7 +77,7 @@ test("registered schemas without adapters are included in runtime and preflight 
 
 test("DDL preflight aborts new PUBLIC functions while retaining both product registrations", async () => {
   await db.exec("insert into public.joy8_product_schemas values('review_b')")
-  await denied("create function review_b.leaked() returns int language sql as $$ select 1 $$; select public.joy8_validate_product_adapters()")
+  await denied("create function review_b.leaked() returns int language sql as $$ select 1 $$; grant execute on function review_b.leaked() to public; select public.joy8_validate_product_adapters()")
   assert.equal((await one("select to_regprocedure('review_b.leaked()') function")).function, null)
   assert.equal((await one("select count(*)::int n from public.joy8_product_schemas")).n, 2)
   assert.deepEqual((await invoke()).result, { committed: true })

@@ -19,6 +19,10 @@
     "./server": {
       "types": "./server.d.ts",
       "import": "./server.js"
+    },
+    "./contract": {
+      "types": "./contract.d.ts",
+      "import": "./contract.js"
     }
   },
   "files": [

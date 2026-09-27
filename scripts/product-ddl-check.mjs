@@ -108,6 +108,7 @@ test("schema rename, adapter relocation and adapter deletion retain isolation ch
 test("moving a PUBLIC function from an unrelated schema into a registered product is rejected", async () => {
   await rejected(`create schema ddl_unrelated;
     create function ddl_unrelated.leaked() returns int language sql as $$ select 1 $$;
+    grant execute on function ddl_unrelated.leaked() to public;
     alter function ddl_unrelated.leaked() set schema ddl_product`)
 })
 

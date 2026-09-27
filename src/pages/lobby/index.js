@@ -5,6 +5,7 @@ import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { createMemberService, memberErrorMessage } from "../../member/service.js"
 import { createGameEntry } from "../../member/game-entry.js"
 import { memberSupabase } from "../../lib/memberClient.js"
+import { readEntryParams } from "../../member/callback.js"
 
 let deferredInstallPrompt = null
 
@@ -23,7 +24,7 @@ export async function initLobbyPage(appRoot) {
   appRoot.innerHTML = renderLobby()
   setupInstallButton(appRoot)
   const openEntry = setupMemberEntry(appRoot)
-  const entryParams = new URLSearchParams(location.search)
+  const entryParams = readEntryParams(location, history)
   const memberMode = ["open", "callback"].includes(entryParams.get("member")) ? entryParams.get("member") : null
   const memberParams = memberMode ? new URLSearchParams(entryParams) : null
   const requestedGame = memberMode ? null : entryParams.get("play")

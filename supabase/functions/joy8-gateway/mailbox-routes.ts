@@ -16,15 +16,20 @@ export async function mailboxOperation(route: string, request: Request, headers:
     || !actions.includes(action) || !payload || typeof payload !== "object" || Array.isArray(payload)) {
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
-  const admission = await callRpc("joy8_consume_gateway_rate_limit", {
-    p_key: `mail:${route}:${auth.userId}`, p_limit: admin ? 30 : 120, p_window_seconds: 60,
-  })
-  if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
-  if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  if (!admin) {
+    const admission = await callRpc("joy8_consume_gateway_rate_limit", {
+      p_key: `mail:${route}:${auth.userId}`, p_limit: 120, p_window_seconds: 60,
+    })
+    if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+    if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  }
   const args = { p_action: action, p_request: payload }
   const result = admin
     ? await callUserRpc("joy8_admin_mail", args, request.headers.get("authorization")!)
     : await callRpc("joy8_member_mail", { ...args, p_auth_user_id: auth.userId })
+  if ((result.body as { error?: string } | null)?.error === "JOY8_RATE_LIMITED") {
+    return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  }
   if (!result.ok) {
     const error = result.body as { message?: string; code?: string } | null
     const allowed = new Set(["JOY8_INVALID_REQUEST", "JOY8_MAIL_FORBIDDEN", "JOY8_MAIL_NOT_FOUND", "JOY8_MAIL_NO_REWARD",

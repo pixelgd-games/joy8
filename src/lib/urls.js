@@ -1,4 +1,4 @@
-import { GAME_SLUG_PATTERN, isLoopbackHostname } from "../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN, isLoopbackHostname } from "../../packages/joy8-game-sdk/contract.js"
 
 const ROOT_RELATIVE_PATH = /^\/(?!\/)/
 const HTTP_URL = /^https?:\/\//i

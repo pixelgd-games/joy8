@@ -1,4 +1,4 @@
-import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/contract.js"
 
 export function safeReturnPath(value, origin) {
   try {
@@ -48,11 +48,7 @@ export function memberErrorMessage(error, provider) {
     JOY8_GUEST_DISABLED: "訪客入口暫停開放，請使用白名單 Google 帳號登入。",
     identity_already_exists: `這個 ${label} 已綁定其他玩家，不能合併目前的訪客資料。`,
     over_request_rate_limit: "操作太頻繁，請稍後再試。",
-    captcha_failed: "安全驗證失敗，請重新驗證後再試。",
-    captcha_timeout: "安全驗證逾時，請檢查網路後再試一次。",
-    captcha_unavailable: "安全驗證暫時無法載入，請稍後再試。",
     verification_required: "目前的登入身分無法通過驗證，請重新登入。",
-    guest_lock_unavailable: "這個瀏覽器暫時無法使用訪客登入，請改用 Google 登入。",
     identity_conflict: "登入身分與原訪客不同，已停止升級，沒有合併帳號或點數。",
     registered_session: "目前已登入正式帳號，請使用 Google 繼續啟用玩家身分。",
     member_inactive: "這個玩家帳號目前無法使用，請聯絡平台。",
@@ -63,7 +59,7 @@ export function memberErrorMessage(error, provider) {
   return messages[code] || "目前無法完成操作，請稍後再試。"
 }
 
-export function createMemberService(client, { origin, next = "/", guestLock } = {}) {
+export function createMemberService(client, { origin, next = "/" } = {}) {
   const returnPath = safeReturnPath(next, origin)
   const callbackUrl = (flow, provider) => `${origin}${accountPath(returnPath, origin)}&flow=${flow}&provider=${provider}`
 
@@ -75,7 +71,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     if (!(await session())) return null
     const result = await client.functions.invoke(`joy8-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
     if (result.error) {
-      if (result.error.context?.status === 429) throw Object.assign(new Error("Member request rate limited"), { code: "Too many requests", context: result.error.context })
+      if (result.error.context?.status === 429) throw Object.assign(new Error("Member request rate limited"), { code: "over_request_rate_limit", context: result.error.context })
       let code = "member_unavailable"
       try {
         const body = await result.error.context?.json()

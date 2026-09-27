@@ -1,5 +1,6 @@
 import "../styles/theme.css"
 import { safeReturnPath } from "./service.js"
+import { forwardCallback } from "./callback.js"
 
 const params = new URLSearchParams(location.search)
 const next = safeReturnPath(params.get("next"), location.origin)
@@ -11,7 +12,5 @@ if (!next.startsWith("/entry/")) {
   target.searchParams.set("member", callback ? "callback" : "open")
   target.searchParams.set("next", next)
 }
-for (const key of ["flow", "provider", "code", "error", "error_code"]) {
-  if (params.has(key)) target.searchParams.set(key, params.get(key))
-}
-location.replace(target)
+history.replaceState(null, "", "/account/")
+location.replace(forwardCallback(params, target))

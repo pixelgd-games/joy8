@@ -161,9 +161,11 @@ Joy8-controlled Google button. Guest iframe requests are explicitly rejected.
 An existing eligible member can continue automatically. Native implementation remains deferred.
 
 The callback passes OAuth parameters through `/account/`. Lobby flows continue
-to `/?member=callback&code=...`; a validated branded flow returns directly to
-`/entry/?slug=...&code=...`. The receiving page clears the visible callback
-query using `history.replaceState`. Never log the callback URL or send it to analytics.
+to `/?member=callback#code=...`; a validated branded flow returns directly to
+`/entry/?slug=...#code=...`. Callback fields are forwarded only in the fragment,
+which is removed immediately with `history.replaceState`. The initial provider
+request to `/account/` still contains its OAuth code; exclude callback queries
+from access-log exports and analytics.
 
 After successful enrollment, the member service dispatches the window event
 `joy8:membership`. Its `detail` is the Gateway member object containing
@@ -241,8 +243,10 @@ deferred. Purchase launch timing belongs in the product plan.
 
 ## Provider and Abuse Protection
 
-Cloudflare Turnstile Managed protection is enabled for guest Auth; its public
-site key may be used by the client, while its secret remains provider-side.
+Hosted Turnstile configuration remains provider-side. The Google-only frontend
+no longer loads CAPTCHA or requires a site key. Reopening guest Auth requires
+explicitly restoring and testing protection; dormant linking support does not
+provide anonymous sign-in.
 Guest-to-provider linking and provider-conflict preservation remain pending and
 must not be inferred from a standalone provider sign-in.
 

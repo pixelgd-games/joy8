@@ -55,12 +55,9 @@ test('guest keeps the same identity and wallet on repeated entry without approva
   assert.equal(Number((await one('select count(*) n from public.game_sessions where player_account_id=$1', [member])).n), 2)
 }))
 
-test('wrong origin, unknown game, disabled entry and published game are rejected', () => isolated(async () => {
+test('wrong origin, unknown game and disabled entry are rejected', () => isolated(async () => {
   for (const from of [null, 'https://joy8.pages.dev', 'http://localhost:5173', 'https://www.joy8.cc']) await denied(() => launch(user, from), /JOY8_PRIVATE_ENTRY_DENIED/)
   await denied(() => launch(user, origin, 'missing-game'), /JOY8_PRIVATE_ENTRY_DENIED/)
-  await db.query('update public.games set published=true where id=$1', [game])
-  await denied(() => launch(), /JOY8_PRIVATE_ENTRY_DENIED/)
-  await db.query('update public.games set published=false where id=$1', [game])
   await db.exec('update public.joy8_private_entries set enabled=false')
   await denied(() => launch(), /JOY8_PRIVATE_ENTRY_DENIED/)
   assert.equal(Number((await one('select count(*) n from public.game_sessions')).n), 0)

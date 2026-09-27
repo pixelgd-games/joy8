@@ -111,19 +111,24 @@ The current Loader requests `POINT` with a 12-hour session expiry.
 Joy8's `/play-test/?slug=...` uses the same member flow and iframe shell.
 `POST /private-session` accepts only `{ "slug": "..." }` with a verified member
 bearer and an allowed browser Origin. Its service-only RPC checks backend entry
-configuration, exact Origin and hidden catalog status. Only enrolled Google members whose current email is allowlisted can enter.
+configuration and exact Origin, independently of catalog publication. Only enrolled Google members whose current email is allowlisted can enter.
 Only then does the shared internal session issuer resolve a wallet and issue a
 one-use launch code. The response additionally includes backend-owned `game_name`
 and `launch_url`; the browser cannot select the URL or identity. It uses no-store.
 The public `create-session` path remains restricted to published games.
 
-“Private” identifies the hidden catalog entry; the platform email gate still applies.
+“Private” identifies an explicitly enabled entry; the platform email gate still applies.
 Only allowlisted Google members can request it when enabled. Origin validation is a
 browser boundary, not unforgeable identity proof; localhost bindings do not isolate
 the hosted database. Public access requires explicit entry activation review.
 
 Entry configuration, including the exact origin and launch URL, is
 backend-controlled and changed only through a reviewed migration.
+
+Publication and independent entry are separate switches. Publishing never enables
+an entry, and unpublishing never disables one. Both published and unpublished
+games may use an explicitly enabled entry; operations must disable the entry
+itself when withdrawing access.
 
 ### Branded H5 entry
 
@@ -144,7 +149,7 @@ parent. The game never receives provider or member tokens.
 `POST /branded-entry` requires a verified bearer and allowlisted Google identity;
 it resolves only `game_id`, `game_name`, `launch_url` and
 `protocol` from trusted backend configuration and exact Origin. After verified
-membership, `POST /private-session` uses the same hidden-game session authority
+membership, `POST /private-session` uses the same independently configured session authority
 as the private entry. The resulting launch is delivered through the normal
 `joy8-launch-v1` message, with the matching `requestId` alongside `launch` when
 responding to an iframe request. Entry errors carry that same `requestId` in

@@ -3,7 +3,7 @@ import { memberSupabase } from "../../lib/memberClient.js"
 import { normalizeLaunchUrl } from "../../lib/urls.js"
 import { lobbyGamePath, createMemberService } from "../../member/service.js"
 import { renderLoader, mountSession, failedGame, showGameError } from "./loader.js"
-import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 
 renderLoader()
 async function main() {

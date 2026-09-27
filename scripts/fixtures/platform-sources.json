@@ -53,7 +53,10 @@
     "20260925150000_single_trip_server_requests.sql",
     "20260925170000_open_settle_balance_response.sql",
     "20260926100000_in_app_mailbox.sql",
-    "20260927100000_email_play_allowlist.sql"
+    "20260927100000_email_play_allowlist.sql",
+    "20260928100000_independent_game_entry.sql",
+    "20260928101000_catalog_readiness.sql",
+    "20260928102000_mailbox_and_function_permissions.sql"
   ],
   "drafts": [],
   "excluded": {

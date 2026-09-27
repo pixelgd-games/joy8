@@ -1,4 +1,4 @@
-import { isLoopbackHostname } from "../../../packages/joy8-game-sdk/policy.js"
+import { isLoopbackHostname } from "../../../packages/joy8-game-sdk/contract.js"
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 

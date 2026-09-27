@@ -15,6 +15,12 @@ Never import the server client into a browser build. Never expose
 The authoritative protocol is
 [`docs/platform/GAME_PLATFORM_INTEGRATION.md`](../../docs/platform/GAME_PLATFORM_INTEGRATION.md).
 
+## Shared contract
+
+`@joy8/game-sdk/contract` publicly exports `GAME_SLUG_PATTERN` and
+`isLoopbackHostname`. Joy8 source uses this same maintained module. Changes are
+contract changes covered by platform and SDK verification.
+
 ## Installation
 
 Until the package is published to a registry, Joy8 supplies a versioned npm

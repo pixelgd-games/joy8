@@ -58,6 +58,8 @@ try {
     assert.deepEqual(await result.json(), { error: publicError })
   }
   failure = null
+  response = { error: "JOY8_RATE_LIMITED", retry_after: 60 }
+  assert.equal((await request("admin-mailbox")).status, 429)
   response = []
   assert.equal((await request("mailbox")).status, 502)
   console.log("OK Mailbox Gateway validates session/origin/action, uses verified identity, preserves admin JWT, limits traffic and masks SQL details")

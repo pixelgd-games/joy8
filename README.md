@@ -111,7 +111,7 @@ game-facing protocol is `server-v1`, defined in
 | `/admin/mail/` | `admin/mail/index.html` | Administrator compose, preview, send and recipient audit |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
 | `/entry/` | `entry/index.html` | Joy8-controlled Google entry and branded game shell and in-memory launch handoff |
-| `/play-test/` | `play-test/index.html` | Hidden-game entry using the shared Loader and the same email access gate |
+| `/play-test/` | `play-test/index.html` | Explicitly enabled independent entry using the shared Loader and email access gate |
 | `/admin/login/` | `admin/login/index.html` | Google OAuth entry |
 | `/admin/games/` | `admin/games/index.html` | Game list |
 | `/admin/games/new/` | `admin/games/new/index.html` | Create game |
@@ -196,8 +196,9 @@ Auth setting enforce this server-side at rollout. Logout is local to the selecte
 session and does not create a replacement guest. Clearing storage can lose guest
 access.
 
-The Auth trampoline forwards the one-use OAuth code from `/account/` to the Lobby
-callback query, and the Lobby removes that query before loading the member dialog.
+The Auth trampoline forwards the one-use OAuth code from `/account/` in a URL
+fragment, not another query. The Lobby or branded entry removes that fragment
+before using the callback.
 This does not remove the initial request from infrastructure logs; do not collect
 callback queries in analytics or access-log exports.
 
@@ -219,6 +220,13 @@ applies the one-time top-up when a guest has linked Google.
    Auth identity listed in `admin_users`.
 3. Authorized users can list, create, edit, publish, and unpublish catalog records.
 4. Public users read only the safe fields exposed by `public_games_v1`.
+
+Published catalog writes through authenticated PostgREST must pass the database
+`joy8_game_readiness` policy: HTTPS URL, matching cover path, enabled game and
+POINT policies, an active key with all six runtime scopes, and a valid configured
+adapter. Save a new game as an unpublished draft before provisioning it. Admin
+forms show missing prerequisites; direct writes cannot bypass RLS. These checks
+do not certify real gameplay acceptance or prevent later operator revocation.
 
 Catalog forms stay disabled until administrator verification and, for edits,
 successful record loading. Failed reads cannot enable saving; an in-flight save
@@ -306,15 +314,14 @@ Requirements:
 ```dotenv
 VITE_SUPABASE_URL=...
 VITE_SUPABASE_ANON_KEY=...
-VITE_TURNSTILE_SITE_KEY=...
 ```
 
 Leave `VITE_FACEBOOK_AUTH_ENABLED` unset so Facebook entry stays hidden; see
 [Deployment](#deployment).
 
 Production builds reject missing variables, another Supabase project,
-privileged keys and Turnstile test keys. Test keys are reserved for the mocked
-smoke build; never use them with hosted Auth or production.
+privileged keys. Google OAuth does not use a client CAPTCHA token; Turnstile
+is not a frontend build dependency. Hosted Auth protection is configured separately.
 
 Do not commit or quote real credentials. A local Vite server still uses the
 database configured in `.env.local`; localhost alone does not isolate data.
@@ -334,7 +341,7 @@ npm run preview
 dependency paths, runs the unit and database suites on PGlite, checks the
 Gateway, builds optimized smoke assets and runs browser smoke. It stops at the
 first failure. Chrome or Edge is required for smoke. It never applies SQL or
-publishes code. Smoke assets use test Turnstile configuration and are written to
+publishes code. Smoke assets are written to
 `.smoke-dist.local`, never the production `dist`; run `npm run build` separately
 to validate production configuration.
 
@@ -355,7 +362,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | Command | Covers |
 | --- | --- |
 | `node --test scripts/email-allowlist-check.mjs scripts/reviewed-cleanup-check.mjs scripts/mahjong-release-policy-check.mjs` | Applied whitelist/cleanup/reserve SQL and pending Mahjong payout/key drafts; isolated fixtures only |
-| `npm run test:member` / `test:captcha` / `test:iframe` | Member flow, Turnstile handling and Loader handshake with mocks |
+| `npm run test:member` / `test:iframe` | Member flow and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, grants, promotion, launch and wallet concurrency |
 | `npm run test:mailbox` | Mailbox audience snapshot, permissions, read/claim states, atomic credit and retries on the current schema; set `JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN` for competing connections |
@@ -378,6 +385,30 @@ business data but changes rate counters; hosted execution requires
 
 For Markdown-only changes, validate document links, paths, language, and
 architecture claims; a production build is not required.
+
+### Release gate
+
+Run `npm run verify:release` before deployment. It requires `JOY8_TEST_PG_BIN`,
+runs normal verification, native PostgreSQL 17 financial/identity/DDL/concurrency
+and mailbox suites, then a production build. Missing native PostgreSQL is a
+failure, never an automatic PGlite fallback.
+
+### Fresh database and recovery
+
+The synthetic platform bundle is an isolated contract fixture, not a production
+bootstrap. A new Supabase project requires an exported current schema and roles,
+reviewed extension/product dependencies, and separately recreated Auth, Hook,
+Gateway secrets and catalog policies. Restore schema and any approved data into
+an isolated project, then check grants, identity references and ledger totals.
+Never replay historical cleanup or credential migrations into a new project.
+Do not replace the live database to remove migration history. The hosted recovery
+acceptance remains open until a real isolated restore succeeds.
+
+The migration owner creates new functions without implicit PUBLIC, anon,
+authenticated or service-role execution in `public`; each exposed function must
+grant its intended callers explicitly. Supabase-managed roles retain their own
+vendor defaults. Read-only release inspection uses
+`scripts/sql/review-readiness-status.sql`.
 
 ## Supabase Operations
 
@@ -448,9 +479,9 @@ for the complete safety rules.
   keeping the host and member route fixed.
 - No outbound email is configured: Cloudflare Email Sending is disabled and no
   SMTP credential exists.
-- Cloudflare Turnstile Managed protection is enabled for Auth on `joy8.cc` and
-  its subdomains. The public site key is used by the member client; the secret
-  exists only in Cloudflare and Supabase.
+- Cloudflare Turnstile configuration remains hosted. The Google-only frontend
+  does not load Turnstile or request its token; reopening guest Auth requires
+  a new protection and acceptance review.
 
 ## Deployment
 
@@ -464,11 +495,13 @@ for the complete safety rules.
   apex host, preserving path and query string.
 - Build command: `npm run build`.
 - Output directory: `dist`.
-- Required production variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_TURNSTILE_SITE_KEY`.
+- Required production variables: `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
 - Set `VITE_FACEBOOK_AUTH_ENABLED=true` only after the hosted Facebook provider
   and its conflict-safe sign-in/linking flow pass acceptance. Omit it otherwise.
-- `public/_headers` denies framing of Joy8 pages and supplies the production
-  content-type and referrer protections copied into the Cloudflare Pages build.
+- `public/_headers` denies framing, limits scripts to this origin and API
+  connections to Joy8 Supabase, disables objects/base overrides, and sends no
+  referrer. Game frames allow HTTPS because approved games use separate hosts.
+  Inline styles remain permitted for existing UI styles; inline scripts do not.
 - Git-triggered Pages builds deploy the production branch. If a provider build
   fails, an authorized operator can deploy a verified local `dist` with Wrangler.
   Never deploy `.smoke-dist.local`, which contains mocked test configuration.

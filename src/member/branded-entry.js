@@ -15,7 +15,7 @@ export function createBrandedEntryRequests({ canRequest, enter, onError }) {
   }
 }
 
-export async function enterBrandedMember({ method, service, captcha, onGoogle, onLaunch }) {
+export async function enterBrandedMember({ method, service, onGoogle, onLaunch }) {
   if (!["google", "guest"].includes(method)) return
   if (method === "guest") throw Object.assign(new Error("Guest entry is disabled"), { code: "JOY8_GUEST_DISABLED" })
   const current = await service.session()

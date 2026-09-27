@@ -1,4 +1,4 @@
-import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 import { resolveAuthUser } from "./auth.ts"
 import { callRpc, firstRpcRow, statusFromRpcError, toPublicRpcError } from "./rpc.ts"
 import { enforceSubjectRateLimit } from "./rate-limit.ts"

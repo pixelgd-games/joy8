@@ -1,7 +1,6 @@
 import { createMemberAuthFlow } from "./auth-flow.js"
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
-import { createMemberCaptcha } from "./captcha.js"
 import { createMemberService, memberErrorMessage, providerLabel } from "./service.js"
 
 export function initMemberPanel(root, options = {}) {
@@ -15,9 +14,7 @@ export function initMemberPanel(root, options = {}) {
   const service = createMemberService(memberSupabase, {
     origin: location.origin,
     next: params.get("next"),
-    guestLock: navigator.locks ? (fn) => navigator.locks.request("joy8-guest-entry", fn) : null,
   })
-  const captcha = options.captcha ?? createMemberCaptcha(root)
   const memberFlow = createMemberAuthFlow(service, { isActive: () => !disposed, onRetained: async () => { status("已保留目前的訪客帳號，沒有合併或轉移任何資料。"); await refresh() } })
   const entryDescription = $("account-description").textContent
   let user = null
@@ -138,7 +135,6 @@ export function initMemberPanel(root, options = {}) {
     ready,
     dispose() {
       disposed = true
-      captcha.dispose()
       window.removeEventListener("focus", onFocus)
     },
   }

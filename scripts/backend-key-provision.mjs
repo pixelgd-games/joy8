@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { GAME_SLUG_PATTERN } from "../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../packages/joy8-game-sdk/contract.js"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const projectRef = "lsazydefvnuqglultqii"

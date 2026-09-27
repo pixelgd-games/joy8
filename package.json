@@ -10,7 +10,6 @@
     "verify": "node scripts/verify.mjs",
     "smoke": "node scripts/smoke-check.mjs",
     "test:member": "node --test scripts/member-unit-check.mjs",
-    "test:captcha": "node --test scripts/captcha-check.mjs",
     "test:iframe": "node --test scripts/iframe-check.mjs",
     "test:member-db": "node --test scripts/member-database-check.mjs",
     "test:mailbox": "node --test scripts/mailbox-database-check.mjs",
@@ -36,7 +35,8 @@
     "test:continuous-pg": "node scripts/continuous-postgres-check.mjs",
     "test:gateway": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/gateway-unit-check.mjs",
     "test:gateway-rate": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test scripts/gateway-rate-limit-check.mjs",
-    "smoke:gateway": "node scripts/gateway-security-smoke.mjs"
+    "smoke:gateway": "node scripts/gateway-security-smoke.mjs",
+    "verify:release": "node scripts/release-check.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8",
@@ -46,5 +46,8 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8"
+  },
+  "engines": {
+    "node": ">=22.23.2 <23"
   }
 }

@@ -80,11 +80,14 @@ Broadcasts beyond that audience bound need a separately designed batching flow.
 
 Both routes accept `POST` JSON `{ "action": "...", "request": { ... } }` using
 the corresponding Joy8 member/admin Auth bearer token. Only configured platform
-origins are accepted. Existing ingress limits apply, followed by a verified-user
-budget of 120 member or 30 admin requests per minute. A limited response is 429
-with `Retry-After: 60`. Admin RPC is also reachable through authenticated
-PostgREST; its Google admin check and database invariants remain authoritative,
-while the Gateway rate limit applies only to Gateway traffic.
+origins are accepted. Existing ingress limits apply. Member mailbox has a Gateway budget of 120
+requests per minute. Admin mailbox has one database budget of 30 successful
+operations per minute per verified administrator, shared by Gateway and direct
+PostgREST calls. The SQL function checks administrator identity before admission.
+A limited request returns `JOY8_RATE_LIMITED` with `retry_after: 60`, sets
+PostgREST status 429 and `Retry-After: 60`; Gateway maps it to its normal 429
+response. Failed SQL transactions roll back their counter increment. The Gateway
+does not double-charge the admin budget.
 
 | Route | Actions | Request |
 | --- | --- | --- |

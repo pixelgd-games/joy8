@@ -4,7 +4,7 @@ import { createMemberService } from "../../member/service.js"
 import { openMemberModal } from "../../member/modal.js"
 import { renderLoader, mountSession, failedGame, showGameError } from "../game/loader.js"
 import { gameFailure } from "../game/errors.js"
-import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 
 const slug = new URLSearchParams(location.search).get("slug")
 renderLoader()

@@ -2,23 +2,21 @@ import { memberSupabase } from "../../lib/memberClient.js"
 import { mountGameFrame } from "../game/iframe.js"
 import { gameLaunchPayload } from "../game/launch.js"
 import { normalizeLaunchUrl } from "../../lib/urls.js"
-import { createMemberCaptcha } from "../../member/captcha.js"
 import { createMemberService, memberErrorMessage } from "../../member/service.js"
 import { createMemberAuthFlow } from "../../member/auth-flow.js"
 import { createBrandedEntryRequests, enterBrandedMember } from "../../member/branded-entry.js"
-import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 import { gameFailure } from "../game/errors.js"
+import { readEntryParams } from "../../member/callback.js"
 
-const params = new URLSearchParams(location.search)
+const params = readEntryParams(location, history)
 const slug = params.get("slug")
 const root = document.getElementById("entry")
 const status = document.getElementById("entry-status")
 const next = `/entry/?slug=${encodeURIComponent(slug || "")}`
 const service = createMemberService(memberSupabase, {
   origin: location.origin, next,
-  guestLock: navigator.locks ? action => navigator.locks.request("joy8-guest-entry", action) : null,
 })
-const captcha = createMemberCaptcha(document)
 const memberFlow = createMemberAuthFlow(service, { isActive: () => !failed && !issued, onRetained: () => showStatus("已保留目前的訪客帳號，沒有合併或轉移任何資料。") })
 let frame
 let busy = true
@@ -47,7 +45,7 @@ const handleRequest = createBrandedEntryRequests({
   canRequest: () => !busy && !failed,
   enter: async (method, requestId) => {
     issued = false
-    await enterBrandedMember({ method, service, captcha, onGoogle: () => memberFlow.begin("google"),
+    await enterBrandedMember({ method, service, onGoogle: () => memberFlow.begin("google"),
       onLaunch: () => deliverSession(requestId) })
   },
   onError: async (error, requestId) => showStatus(error.context ? (await gameFailure(error)).message : memberErrorMessage(error, "google"), true, requestId),

@@ -16,6 +16,9 @@ dist-ssr
 .env.supabase.local
 
 # Editor directories and files
+.wrangler/
+.codex-remote-attachments/
+.codex/
 .vscode/*
 !.vscode/extensions.json
 .idea

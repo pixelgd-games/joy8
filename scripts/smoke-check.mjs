@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url"
 import WebSocket from "ws"
 import { expectMailbox } from "./mailbox-browser-check.mjs"
 import { expectAllowlistAdmin } from "./allowlist-browser-check.mjs"
+import { expectProductionCsp } from "./production-csp-check.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const host = "127.0.0.1"
@@ -16,7 +17,7 @@ const cdpTimeoutMs = 8000
 
 const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm"
 const viteBin = path.join(cwd, "node_modules", ".bin", process.platform === "win32" ? "vite.cmd" : "vite")
-const smokeEnv = { ...process.env, VITE_FACEBOOK_AUTH_ENABLED: "true", VITE_TURNSTILE_SITE_KEY: "1x00000000000000000000AA" }
+const smokeEnv = { ...process.env, VITE_FACEBOOK_AUTH_ENABLED: "true" }
 
 let devServer
 let browser
@@ -78,6 +79,7 @@ try {
   await expectAllowlistAdmin(client, appPort)
   await expectPageText(client, appPort, "/account/?error=access_denied&error_description=JOY8_EMAIL_NOT_ALLOWED&provider=google&flow=signin", text => text.includes("尚未開放") && text.includes("白名單 Google"), "Signup-hook rejection survives the Auth trampoline")
 
+  await expectProductionCsp(client, cwd)
   client.ws.close()
   console.log("Smoke check passed.")
 } finally {
@@ -108,7 +110,7 @@ function verifySecurityHeaders() {
     "Content-Security-Policy: frame-ancestors 'none'",
     "X-Frame-Options: DENY",
     "X-Content-Type-Options: nosniff",
-    "Referrer-Policy: strict-origin-when-cross-origin",
+    "Referrer-Policy: no-referrer", "script-src 'self'", "object-src 'none'", "base-uri 'none'",
   ]) {
     if (!headers.includes(expected)) throw new Error(`Missing production security header: ${expected}`)
   }
@@ -498,7 +500,7 @@ async function expectAdminFormSafety(client) {
       const writes = []
       let resolveRead, resolveWrite
       supabase.auth.getSession = async () => ({ data: { session: { user: { id: "test-admin" } } }, error: null })
-      supabase.rpc = async () => ({ data: true, error: null })
+      supabase.rpc = async name => ({ data: name === "joy8_game_readiness" ? [] : true, error: null })
       supabase.from = table => {
         check(table === "games", "Unexpected admin table")
         return {
@@ -541,6 +543,7 @@ async function expectAdminFormSafety(client) {
       document.getElementById("name").value = "Updated"
       submit(form)
       submit(form)
+      await tick()
       check(writes.length === 1 && form.querySelector("fieldset").disabled, "Duplicate save was allowed")
       check(writes[0].payload.name === "Updated" && writes[0].payload.published === true
         && writes[0].payload.type === "card" && writes[0].payload.sort_order === 7
@@ -551,6 +554,7 @@ async function expectAdminFormSafety(client) {
       check(!form.querySelector("fieldset").disabled, "Failed save prevented retry")
       document.querySelector(".joy8-error-action:last-child")?.click()
       submit(form)
+      await tick()
       check(writes.length === 2, "Explicit retry did not run")
       resolveWrite({ error: { message: "Save rejected" } })
       await tick()
@@ -755,13 +759,11 @@ async function expectMemberContinuation(client) {
       const paths = []
       const roots = []
       const panels = []
-      const originalTurnstile = window.turnstile
-      const originalSetTimeout = window.setTimeout
       auth.getSession = async () => ({ data: { session: user ? { user } : null }, error: null })
       auth.signInAnonymously = async () => { user = { id: "fixture-guest", is_anonymous: true }; return { data: { user }, error: null } }
       auth.exchangeCodeForSession = async () => { user = { id: "fixture-google", is_anonymous: false }; return { data: { user }, error: null } }
       Object.defineProperty(memberSupabase, "functions", { configurable: true, value: { invoke: async () => ({ data: { member: { player_account_ref: "fixture-player", account_type: user?.is_anonymous ? "guest" : "registered" } }, error: null }) } })
-      const mount = (next, extra = {}, captcha = { token: async () => "fixture-captcha", reset() {}, dispose() {} }) => {
+      const mount = (next, extra = {}) => {
         const root = document.createElement("div")
         root.hidden = true
         root.innerHTML = memberCardMarkup
@@ -772,7 +774,6 @@ async function expectMemberContinuation(client) {
         const panel = initMemberPanel(root, {
           params: new URLSearchParams({ next, ...extra }),
           onContinue: path => { paths.push(path); complete(path) },
-          captcha,
         })
         panels.push(panel)
         return { root, panel, continued }
@@ -796,8 +797,6 @@ async function expectMemberContinuation(client) {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
         Object.assign(auth, saved)
-        window.turnstile = originalTurnstile
-        window.setTimeout = originalSetTimeout
         if (descriptor) Object.defineProperty(memberSupabase, "functions", descriptor)
         else delete memberSupabase.functions
       }

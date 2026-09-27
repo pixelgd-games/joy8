@@ -1,5 +1,5 @@
 import { Joy8SdkError } from "./errors.js"
-import { isLoopbackHostname } from "./policy.js"
+import { isLoopbackHostname } from "./contract.js"
 
 export const PROTOCOL = "server-v1"
 export const CURRENCY = "POINT"

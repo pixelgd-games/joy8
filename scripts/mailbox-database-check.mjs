@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
-import { after, before, test } from "node:test"
+import { after, before, beforeEach, test } from "node:test"
 import { createTestDatabase } from "./fixtures/test-database.mjs"
 import { loadMemberPlatformDatabase, reserveMemberWallet } from "./fixtures/member-platform.mjs"
 
@@ -15,6 +15,7 @@ before(async () => {
   await db.exec("insert into public.admin_users(email) values('mail-admin@example.test')")
   await db.query("select set_config('request.jwt.claim.sub',$1,false),set_config('request.jwt.claims',$2,false)", [adminId, JSON.stringify({ app_metadata: { provider: "google" } })])
 })
+beforeEach(() => db.exec("delete from public.gateway_rate_limits"))
 after(() => db.close())
 
 async function admin(action, request, connection = db) {

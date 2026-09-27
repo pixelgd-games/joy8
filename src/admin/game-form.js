@@ -4,7 +4,7 @@ import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
 import { requireAdmin } from "./auth.js"
 import "../styles/admin-form.css"
-import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/policy.js"
+import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/contract.js"
 
 const params = new URLSearchParams(window.location.search)
 const isEditPage = window.location.pathname.startsWith("/admin/games/edit/")
@@ -130,6 +130,22 @@ async function submitForm(e) {
   fields.disabled = true
 
   try {
+    if (payload.published) {
+      const { data, error } = await supabase.rpc("joy8_game_readiness", {
+        p_game_id: gameId, p_slug: payload.slug, p_launch_url: payload.launch_url, p_thumbnail: payload.thumbnail,
+      })
+      if (error || !Array.isArray(data)) {
+        showValidationError("目前無法確認遊戲是否可上架，請稍後再試。")
+        return
+      }
+      const labels = { save_draft: "先儲存未上架的遊戲", slug: "有效的遊戲代碼", https_url: "HTTPS 遊戲網址",
+        cover: "遊戲封面", game_policy: "已啟用的遊戲規則", wallet_policy: "已啟用的 POINT 錢包",
+        backend_key: "完整遊戲服務授權", product_adapter: "有效的遊戲結算連接" }
+      if (data.length) {
+        showValidationError(`尚未完成上架設定：${data.map(key => labels[key] || "遊戲設定").join("、")}。`)
+        return
+      }
+    }
     if (gameId) {
       const { error } = await supabase.from("games").update(payload).eq("id", gameId)
       if (error) {

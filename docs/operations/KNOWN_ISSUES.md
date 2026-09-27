@@ -168,6 +168,11 @@ trust, real Auth or production capacity.
 
 ## Test Gaps
 
+`npm run verify:release` requires native PostgreSQL 17 concurrency coverage and
+a production build in addition to normal verification. PGlite alone is not a
+release acceptance. Catalog configuration checks cannot certify hosted gameplay;
+the real-service cases below remain separate.
+
 Not automated:
 
 - Loader success from session creation through a real game iframe.
