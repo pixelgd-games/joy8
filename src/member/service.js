@@ -93,7 +93,7 @@ export function createMemberService(client, { origin, next = "/", guestLock } = 
     return member
   }
 
-  async function guest(captchaToken) {
+  async function guest() {
     throw Object.assign(new Error("Guest entry is disabled"), { code: "JOY8_GUEST_DISABLED" })
   }
 

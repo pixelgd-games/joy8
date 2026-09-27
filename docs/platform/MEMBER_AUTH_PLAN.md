@@ -54,9 +54,10 @@ and emails absent from the allowlist. It checks the incoming user because the ne
 Auth row does not exist yet. The hook runs as `supabase_auth_admin`; browser and
 game roles cannot invoke it. Anonymous Auth is also disabled in hosted settings.
 
-The Gateway verifies the bearer and checks the current database identity/email on
-`enroll-member`, `create-session`, `private-session` and `branded-entry`. The SQL
-session/enrollment insert guards provide a second boundary. Removal denies future
+The Gateway verifies the bearer on `enroll-member`, `create-session`,
+`private-session` and `branded-entry`. SQL insert guards check the current database
+identity/email when creating player accounts and sessions. `branded-entry` creates
+neither, so it retains its explicit Gateway access check. Removal denies future
 sessions, including existing Google accounts; it does not cancel committed match
 obligations or revoke previously issued sessions. The Lobby stays public.
 Errors are `JOY8_EMAIL_NOT_ALLOWED` and `JOY8_GUEST_DISABLED`, both HTTP 403.

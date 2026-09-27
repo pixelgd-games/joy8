@@ -245,7 +245,9 @@ Rules:
   session returns `JOY8_GUEST_DISABLED`; an email outside the list returns
   `JOY8_EMAIL_NOT_ALLOWED` (both 403). Missing enrollment
   or an inactive player blocks launch; it never creates a replacement guest.
-- The route requires an allowed Joy8 origin. Localhost development ports are accepted.
+- The route requires an allowed Joy8 origin. Local development requires its exact
+  origin in `JOY8_ALLOWED_ORIGINS`; production allows only `https://joy8.cc` and
+  `https://www.joy8.cc`.
 
 Relevant response fields:
 

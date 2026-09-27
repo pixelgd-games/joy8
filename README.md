@@ -89,8 +89,9 @@ The front end is a Vite multi-page application written in vanilla JavaScript and
 CSS. Admin uses its Auth client; public catalog reads use a non-persistent client
 with no administrator session. Member entry and launch use a separate PKCE client
 with storage key `joy8-member-auth-v1`; Auth session storage is platform-owned and
-never passed into games. The prepared Gateway checks current Google email access before enrollment and
-all public/private/branded entry routes. The Gateway is the only public path to protected player,
+never passed into games. Database insert guards check current Google email access
+when creating players or game sessions; the Gateway checks branded-entry directly
+because that route creates neither. The Gateway is the only public path to protected player,
 game-session, and wallet RPCs. Separate browser storage does not grant
 administrator or player eligibility.
 
@@ -263,6 +264,12 @@ Browser preflight responses include `Access-Control-Max-Age: 7200`. Responses
 expose `Retry-After` and `X-Joy8-Request-Id` to cross-origin browser clients. Successful
 server open and settlement replies include the player's available POINT;
 `server-open-v1` can include settlement 1 for a one-request paid spin.
+
+Member routes default to `https://joy8.cc` and `https://www.joy8.cc` only.
+Local development requires explicitly adding the exact origin to
+`JOY8_ALLOWED_ORIGINS`; arbitrary localhost ports are rejected. The hosted secret
+contains only the two production origins. Session creation relies on its SQL
+issuer for membership and insert access checks; runtime cleanup stays in pg_cron.
 
 ## Database
 

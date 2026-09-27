@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises"
 
 const originalFetch = globalThis.fetch
 let handleRequest
+let testOrigins = "https://joy8.cc,https://www.joy8.cc,http://localhost:5173"
 
 globalThis.Deno = {
   env: {
@@ -11,6 +12,7 @@ globalThis.Deno = {
         SUPABASE_URL: "https://supabase.example",
         SUPABASE_SERVICE_ROLE_KEY: "service-key",
         SUPABASE_ANON_KEY: "anon-key",
+        JOY8_ALLOWED_ORIGINS: testOrigins,
       }[name]
     },
   },
@@ -22,6 +24,15 @@ try {
   const { callRpc, SERVER_ERROR_STATUSES } = await import("../supabase/functions/joy8-gateway/rpc.ts")
   const { resolveAuthUser } = await import("../supabase/functions/joy8-gateway/auth.ts")
   const { readJsonBody } = await import("../supabase/functions/joy8-gateway/http.ts")
+  testOrigins = ""
+  const { isCorsOriginAllowed: productionOriginAllowed } = await import("../supabase/functions/joy8-gateway/http.ts?production")
+  for (const route of ["member", "enroll-member", "create-session", "private-session", "branded-entry"]) {
+    assert.equal(productionOriginAllowed("https://joy8.cc", route), true)
+    assert.equal(productionOriginAllowed("https://www.joy8.cc", route), true)
+    for (const origin of ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:9000"]) {
+      assert.equal(productionOriginAllowed(origin, route), false)
+    }
+  }
   const bodyRequest = (body, headers = {}) => new Request("https://gateway.example/member", {
     method: "POST", body, headers, duplex: "half",
   })
@@ -178,22 +189,31 @@ try {
   memberRows = []
   assert.deepEqual(await (await request("member")).json(), { member: null })
   assert.equal((await request("enroll-member")).status, 502)
+  sessionError = { code: "42501", message: "player membership is required" }
   assert.equal((await request("create-session", { slug: "test" })).status, 403)
-  assert.equal(rpcCalls.some(({ name }) => name === "create_game_session"), false)
+  assert.equal(rpcCalls.at(-1).name, "create_game_session")
   memberError = { code: "42501", message: "player account is not active" }
   assert.equal((await request("enroll-member")).status, 403)
+  sessionError = memberError
   assert.equal((await request("create-session", { slug: "test" })).status, 403)
-  assert.equal(rpcCalls.some(({ name }) => name === "create_game_session"), false)
+  assert.equal(rpcCalls.at(-1).name, "create_game_session")
   memberError = { code: "42501", message: "private database diagnostic" }
   assert.deepEqual(await (await request("member")).json(), { error: "Gateway RPC failed" })
   memberError = null
+  sessionError = null
   memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "guest" }]
   for (const extra of [{auth_user_id:"victim"},{currency:"POINT"},{expires_in_seconds:3600},{display_name:"unused"}]) assert.equal((await request("create-session", {slug:"test",...extra})).status,400)
+  rpcCalls.length = 0
   const launched = await request("create-session", { slug: "test" })
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")
   assert.equal((await launched.json()).account_type, "guest")
   assert.deepEqual(rpcCalls.find(({ name }) => name === "create_game_session").args, { p_game_slug: "test", p_auth_user_id: "verified-user" })
+  assert.deepEqual(rpcCalls.map(({ name }) => name), ["joy8_consume_gateway_rate_limit", "joy8_admit_gateway_request", "create_game_session"])
+  for (const route of ["member", "enroll-member", "create-session"]) {
+    assert.equal((await request(route, {}, "member-token", "http://localhost:9000")).status, 403)
+    assert.equal((await request(route, {}, "", "http://localhost:5173")).status, 401)
+  }
 
   for (const [code, message, status] of [
     ["P0002", "game is not available", 404],
@@ -244,16 +264,23 @@ try {
   for (const route of ["enroll-member", "create-session", "private-session", "branded-entry"]) {
     for (const error of ["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"]) {
       accessError = error
+      memberError = { code: "42501", message: error }
+      sessionError = memberError
       rpcCalls.length = 0
       const response = await request(route, route === "enroll-member" ? {} : { slug: "test" })
       assert.equal(response.status, 403)
       assert.deepEqual(await response.json(), { error })
-      assert.equal(rpcCalls.some(({ name }) => ["create_game_session", "joy8_create_private_session", "joy8_resolve_branded_entry", "joy8_resolve_member_profile"].includes(name)), false)
+      assert.equal(rpcCalls.some(({ name }) => name === "joy8_assert_play_access"), route === "branded-entry")
+      assert.equal(rpcCalls.at(-1).name, { "enroll-member": "joy8_resolve_member_profile", "create-session": "create_game_session", "private-session": "joy8_create_private_session", "branded-entry": "joy8_assert_play_access" }[route])
     }
     accessError = null
+    memberError = { code: "JOY8_UPSTREAM_UNAVAILABLE" }
+    sessionError = memberError
     accessReply = null
     assert.equal((await request(route, route === "enroll-member" ? {} : { slug: "test" })).status, 503)
     accessReply = true
+    memberError = null
+    sessionError = null
   }
 
   assert.equal((await request("branded-session")).status,404)

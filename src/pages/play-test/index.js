@@ -14,7 +14,7 @@ if (!GAME_SLUG_PATTERN.test(slug || "")) {
   const service = createMemberService(memberSupabase, { origin: location.origin })
   const card = document.querySelector(".loader-card")
   card.querySelector(".loader-ring").remove()
-  card.querySelector(".loader-copy").textContent = "登入 Joy8 或使用快速登入，即可進入測試。"
+  card.querySelector(".loader-copy").textContent = "登入 Joy8，即可進入測試。"
   const button = document.createElement("button")
   button.id = "private-start"
   button.textContent = "進入測試"

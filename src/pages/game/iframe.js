@@ -1,3 +1,5 @@
+import { ENTRY_REQUEST_ID_PATTERN } from "../../lib/entryProtocol.js"
+
 const BASE_SANDBOX_TOKENS = [
   "allow-forms",
   "allow-orientation-lock",
@@ -105,4 +107,3 @@ function getSandboxTokens(gameUrl) {
 
   return tokens
 }
-import { ENTRY_REQUEST_ID_PATTERN } from "../../lib/entryProtocol.js"

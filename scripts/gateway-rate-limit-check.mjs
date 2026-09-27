@@ -36,7 +36,6 @@ before(async () => {
     }
     const name = url.split("/").at(-1)
     const args = JSON.parse(options.body)
-    if (name === "joy8_assert_play_access") return Response.json(true)
     if (name === "joy8_consume_gateway_rate_limit") {
       if (unavailable) return Response.json({}, { status: 503 })
       const { rows } = await db.query("select public.joy8_consume_gateway_rate_limit($1,$2,$3) allowed", [args.p_key, args.p_limit, args.p_window_seconds])
@@ -60,6 +59,14 @@ before(async () => {
     if (name === "joy8_resolve_member_profile") {
       const { rows } = await db.query("select * from public.joy8_resolve_member_profile($1,$2)", [args.p_auth_user_id, args.p_enroll])
       return Response.json(rows)
+    }
+    if (name === "create_game_session") {
+      try {
+        const { rows } = await db.query("select * from public.create_game_session($1,$2)", [args.p_game_slug, args.p_auth_user_id])
+        return Response.json(rows)
+      } catch (error) {
+        return Response.json({ code: error.code, message: error.message }, { status: 400 })
+      }
     }
     throw new Error(`Unexpected upstream RPC ${name}`)
   }
@@ -262,4 +269,21 @@ test("malformed admission replies fail closed before accounting and disclose no 
     }
     assert.equal(settlementCalls,beforeCalls)
   } finally { subjectOverride=undefined }
+})
+
+test("session creation returns database allowlist and guest denials through the actual Gateway", async () => {
+  const auth = await googleIdentity(db)
+  identities.set("launch-access-member", auth)
+  await db.query("select * from public.joy8_resolve_member($1,true)", [auth])
+  const launch = () => post("create-session", "192.0.2.99", "launch-access-member", { slug: "test-game" })
+  assert.equal((await launch()).status, 200)
+  await db.query("delete from public.joy8_email_allowlist where email=(select email from auth.users where id=$1)", [auth])
+  const emailDenied = await launch()
+  assert.equal(emailDenied.status, 403)
+  assert.deepEqual(await emailDenied.json(), { error: "JOY8_EMAIL_NOT_ALLOWED" })
+  await db.query("update auth.users set is_anonymous=true where id=$1", [auth])
+  const guestDenied = await launch()
+  assert.equal(guestDenied.status, 403)
+  assert.deepEqual(await guestDenied.json(), { error: "verified member identity is required" })
+  assert.equal((await one("select count(*)::int n from public.game_sessions s join public.player_accounts p on p.id=s.player_account_id where p.auth_user_id=$1", [auth])).n, 1)
 })

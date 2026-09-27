@@ -11,10 +11,6 @@ const MAX_BODY_BYTES = 16 * 1024
 const DEFAULT_ALLOWED_ORIGINS = [
   "https://joy8.cc",
   "https://www.joy8.cc",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-  "http://localhost:4173",
-  "http://127.0.0.1:4173",
 ]
 
 const allowedOrigins = (Deno.env.get("JOY8_ALLOWED_ORIGINS") ?? "")
@@ -67,7 +63,7 @@ export function isCorsOriginAllowed(origin: string | null, route: string): boole
   }
 
   if (memberRoute) {
-    return allowedOrigins.includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin)
+    return allowedOrigins.includes(origin)
   }
 
   try {
