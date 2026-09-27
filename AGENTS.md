@@ -27,7 +27,7 @@ Read the smallest complete set for the task:
 | Current repository structure, setup, build, or deployment | `README.md` |
 | Product boundaries, priorities, or roadmap | `docs/product/PRODUCT_SCOPE.md` |
 | Joy8 game launch, iframe, Gateway, wallet, or game integration | `docs/platform/GAME_PLATFORM_INTEGRATION.md` |
-| Member authentication, persistent guest identity, game-wallet relationship, or branded game entry | `docs/platform/MEMBER_AUTH_PLAN.md` |
+| Member authentication, Google allowlist, game-wallet relationship, or branded game entry | `docs/platform/MEMBER_AUTH_PLAN.md` |
 | In-app mailbox, announcements, notifications, rewards, compensation or mail administration | `docs/platform/MAILBOX.md` |
 | CrazyGames builds, SDK, ads, saves, or store submission | `docs/platform/CRAZYGAMES_INTEGRATION.md` |
 | Cross-module Flash context | `docs/platform/FLASH.md` |

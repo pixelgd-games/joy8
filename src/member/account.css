@@ -238,10 +238,6 @@
   font-style: normal;
 }
 
-.account-captcha {
-  min-height: 0;
-}
-
 .account-card :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;

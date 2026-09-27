@@ -127,13 +127,14 @@ The standalone Auth config helper, if separately authorized in another task,
 only patches the two Before User Created fields for `enable-whitelist`; it
 preserves every provider setting. It was not used for this activation.
 
-The test bundle includes the applied access migration. Financial and Gateway
-regressions use allowlisted Google fixtures. Guest-era member/private-entry and
-raw public-ID regressions explicitly use `loadPreAllowlistPlatform`; they test
-historical behavior and do not establish release access acceptance. The access
-suite installs the real migration and tests the actual Auth invoker role, RLS,
-Google allow/deny, guest denial and session denial after removal. Cleanup seeds
-historical records before installing the access migration, matching deployment.
+The current test bundle includes the access and Google-only migrations.
+Financial, member, private-entry, public-ID and Gateway regressions use
+allowlisted Google fixtures through `loadCurrentPlatform`; the old
+`loadPreAllowlistPlatform` entry point is removed. The access suite tests the
+actual Auth invoker role, RLS, Google allow/deny, anonymous denial and session
+denial after removal. Cleanup tests seed historical records before installing
+the access migration to verify that one-time operation; they do not restore
+Guest support in the runtime.
 
 Vendor contract: [Before User Created Hook](https://supabase.com/docs/guides/auth/auth-hooks/before-user-created-hook).
 

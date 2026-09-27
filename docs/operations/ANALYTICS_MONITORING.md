@@ -138,12 +138,12 @@ This proves that Joy8 issued launch authorization. It does not prove that the if
 
 Count distinct `player_account_id` values with trusted activity during the period.
 
-Persistent anonymous identity and enrolled player accounts are implemented.
+Allowlisted Google identity and enrolled player accounts are implemented.
 Continue to label this metric `Active Accounts`, not DAU, WAU, or MAU, until a
 trusted activity event and cross-browser/device reporting rules exist. One
 person can still have more than one account.
 
-Member and persistent guest design is owned by `../platform/MEMBER_AUTH_PLAN.md`.
+Member identity design is owned by `../platform/MEMBER_AUTH_PLAN.md`.
 
 ### DAU, WAU, and MAU
 
@@ -289,7 +289,7 @@ The deployed implementation provides `POST /health` with `{}` and no credential.
 It returns only `{"status":"ok"}` (200) or unavailable (503). Gateway rate-limit
 failure may return 429/503 before the probe. The dependency RPC reads the catalog
 and verifies critical member/session/settlement function presence. It does not
-exercise financial writes or prove Google, guest Auth, Turnstile, product backend
+exercise financial writes or prove Google Auth, product backend
 or iframe health.
 The rate limiter may update runtime counters; no business records are created.
 
@@ -300,7 +300,7 @@ It should distinguish:
 
 It must not:
 
-- Create a guest, player, wallet, session, financial match, settlement, or transaction.
+- Create an Auth identity, player, wallet, session, financial match, settlement, or transaction.
 - Return credentials or internal database details.
 - Bypass rate limiting.
 - Become a high-cost database query.
