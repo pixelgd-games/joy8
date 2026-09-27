@@ -11,6 +11,10 @@ a designated real test identity. Existing administrator access remains working.
 The approved product policy is in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md).
 The identity contract is in [MEMBER_AUTH_PLAN.md](../platform/MEMBER_AUTH_PLAN.md).
 
+For routine email additions, use the verified-admin page at `/admin/access/`.
+Do not create further migrations containing individual allowlist emails. Earlier
+applied allowlist migrations remain unchanged deployment history.
+
 ## SQL approval units
 
 The email, cleanup and reserve files below were individually approved and applied.
@@ -29,6 +33,7 @@ Never edit applied migrations, reset the database, or apply all drafts together.
 | [Mahjong key scope](../../supabase/migrations/20260927121000_mahjong_reviewed_key_scopes.sql) | Approves the existing key for exchange/renew/open/settle/status/cancel | Applied after the payout policy; secret unchanged |
 | [Johnny access](../../supabase/migrations/20260927122000_allow_johnny_google.sql) | Adds the explicitly requested Google email | Applied; grants play access, not administrator access |
 | [Mahjong publication](../../supabase/migrations/20260927123000_publish_mahjong_clash.sql) | Publishes the verified Pages URL and keeps the localhost private entry disabled | Applied after successful WSS and Origin rejection checks |
+| [Mahjong cover](../../supabase/migrations/20260927124000_mahjong_clash_cover.sql) | Sets only `games.thumbnail` to `/games/mahjong-clash/cover.webp` | Applied with the reviewed catalog-state guard; draft removed |
 
 The key review binds game `faaa45eb-7d7d-40b5-9081-3dd73482adfa` and existing
 key ID `a2eeea4b-026b-4e32-bfd8-1d75223ad92b`. It retains the current secret/hash,
