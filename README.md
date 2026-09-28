@@ -418,6 +418,24 @@ only the local restore. Snapshot files contain sensitive data: they remain
 ignored, local and outside source control. This does not test Supabase's managed
 backup/PITR service or re-create its infrastructure.
 
+Snapshots preserve Auth/public/product object ownership and extension schema
+permissions required by definer functions. Restore re-enables row security after
+loading the dump. Snapshots lacking this metadata must be generated again.
+`test:recovery` includes a distinct-owner/RLS/extension-access regression.
+
+`node scripts/mahjong-capacity-check.mjs <snapshot-directory>` restores only to
+local PostgreSQL and exercises the captured Mahjong functions with 25 synthetic
+members and 75 synthetic AI accounts. It tests 1/5/25 simultaneous tables, mixed
+win/draw settlements, retries, lock waits and reconciliation. It never connects
+to hosted gameplay or measures hosted capacity. Results stay with the ignored
+snapshot as `capacity-result.json`.
+
+On Windows, set `ALLOW_PRODUCTION_GATEWAY_SMOKE=1` and run
+`node scripts/gateway-ingress-check.mjs` to send ten bounded health requests and
+use the Joy8 wrapper for read-only counter inspection. Results stay under
+`.acceptance.local/`; no raw client IP is recorded. This probes direct ingress,
+not every proxy path or Worker subrequest.
+
 A fresh hosted project still needs separately provisioned administrator and
 allowlist entries, catalog/policies, game-owned schemas, Backend Keys, Auth
 provider/Hook settings, Gateway secrets, Edge deployment and DNS/redirect settings.

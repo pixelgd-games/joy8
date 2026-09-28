@@ -1,7 +1,11 @@
 import assert from "node:assert/strict"
-import { readFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { createHash, randomUUID } from "node:crypto"
+import path from "node:path"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
 import { googleIdentity } from "./fixtures/google-identity.mjs"
+import { snapshotMetadata } from "./snapshot-metadata.mjs"
+import { restoreSnapshot } from "./restore-snapshot.mjs"
 
 const bootstrap = await readFile("supabase/bootstrap/platform.sql", "utf8")
 const fixture = await readFile("scripts/fixtures/member-database.sql", "utf8")
@@ -36,5 +40,40 @@ try {
   assert.deepEqual(await snapshot(restored), before)
   await assert.rejects(restored.exec(bootstrap), /JOY8_BOOTSTRAP_REQUIRES_EMPTY_PROJECT/)
   await restored.exec("rollback")
+  await first.exec(`
+    create role probe_table_owner nologin;
+    create role probe_function_owner nologin;
+    create table public.recovery_probe_rows(value integer);
+    insert into public.recovery_probe_rows values(7);
+    alter table public.recovery_probe_rows owner to probe_table_owner;
+    alter table public.recovery_probe_rows enable row level security;
+    create policy recovery_probe_read on public.recovery_probe_rows for select to probe_function_owner using(true);
+    grant select on public.recovery_probe_rows to probe_function_owner;
+    grant usage on schema extensions to probe_function_owner;
+    create function public.recovery_permission_probe(p public.wallet_accounts) returns boolean
+      language sql security definer set search_path='' as $$
+      select sum(value)=7 and octet_length(extensions.gen_random_bytes(4))=4 from public.recovery_probe_rows;
+      $$;
+    alter function public.recovery_permission_probe(public.wallet_accounts) owner to probe_function_owner;
+  `)
+  assert.equal((await first.query("select public.recovery_permission_probe(null) ok")).rows[0].ok, true)
+  await first.exec("begin read only; set local search_path=''")
+  const metadata = await snapshotMetadata(first, ["public", "auth"])
+  const directory = path.resolve(".recovery.local", `regression-${randomUUID()}`)
+  await mkdir(directory, { recursive: true })
+  const hashes = {}
+  for (const section of ["pre-data", "data", "post-data"]) {
+    const sql = cleanDump(await first.dump(["--inserts", "--schema=public", "--schema=auth", `--section=${section}`])).replace(/^CREATE SCHEMA public;\r?\n/gm, "")
+    await writeFile(path.join(directory, `${section}.sql`), sql)
+    hashes[section] = createHash("sha256").update(sql).digest("hex")
+  }
+  await first.exec("commit")
+  await writeFile(path.join(directory, "manifest.json"), JSON.stringify({ ref: "lsazydefvnuqglultqii", ...metadata, sha256: hashes }))
+  await restoreSnapshot(directory, async db => {
+    assert.equal((await db.query("select public.recovery_permission_probe(null) ok")).rows[0].ok, true)
+    assert.equal((await db.query("select pg_get_userbyid(relowner) owner from pg_class where oid='public.recovery_probe_rows'::regclass")).rows[0].owner, "probe_table_owner")
+    assert.equal((await db.query("show row_security")).rows[0].row_security, "on")
+  })
+  console.log("Hosted restore regression passed: distinct object/function owners, schema-qualified row types, extension access and RLS execution.")
   console.log("Empty project bootstrap, schema/data restore, identity, wallet, ledger, grants and no duplicate enrollment credit passed on PostgreSQL 17.")
 } finally { await Promise.all([first.close(), restored.close()]) }

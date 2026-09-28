@@ -6,9 +6,9 @@ import path from "node:path"
 import { promisify } from "node:util"
 import pg from "pg"
 import { restoreSnapshot } from "./restore-snapshot.mjs"
+import { snapshotMetadata } from "./snapshot-metadata.mjs"
 
 const ref = "lsazydefvnuqglultqii"
-const quote = value => `"${String(value).replaceAll('"', '""')}"`
 const clean = sql => sql.replace(/^\\(?:un)?restrict.*\r?\n/gm, "").replace(/^CREATE SCHEMA public;\r?\n/gm, "")
 const run = promisify(execFile)
 assert.equal(process.env.SUPABASE_PROJECT_ID, ref, "Use scripts/supabase-joy8.cmd recovery-snapshot")
@@ -23,16 +23,10 @@ const source = new pg.Client({ host: endpoint.hostname, port: Number(endpoint.po
 try {
   await source.connect()
   await source.query("begin isolation level repeatable read read only")
+  await source.query("set local search_path=''")
   const snapshot = (await source.query("select pg_export_snapshot() id")).rows[0].id
   const schemas = ["auth", "public", ...(await source.query("select schema_name from public.joy8_product_schemas order by schema_name")).rows.map(row => row.schema_name)]
-  const owners = (await source.query("select n.nspname schema,c.relname name,r.rolname owner,c.relkind kind from pg_class c join pg_namespace n on n.oid=c.relnamespace join pg_roles r on r.oid=c.relowner where n.nspname=any($1) and n.nspname not in ('auth','public') and c.relkind in ('r','p','v','m','S')", [schemas])).rows
-  const functions = (await source.query("select n.nspname schema,p.proname name,pg_get_function_identity_arguments(p.oid) args,r.rolname owner from pg_proc p join pg_namespace n on n.oid=p.pronamespace join pg_roles r on r.oid=p.proowner where n.nspname=any($1) and n.nspname not in ('auth','public') and p.prokind='f'", [schemas])).rows
-  const schemaOwners = (await source.query("select nspname name,pg_get_userbyid(nspowner) owner from pg_namespace where nspname=any($1) and nspname not in ('auth','public')", [schemas])).rows
-  const roles = (await source.query("select rolname,rolbypassrls from pg_roles where rolname !~ '^pg_' order by rolname")).rows
-  const events = (await source.query("select evtname,evtevent,evtfoid::regproc::text function,evttags from pg_event_trigger where evtname like 'joy8_%'")).rows
-  const tables = (await source.query("select schemaname,tablename from pg_tables where schemaname=any($1) order by schemaname,tablename", [schemas])).rows
-  const counts = {}
-  for (const table of tables) counts[`${table.schemaname}.${table.tablename}`] = (await source.query(`select count(*)::text n from ${quote(table.schemaname)}.${quote(table.tablename)}`)).rows[0].n
+  const metadata = await snapshotMetadata(source, schemas)
   const directory = path.resolve(".recovery.local", new Date().toISOString().replaceAll(/[:.]/g, "-"))
   await mkdir(directory, { recursive: true })
   const files = {}
@@ -48,7 +42,7 @@ try {
     await writeFile(path.join(directory, `${section}.sql`), files[section], { mode: 0o600 })
   }
   await source.query("commit")
-  await writeFile(path.join(directory, "manifest.json"), JSON.stringify({ ref, schemas, counts, owners, functions, roles, events, schemaOwners,
+  await writeFile(path.join(directory, "manifest.json"), JSON.stringify({ ref, ...metadata,
     sha256: Object.fromEntries(Object.entries(files).map(([key, value]) => [key, createHash("sha256").update(value).digest("hex")])) }, null, 2), { mode: 0o600 })
   console.log("Consistent hosted snapshot saved locally; restoring into an isolated PostgreSQL 17 process.")
   await restoreSnapshot(directory)

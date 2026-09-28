@@ -10,6 +10,8 @@ try {
   sql = sql.replace(/^\\(?:un)?restrict.*\r?\n/gm, "")
     .replace(/^--.*\r?\n/gm, "")
     .replace(/^CREATE SCHEMA public;\r?\n/gm, "")
+    .replace(/^SET /gm, "SET LOCAL ")
+    .replace("pg_catalog.set_config('search_path', '', false)", "pg_catalog.set_config('search_path', '', true)")
     .replace(/ALTER DEFAULT PRIVILEGES FOR ROLE joy8_test/g, "ALTER DEFAULT PRIVILEGES")
     .replace(/\n{3,}/g, "\n\n")
   const events = (await db.query("select evtname,evtevent,evtfoid::regproc::text function,evttags from pg_event_trigger order by evtname")).rows

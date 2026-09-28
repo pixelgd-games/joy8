@@ -72,7 +72,12 @@ Remaining acceptance:
   operator queue. Its `mahjong_clash_operator` role has no login; an operator
   login needs a separate reviewed credential action.
 - Economy operations lock one singleton `economy_state` row, serializing them
-  across tables. Measure hosted capacity before funded or public activation.
+  across tables. A local PostgreSQL 17 snapshot test completed 124 mixed win/draw
+  hands across 1/5/25-table scenarios with no accounting mismatch or duplicate
+  retry credit. At 25 tables, settlement p95 was 711 ms, maximum 1,279 ms and up
+  to 24 connections waited for locks. Throughput rose from 44.64 hands/s at five
+  tables to 49.54 at 25; this is a short local SQL measurement, not hosted capacity
+  or full game-server throughput. Reproduce with `scripts/mahjong-capacity-check.mjs`.
 - Real allowlisted Joy8 sign-in must reach the game with the same player and
   balance, followed by one played hand and reconciliation of human POINT and
   product-owned AI funding. Published infrastructure is not proof of settlement.
@@ -124,11 +129,14 @@ device attestation, or a stronger issuance design with a privacy review.
 
 The Gateway selects `cf-connecting-ip`, then `x-real-ip`, then the first
 `x-forwarded-for` value, falling back to `unknown`. Which headers the hosted
-ingress overwrites is not established. A bounded hosted probe found no bucket
-matching injected addresses, but it did not cover native IPv6 transport or Worker
-subrequests. This is an unverified boundary, not a confirmed bypass. Establish the
-managed ingress contract before changing the selection; do not add a public
-header echo endpoint.
+ingress overwrites is not fully established. A ten-request direct hosted probe
+rejected four forged `cf-connecting-ip` variants at Cloudflare (403 before the
+Gateway); six accepted requests, including fake `x-real-ip` and forwarded chains,
+incremented one common bucket. No injected or `unknown` bucket appeared. The
+tested hostname had no AAAA record, so native IPv6 transport was not tested.
+Worker subrequests remain untested. These observations support the direct path,
+not a guarantee across every managed ingress path. Keep subject-based limits and
+do not add a public header echo endpoint.
 
 ### Scoped Limit Capacity
 
@@ -158,6 +166,10 @@ A current empty-project bootstrap and native schema/data restore verification ar
 provided. The hosted snapshot tool restores Auth, platform and registered product
 data locally and checks accounting and permission boundaries. These tools do not
 re-create provider secrets, external game services or managed Supabase backup/PITR.
+The Joy8 Dashboard currently shows the Free plan with no scheduled project backups;
+PITR and restore-to-new-project are unavailable under that plan. There is no
+managed restore point to exercise. A paid plan and suitable isolated restore
+target must be arranged before claiming a managed recovery drill.
 See [README.md](../../README.md#fresh-database-and-recovery) for commands and limits.
 
 

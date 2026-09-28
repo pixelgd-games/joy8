@@ -9,17 +9,17 @@ ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC,anon,authenticated,service_role;
 CREATE SCHEMA IF NOT EXISTS extensions;
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
-SET statement_timeout = 0;
-SET lock_timeout = 0;
-SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
-SET client_encoding = 'UTF8';
-SET standard_conforming_strings = on;
-SELECT pg_catalog.set_config('search_path', '', false);
-SET check_function_bodies = false;
-SET xmloption = content;
-SET client_min_messages = warning;
-SET row_security = off;
+SET LOCAL statement_timeout = 0;
+SET LOCAL lock_timeout = 0;
+SET LOCAL idle_in_transaction_session_timeout = 0;
+SET LOCAL transaction_timeout = 0;
+SET LOCAL client_encoding = 'UTF8';
+SET LOCAL standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', true);
+SET LOCAL check_function_bodies = false;
+SET LOCAL xmloption = content;
+SET LOCAL client_min_messages = warning;
+SET LOCAL row_security = off;
 
 
 
@@ -299,9 +299,9 @@ end;
 $$;
 
 
-SET default_tablespace = '';
+SET LOCAL default_tablespace = '';
 
-SET default_table_access_method = heap;
+SET LOCAL default_table_access_method = heap;
 
 
 CREATE TABLE public.wallet_accounts (

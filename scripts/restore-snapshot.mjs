@@ -5,12 +5,14 @@ import path from "node:path"
 import { createLocalPostgres } from "./fixtures/local-postgres.mjs"
 
 const quote = value => `"${String(value).replaceAll('"', '""')}"`
-export async function restoreSnapshot(directory) {
+export async function restoreSnapshot(directory, verify = null) {
   directory = path.resolve(directory)
   const root = path.resolve(".recovery.local") + path.sep
   assert.ok(directory.startsWith(root), "Snapshot must be in the ignored recovery directory")
   const manifest = JSON.parse(await readFile(path.join(directory, "manifest.json"), "utf8"))
   assert.equal(manifest.ref, "lsazydefvnuqglultqii")
+  for (const schema of ["auth", "public"]) assert.ok(manifest.owners.some(owner => owner.schema === schema), "Take a new snapshot with complete object ownership")
+  assert.ok(manifest.extensionSchema, "Take a new snapshot including extension schema permissions")
   const files = {}
   for (const section of ["pre-data", "data", "post-data"]) {
     files[section] = await readFile(path.join(directory, `${section}.sql`), "utf8")
@@ -20,6 +22,11 @@ export async function restoreSnapshot(directory) {
   try {
     for (const role of manifest.roles) if (role.rolname !== "joy8_test") await local.exec(`CREATE ROLE ${quote(role.rolname)} NOLOGIN ${role.rolbypassrls ? "BYPASSRLS" : "NOBYPASSRLS"}`)
     await local.exec("create schema extensions; create extension pgcrypto with schema extensions; create extension if not exists \"uuid-ossp\" with schema extensions;")
+    await local.exec(`ALTER SCHEMA extensions OWNER TO ${quote(manifest.extensionSchema.owner)}; REVOKE ALL ON SCHEMA extensions FROM PUBLIC`)
+    for (const grant of manifest.extensionSchema.grants) {
+      assert.ok(["USAGE", "CREATE"].includes(grant.privilege))
+      await local.exec(`GRANT ${grant.privilege} ON SCHEMA extensions TO ${grant.role === "PUBLIC" ? "PUBLIC" : quote(grant.role)}${grant.grantable ? " WITH GRANT OPTION" : ""}`)
+    }
     await local.exec(files["pre-data"])
     for (const owner of manifest.owners) {
       if (owner.kind === "S" && (await local.query("select exists(select 1 from pg_depend where classid='pg_class'::regclass and objid=$1::regclass and refclassid='pg_class'::regclass and deptype in ('a','i')) owned", [`${quote(owner.schema)}.${quote(owner.name)}`])).rows[0].owned) continue
@@ -30,6 +37,7 @@ export async function restoreSnapshot(directory) {
     for (const schema of manifest.schemaOwners || []) await local.exec(`ALTER SCHEMA ${quote(schema.name)} OWNER TO ${quote(schema.owner)}`)
     await local.exec(files.data)
     await local.exec(files["post-data"])
+    await local.exec("set row_security=on; set search_path=public")
     for (const [table, count] of Object.entries(manifest.counts)) {
       const [schema, name] = table.split(".")
       assert.equal((await local.query(`select count(*)::text n from ${quote(schema)}.${quote(name)}`)).rows[0].n, count)
@@ -48,6 +56,7 @@ export async function restoreSnapshot(directory) {
     for (const key of ["wallet_ledger_mismatches", "reservation_mismatches", "fee_mismatches", "unbalanced_settlements", "finalized_with_reservations"]) assert.equal(reconciliation[key], 0, key)
     await writeFile(path.join(directory, "restore-result.json"), JSON.stringify({ restored: true, countsMatched: true, productAdaptersValid: true, eventGuardsInstalled: true, reconciliation }, null, 2), { mode: 0o600 })
     console.log("Hosted snapshot restored locally: table counts, accounting, adapter permissions and DDL guards passed.")
+    if (verify) await verify(local)
   } finally { await local.close() }
 }
 
