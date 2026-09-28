@@ -118,7 +118,7 @@ When a non-gambling game ships to both Joy8 and CrazyGames, read both platform i
 - Add allowlisted emails through the Joy8 admin page at `/admin/access/`. Do not put individual email additions into new SQL migrations; existing applied migrations remain unchanged deployment history.
 - Every hosted SQL migration requires separate user confirmation before application. Player-test cleanup requires an exact table/count review, preserves administrators, and never resets the database. Monster Lab D1 is outside this cleanup.
 - The current player table is `player_accounts`; wallets use `wallet_accounts` and `wallet_transactions`.
-- Player, guest, and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
+- Registered Google player and wallet initialization belongs in database RPC or backend flows. The front end must not write those tables directly.
 - Game session and wallet RPCs remain `service_role` only and must not be called from the front end.
 - Every enrolled player has one shared POINT wallet across all Joy8-integrated games. Trusted Joy8 configuration resolves that wallet; a game request cannot select a wallet or mutate its balance.
 - Do not recreate the superseded Demo currency hold migration. Current POINT enforcement belongs to the shared wallet policy and trusted session protocol.

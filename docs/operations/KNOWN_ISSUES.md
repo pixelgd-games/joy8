@@ -78,9 +78,10 @@ Remaining acceptance:
   to 24 connections waited for locks. Throughput rose from 44.64 hands/s at five
   tables to 49.54 at 25; this is a short local SQL measurement, not hosted capacity
   or full game-server throughput. Reproduce with `scripts/mahjong-capacity-check.mjs`.
-- Real allowlisted Joy8 sign-in must reach the game with the same player and
-  balance, followed by one played hand and reconciliation of human POINT and
-  product-owned AI funding. Published infrastructure is not proof of settlement.
+- Hosted allowlisted Lobby-to-Mahjong launch reached the real iframe and restored
+  an existing game screen. The user will verify a newly played hand, player/balance
+  continuity and reconciliation of human POINT and product-owned AI funding.
+  Reconnecting an existing screen is not proof of a new settlement.
 - The game server runs in a visible local terminal and needs manual restart after
   reboot. Only the Tunnel is an automatic Windows service. Per-IP connection
   limits remain deferred until public operation, as explicitly requested.
@@ -151,14 +152,20 @@ a production build in addition to normal verification. PGlite alone is not a
 release acceptance. Catalog configuration checks cannot certify hosted gameplay;
 the real-service cases below remain separate.
 
-Not automated:
+Manual hosted coverage and remaining boundaries:
 
-- Loader success from session creation through a real game iframe.
-- Full Admin create, edit, publish, ordering and form-validation acceptance.
-  Local browser smoke covers load failure, missing records, metadata preservation,
-  duplicate-submit prevention and retry after a rejected save.
-- Accessibility behavior for modal focus and keyboard navigation.
-- Hosted Auth, production load and managed backup/PITR restoration.
+| Area | Verified | Still outside that verification |
+| --- | --- | --- |
+| Catalog Admin | Unpublished draft creation/readback/edit, sort-value persistence, invalid URL rejection, incomplete readiness blocking, retry after rejection, and ordinary Player Session denied Admin access | Successful publish/unpublish through the hosted UI and visible ordering changes; valid publish transitions are covered by native SQL tests |
+| Game entry | Public Lobby browsing and allowlisted Lobby-to-Mahjong iframe launch; disabled `/play-test/` and `/entry/` reject access | Successful enabled independent entry in a hosted browser; native tests cover enabled entry, publication transitions, origin checks and permissions |
+| Financial gameplay | Isolated snapshot capacity and retry/reconciliation checks described above | A new real Mahjong hand and reconciliation; the user will perform gameplay acceptance |
+| Identity and mailbox | Automated Google-only access guards and atomic mail claim/retry checks | The user will test fresh outside-list Google rejection and hosted mail reward send/read/claim |
+| Operations | Direct hosted IP-header probe and local snapshot restore described in this document | Production capacity, Worker/native IPv6 paths and managed backup/PITR recovery |
+
+The temporary catalog draft used for hosted checks was removed. Those checks did
+not publish test games, issue rewards or play a new hand. Browser smoke remains
+mocked; manual coverage is not an automated end-to-end release gate. Modal focus
+and keyboard accessibility also remain unverified.
 
 ## Database Recovery Boundary
 

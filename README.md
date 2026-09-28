@@ -33,6 +33,10 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   complete Free Spins rounds reconciled against Joy8 settlements; the remaining
   hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
+- Hosted catalog administration and Lobby-to-Mahjong launch have scoped manual
+  coverage. Hosted acceptance remains open for successful enabled independent
+  entry, a newly played Mahjong hand, production capacity and managed recovery.
+  See [verification boundaries](docs/operations/KNOWN_ISSUES.md#test-gaps).
 
 ## Current Scope
 
@@ -359,7 +363,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 
 | Command | Covers |
 | --- | --- |
-| `node --test scripts/email-allowlist-check.mjs scripts/reviewed-cleanup-check.mjs scripts/mahjong-release-policy-check.mjs` | Applied whitelist/cleanup/reserve SQL and pending Mahjong payout/key drafts; isolated fixtures only |
+| `node --test scripts/email-allowlist-check.mjs scripts/reviewed-cleanup-check.mjs scripts/mahjong-release-policy-check.mjs` | Applied whitelist, cleanup, reserve, payout and key-scope migrations; isolated fixtures only |
 | `npm run test:member` / `test:iframe` | Member flow and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, one-time grants, launch and wallet concurrency |
@@ -388,8 +392,8 @@ architecture claims; a production build is not required.
 
 Run `npm run verify:release` before deployment. It requires `JOY8_TEST_PG_BIN`,
 runs normal verification, native PostgreSQL 17 financial/identity/DDL/concurrency
-and mailbox suites, then a production build. Missing native PostgreSQL is a
-failure, never an automatic PGlite fallback.
+and mailbox suites, bootstrap/restore regression, then a production build.
+Missing native PostgreSQL is a failure, never an automatic PGlite fallback.
 
 ### Fresh database and recovery
 

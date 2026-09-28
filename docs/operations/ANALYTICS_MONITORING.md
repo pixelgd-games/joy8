@@ -1,13 +1,12 @@
 # Joy8 Analytics and Monitoring
 
 Status: dashboards/alerts planned. Gateway health is deployed; read-only
-reconciliation queries are available for manual operations.
+reconciliation queries and snapshot/local-restore tools are available for manual
+operations. Scheduled encrypted backup storage and retention are not configured.
 
 This document owns operational analytics, KPI definitions, dashboards, request telemetry, health checks, alerts, and the initial reliability rollout. It does not own member authentication or the game runtime contract.
 
 Current repository behavior is defined in `../../README.md`.
-
-Last reviewed: 2026-09-20.
 
 ## Goals
 
@@ -46,7 +45,7 @@ This is a plan, not an installed dependency. Recheck current pricing, quotas, re
 
 - Successfully created launch sessions.
 - Sessions grouped by game and `games.type`.
-- Guest, wallet, transaction, financial-match, and settlement record counts.
+- Registered player, wallet, transaction, financial-match, and settlement record counts.
 - Net POINT movements and fee totals after the scoped settlement release is active.
 - Open or expired sessions and financial matches.
 - Database size and growth, when reported from the database service.
@@ -373,7 +372,13 @@ The initial proposed process:
 - Perform a local restore test monthly.
 - Use the local `.env.supabase.local` route without copying credentials into scripts, documentation, or chat.
 
-Before implementation, verify that the selected Supabase plan, database connection method, storage provider, encryption, and retention meet current needs. Disaster recovery remains an active limitation in `KNOWN_ISSUES.md`.
+Manual snapshot and local restore are implemented and exercised through the
+approved Joy8 wrapper using native PostgreSQL 17 tools; this path does not require
+Docker or Podman. [README.md](../../README.md#fresh-database-and-recovery) owns the
+commands, permission checks and snapshot handling rules. Automating that process
+still requires a selected storage destination, encryption, retention and scheduling.
+The current plan's managed-backup limitation belongs in
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md#database-recovery-boundary).
 
 A real recovery acceptance must identify an available backup, restore into an
 isolated destination, and verify schema, roles/grants, Auth/player references,
@@ -381,12 +386,11 @@ wallet/ledger totals, reservations, settlements and product markers. Check Stora
 objects and provider/Edge Function settings separately; database restoration
 alone does not prove these services are restored. Never test by overwriting the
 live Joy8 project. Local synthetic SQL tests are not a hosted backup restore.
-The storage destination, credentials and actual restore test remain pending;
-do not mark recovery complete based on a preflight query.
-The prescribed wrapper's linked schema dump currently fails on this workstation
-because neither Docker nor Podman is installed. Restore validation requires that
-prerequisite or an explicitly reviewed alternative export path; the local game
-fixture's copy/reopen test does not satisfy hosted recovery acceptance.
+The captured hosted database has been restored and checked locally, including
+ownership, permissions and executable product accounting functions. This does not
+complete managed backup/PITR or external-service recovery acceptance. The proposed
+encrypted storage/retention process must also be restore-tested once configured;
+do not mark it operational based on a manual snapshot or preflight query.
 
 Official procedures: [Supabase CLI backup/restore](https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore)
 and [restoring a downloaded backup locally](https://supabase.com/docs/guides/local-development/restoring-downloaded-backup).
@@ -423,7 +427,8 @@ Complete when outages are reported without creating platform business data.
 3. Add minimal Gateway request telemetry.
 4. Build Platform Overview, System Health, and the shared Game Detail template.
 5. Add Warning alerts.
-6. Implement and restore-test the backup process.
+6. Automate the existing snapshot process with encrypted storage and retention,
+   then restore-test a retained backup.
 
 Only metrics supported by reliable data are shown.
 

@@ -194,9 +194,14 @@ Different URLs against the same live database do not provide test isolation.
 Local tests use separate data, credentials, and configuration. Do not promote
 test balances, transactions, or fee totals into operational accounts. Any reset
 or balance change requires a separately reviewed scope and authorization.
-The present repository cannot recreate the full local database from migrations
-alone. A reviewed bootstrap/fixture and backup/restore procedure are prerequisite
-work, tracked in [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).
+Fresh platform installation uses the current bootstrap, not a replay of every
+historical migration. Native PostgreSQL tests cover empty-project installation
+and restore; the hosted snapshot tool restores captured Auth, platform and
+registered product data into an isolated local database. Procedures and separate
+provisioning requirements belong in
+[README.md](../../README.md#fresh-database-and-recovery). Managed backup/PITR,
+external services and unattended backup retention remain outside that local
+verification; see [recovery limits](../operations/KNOWN_ISSUES.md#database-recovery-boundary).
 
 The initial hosted cost model may share one Supabase project across Joy8 and
 game-owned schemas, with explicit roles and backend boundaries. A game owns

@@ -94,7 +94,7 @@ Read-only evidence queries:
 [cleanup fingerprints](../../scripts/sql/whitelist-cleanup-snapshot.sql).
 Run the required Joy8 project check before each operation.
 
-## Auth and remaining deployment
+## Auth and acceptance boundaries
 
 The applied SQL seeded the Google administrator and installed private hook
 permissions, admin RLS and player/session guards. Read-only checks
@@ -112,16 +112,21 @@ the key has all six reviewed scopes. Monster Lab D1 was not touched.
 The hosted CLI cannot SET ROLE to `supabase_auth_admin` or directly execute the
 private hook; its grants were not broadened to enable a probe.
 
-Remaining acceptance:
+Gateway and Pages are deployed. Hosted health and unauthenticated/origin rejection
+checks passed without creating business data. Google-only Hook and session guards
+reject anonymous identities in automated tests; Guest entry is absent from the
+production UI. Current manual catalog and session-entry coverage belongs in
+[KNOWN_ISSUES.md](KNOWN_ISSUES.md#test-gaps), including the distinction between
+disabled hosted independent entry and enabled local test coverage.
 
-1. Use a designated fresh Google test identity to verify outside-list rejection.
-   Inside-list successful signup is recorded for Johnny; the administrator's
-   successful backend access alone is not proof of new-user hook execution.
-2. Gateway and the verified Pages build are deployed. The installed Hook rejects
-   new anonymous identities; production guest entry is removed. Hosted Gateway
-   health and unauthenticated/origin rejection checks passed without creating data.
-3. Verify admin add/remove, all three session entry routes, allowlisted launch,
-   guest denial and public Lobby browsing against the deployed code.
+Remaining whitelist acceptance:
+
+1. The user will use a fresh Google test identity to verify outside-list rejection.
+   Inside-list successful signup is recorded for Johnny; existing administrator
+   access alone is not proof of new-user hook execution.
+2. Hosted allowlist add/remove and subsequent session denial still need a designated
+   disposable identity. Catalog draft editing does not verify allowlist management;
+   automated access/RLS tests cover these database boundaries.
 
 The standalone Auth config helper, if separately authorized in another task,
 only patches the two Before User Created fields for `enable-whitelist`; it
