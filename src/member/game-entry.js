@@ -3,7 +3,7 @@ import { safeReturnPath } from "./service.js"
 export function createGameEntry({ origin, membership, openMember, navigate }) {
   let pending = false
 
-  return async ({ trigger, next, gameName }) => {
+  return async ({ trigger, next, gameName, cover = "" }) => {
     const path = safeReturnPath(next, origin)
     if (pending || (next != null && path === "/")) return
     pending = true
@@ -15,7 +15,7 @@ export function createGameEntry({ origin, membership, openMember, navigate }) {
       }
       const member = await membership()
       if (member) navigate(path)
-      else await openMember(trigger, { next: path, gameName })
+      else await openMember(trigger, { next: path, gameName, cover })
     } finally {
       pending = false
       trigger?.removeAttribute("aria-busy")

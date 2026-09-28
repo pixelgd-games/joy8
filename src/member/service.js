@@ -74,6 +74,13 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     return member
   }
 
+  async function wallet() {
+    if (!(await session())) return null
+    const result = await client.functions.invoke("joy8-gateway/wallet", { body: {} })
+    if (result.error) throw Object.assign(new Error("Wallet request failed"), { code: result.error.context?.status === 429 ? "over_request_rate_limit" : "wallet_unavailable" })
+    return result.data?.wallet ?? null
+  }
+
   async function oauth(provider = "google") {
     if (provider !== "google") throw new Error("Unsupported authentication provider")
     const options = { redirectTo: callbackUrl, skipBrowserRedirect: true }
@@ -96,5 +103,5 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  return { session, membership, oauth, completeCallback, signOut, returnPath }
+  return { session, membership, wallet, oauth, completeCallback, signOut, returnPath }
 }

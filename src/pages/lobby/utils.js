@@ -1,10 +1,10 @@
 const GAME_TYPE_LABELS = {
-  slot: "Slot",
-  fish: "Fish",
-  card: "Card",
-  arcade: "Arcade",
-  casual: "Casual",
-  adult: "Premium",
+  slot: "老虎機",
+  fish: "捕魚",
+  card: "桌上遊戲",
+  arcade: "街機",
+  casual: "休閒益智",
+  adult: "精選",
 }
 
 export function buildGameUrl(slug) {
@@ -12,5 +12,5 @@ export function buildGameUrl(slug) {
 }
 
 export function getGameTypeLabel(type) {
-  return GAME_TYPE_LABELS[type] || "Game"
+  return GAME_TYPE_LABELS[type] || "遊戲"
 }

@@ -7,7 +7,7 @@ export async function expectProductionCsp(client, cwd) {
   const root = path.join(cwd, ".smoke-dist.local")
   const headers = Object.fromEntries((await readFile(path.join(root, "_headers"), "utf8")).split(/\r?\n/)
     .filter(line => line.startsWith("  ")).map(line => { const index = line.indexOf(":"); return [line.slice(0, index).trim(), line.slice(index + 1).trim()] }))
-  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".webp": "image/webp", ".svg": "image/svg+xml", ".json": "application/json" }
+  const types = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".webp": "image/webp", ".svg": "image/svg+xml", ".json": "application/json", ".woff2": "font/woff2" }
   const server = http.createServer(async (request, response) => {
     try {
       let name = new URL(request.url, "http://localhost").pathname
@@ -36,7 +36,7 @@ export async function expectProductionCsp(client, cwd) {
         await new Promise(resolve => setTimeout(resolve, 100))
         const result = await client.send("Runtime.evaluate", { returnByValue: true, expression: "({text:document.body?.innerText || '',violations:window.cspViolations})" })
         const state = result.result.value
-        if (state?.text.includes(route === "/" ? "精選遊戲" : "Joy8 Admin")) {
+        if (state?.text.includes(route === "/" ? "全部遊戲" : "Joy8 Admin")) {
           assert.deepEqual(state.violations, [])
           rendered = true
           break

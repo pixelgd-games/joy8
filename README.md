@@ -33,6 +33,10 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   complete Free Spins rounds reconciled against Joy8 settlements; the remaining
   hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
+- The Lobby shows the member's POINT balance through the deployed Gateway
+  `wallet` route and the applied `joy8_member_wallet_v1` migration
+  (`supabase/migrations/20260929100000_member_wallet_balance.sql`). A real
+  member's balance display still needs hosted player acceptance.
 - Hosted catalog administration and Lobby-to-Mahjong launch have scoped manual
   coverage. Hosted acceptance remains open for successful enabled independent
   entry, a newly played Mahjong hand, production capacity and managed recovery.
@@ -42,7 +46,9 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
 
 Joy8 currently provides:
 
-- A public mobile-first game Lobby.
+- A public game Lobby on one URL with separate PC and mobile layouts, selected
+  from the device when the page opens.
+- An in-Lobby member card, POINT balance and mailbox drawer.
 - A database-backed game catalog exposed through `public_games_v1`.
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
 - A reusable branded game-entry shell with Joy8-controlled Google entry before
@@ -58,7 +64,7 @@ Joy8 currently provides:
 - An installable Browser/Server SDK and third-party self-integration kit for the
   `server-v1` contract.
 - Cloudflare Pages static deployment from the `main` branch.
-- PWA metadata and install support for the Lobby.
+- PWA metadata for the Lobby.
 
 Joy8 does not currently provide:
 
@@ -108,9 +114,8 @@ game-facing protocol is `server-v1`, defined in
 
 | Route | Entry | Responsibility |
 | --- | --- | --- |
-| `/` | `index.html` | Public Lobby |
+| `/` | `index.html` | Public Lobby, member card, POINT balance and mailbox drawer |
 | `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog or a validated branded entry |
-| `/mailbox/` | `mailbox/index.html` | Member announcements, notifications and reward claims |
 | `/admin/access/` | `admin/access/index.html` | Google email allowlist management |
 | `/admin/mail/` | `admin/mail/index.html` | Administrator compose, preview, send and recipient audit |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
@@ -128,20 +133,21 @@ Vite declares these entries in `vite.config.js`.
 | Path | Responsibility |
 | --- | --- |
 | `src/main.js` | Lobby bootstrap |
-| `src/pages/lobby/` | Lobby data loading, rendering, and layout |
+| `src/pages/lobby/` | Layout selection, catalog grid, hero carousel, member card and mailbox drawer |
+| `src/pages/lobby/content.js` | Fixed hero slides, notices, social links and placeholder messages |
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
 | `src/pages/entry/` | Branded iframe entry, Google orchestration and callback completion |
 | `src/admin/` | Admin authentication and game CRUD |
 | `src/admin/access.js` | Verified-admin email allowlist management |
 | `src/admin/mail.js` | Administrator mailbox composer and delivery audit |
-| `src/mailbox/` | Member inbox and shared mailbox presentation/service |
+| `src/mailbox/` | Shared mailbox service and administrator presentation |
 | `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
 | `src/member/` | H5 member UI and testable authentication flow |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
-| `src/styles/` | Shared tokens plus theme, Lobby, Loader and error-modal styles |
+| `src/styles/` | Shared tokens plus theme, Lobby (`lobby.css`, `lobby-pc.css`, `lobby-mobile.css`), Loader and error-modal styles |
 | `supabase/functions/joy8-gateway/` | Gateway entry, HTTP/auth/RPC policies and route modules |
 | `supabase/migrations/` | Incremental database migrations |
 | `scripts/` | Local verification, operator tools and Supabase routing helpers |
@@ -149,6 +155,8 @@ Vite declares these entries in `vite.config.js`.
 | `packages/joy8-game-sdk/` | Browser/Server SDK |
 | `integrations/third-party/` | Provider integration kit |
 | `public/games/<slug>/cover.webp` | Joy8-managed Lobby covers |
+| `public/lobby/` | Lobby hero and promotion banners |
+| `public/fonts/` | Self-hosted Lilita One logo font |
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
 
@@ -160,18 +168,33 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 
 ### Lobby
 
-1. The Lobby reads published games from `public_games_v1`.
-   Browsing does not require login. The top-bar account control shows `登入`
-   when signed out and `Player 123456` for an enrolled player; the account-type
-   label is only a temporary fallback while membership is resolving. The control
-   opens the shared member dialog over the unchanged Lobby.
-2. Cards are rendered from database metadata.
-3. Selecting a game checks membership. Enrolled registered players continue to `/game/?slug=<slug>`. Other visitors see the member dialog
-   with the chosen game named. Google entry preserves that
-   destination; closing cancels it.
-4. Missing cover images use the platform fallback behavior.
-
-The responsive Lobby uses four columns on touch devices with a low-height landscape viewport. Desktop and mobile portrait layouts remain separate.
+1. `index.html` is the only Lobby page. When it opens, `src/pages/lobby/layout.js`
+   reads the browser's mobile hint (User-Agent Client Hints, else the
+   User-Agent) and loads either the PC or the mobile layout on the same URL; it
+   never redirects, so `/?play=` and the `/account/` return keep working.
+   PC: fixed top bar, left promotion/notice column, 1600 x 480 hero carousel,
+   one 「全部遊戲」 grid and a fixed social bar. Mobile: one-row top bar,
+   full-width 2:1 hero carousel, notice ticker, three-column grid, floating
+   daily-reward button and footer social links.
+2. The Lobby reads published games from `public_games_v1`. Browsing does not
+   require login. Cards and hero game slides come from that catalog; a hero game
+   slide is shown only while its game is published. Missing covers show the game
+   name on the platform fallback.
+3. Signed-out visitors see `登入`. An enrolled player sees the avatar,
+   `Player 123456`, the POINT balance, the unread count and a member card with
+   the player ID, masked Google email and join date. The balance comes from the
+   Gateway `wallet` route and refreshes after a mailbox claim.
+4. Selecting a game checks membership. Enrolled registered players continue to
+   `/game/?slug=<slug>`. Other visitors see the member dialog with the chosen
+   game named and its cover. Google entry preserves that destination; closing
+   cancels it.
+5. 信箱 opens a right-side drawer on PC and a bottom sheet on mobile. It uses the
+   `mailbox` Gateway route: opening a mail marks it read, and 「領取 POINT」 is a
+   separate explicit claim. Visitors are sent to the member dialog instead.
+   Sign-out clears the displayed mail and balance.
+6. 每日獎勵, 商城, 設定, the promotion banner, social links and footer links are
+   placeholders that only show a short notice. Hero slides, notices and social
+   links are fixed in `src/pages/lobby/content.js`; changing them needs a deploy.
 
 ### Game Launch
 
@@ -254,7 +277,7 @@ Tests exercise the actual handler and import HTTP/auth/RPC helpers directly.
 
 The hosted `joy8-gateway` implements these POST routes:
 
-- member, enroll-member, create-session, private-session, branded-entry, balance, health.
+- member, enroll-member, wallet, create-session, private-session, branded-entry, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1.
 
@@ -367,6 +390,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `npm run test:member` / `test:iframe` | Member flow and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, one-time grants, launch and wallet concurrency |
+| `npm run test:member-wallet` | Member wallet read permissions, reserved/available POINT and the `wallet` Gateway route |
 | `npm run test:mailbox` | Mailbox audience snapshot, permissions, read/claim states, atomic credit and retries on the current schema; set `JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN` for competing connections |
 | `npm run test:public-id` / `test:member-product-db` / `test:member-product-pg` | Public IDs and product-schema registration |
 | `npm run test:platform-db` / `test:platform-pg` | Reservation, settlement, fees, frozen wallets and adapter isolation |
@@ -555,6 +579,9 @@ for the complete safety rules.
 - A game owns its rendering, assets, CSP, `X-Frame-Options`, and sandbox compatibility.
 - Game source changes must be made in the named game repository, not here.
 - Lobby covers use `750 x 1000` WebP at `public/games/<slug>/cover.webp`.
+- Lobby banners (`public/lobby/`) and the logo font (`public/fonts/`) are
+  copied from `D:\Studio\Project_Art\Joy8_assets\`. PC hero banners are
+  `1600 x 480`, mobile banners `1080 x 540` and the PC promotion `540 x 960`.
 - Read `D:\Studio\Project_Art\README.md` before creating, moving, or exporting any asset.
 
 ## Documentation Map

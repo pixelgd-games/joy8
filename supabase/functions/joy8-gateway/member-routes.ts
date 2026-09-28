@@ -192,3 +192,24 @@ export async function getBalance(request: Request, headers: HeadersInit): Promis
     locked_balance: row.locked_balance,
   }, 200, headers)
 }
+
+export async function getMemberWallet(request: Request, headers: HeadersInit): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  if (Object.keys(body.value).length) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
+  const admission = await callRpc("joy8_consume_gateway_rate_limit", {
+    p_key: `wallet:${auth.userId}`, p_limit: 120, p_window_seconds: 60,
+  })
+  if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  const result = await callRpc("joy8_member_wallet_v1", { p_auth_user_id: auth.userId })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  const wallet = (result.body as { wallet?: JsonValue } | null)?.wallet
+  if (wallet === undefined || (wallet !== null && (typeof wallet !== "object" || Array.isArray(wallet)))) {
+    return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  }
+  return jsonResponse({ wallet }, 200, headers)
+}

@@ -885,6 +885,29 @@ $_$;
 
 
 
+CREATE FUNCTION public.joy8_member_wallet_v1(p_auth_user_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+declare
+  v_wallet public.wallet_accounts%rowtype;
+begin
+  select w.* into v_wallet from public.player_accounts p
+  join auth.users u on u.id=p.auth_user_id
+  join public.wallet_accounts w on w.player_account_id=p.id and w.currency='POINT'
+  where p.auth_user_id=p_auth_user_id and p.status='active' and p.member_enrolled_at is not null
+    and u.deleted_at is null and (u.banned_until is null or u.banned_until<=now());
+  if not found then return jsonb_build_object('wallet',null); end if;
+  return jsonb_build_object('wallet',jsonb_build_object(
+    'currency',v_wallet.currency,
+    'status',v_wallet.status,
+    'balance',v_wallet.balance::numeric(18,2)::text,
+    'available_balance',(v_wallet.balance-v_wallet.locked_balance)::numeric(18,2)::text));
+end;
+$$;
+
+
+
 CREATE FUNCTION public.joy8_open_match_v1(p_secret text, p_request jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
@@ -2749,6 +2772,11 @@ GRANT ALL ON FUNCTION public.joy8_match_status_v1(p_secret text, p_request jsonb
 
 REVOKE ALL ON FUNCTION public.joy8_member_mail(p_auth_user_id uuid, p_action text, p_request jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.joy8_member_mail(p_auth_user_id uuid, p_action text, p_request jsonb) TO service_role;
+
+
+
+REVOKE ALL ON FUNCTION public.joy8_member_wallet_v1(p_auth_user_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.joy8_member_wallet_v1(p_auth_user_id uuid) TO service_role;
 
 
 

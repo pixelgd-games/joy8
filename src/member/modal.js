@@ -5,7 +5,7 @@ let dialog
 let panel
 let returnFocus
 
-export async function openMemberModal(trigger, { next = "/", gameName = "", params } = {}) {
+export async function openMemberModal(trigger, { next = "/", gameName = "", cover = "", params } = {}) {
   if (!dialog) {
     dialog = document.createElement("dialog")
     dialog.id = "member-dialog"
@@ -27,7 +27,14 @@ export async function openMemberModal(trigger, { next = "/", gameName = "", para
   returnFocus = trigger
   const content = dialog.querySelector(".member-dialog-content")
   content.innerHTML = memberCardMarkup
-  if (gameName) content.querySelector("#account-description").textContent = `遊玩「${gameName}」`
+  if (gameName) content.querySelector("#account-description").textContent = `登入後即可開始遊玩《${gameName}》，新會員可獲得 1,000 POINT。`
+  if (cover) {
+    const image = document.createElement("img")
+    image.src = cover
+    image.alt = ""
+    content.querySelector("#account-cover").append(image)
+    content.querySelector("#account-cover").hidden = false
+  }
   document.body.classList.add("member-dialog-open")
   dialog.showModal()
   content.querySelector(".account-card").focus({ preventScroll: true })

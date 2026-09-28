@@ -2,8 +2,9 @@
 
 ## Status and scope
 
-The player inbox (`/mailbox/`), administrator composer (`/admin/mail/`), Gateway
-routes and incremental SQL are deployed. The approved migration is
+The administrator composer (`/admin/mail/`), Gateway routes and incremental SQL
+are deployed. Players read and claim mail in the Lobby mailbox drawer; there is
+no standalone player mailbox page. The approved migration is
 `supabase/migrations/20260926100000_in_app_mailbox.sql`. Hosted installation and
 permission checks are verified. No real mail or POINT was issued during
 development or deployment; real-player issuance and claim acceptance remains

@@ -21,6 +21,9 @@ for (const route of ["mailbox", "admin-mailbox"]) {
   assert.equal((await post(route, { action: "list", request: {} })).status, 403)
   assert.equal((await post(route, { action: "list", request: {} }, origin)).status, 401)
 }
+assert.equal((await post("wallet", {}, "https://not-joy8.example")).status, 403)
+assert.equal((await post("wallet")).status, 403)
+assert.equal((await post("wallet", {}, origin)).status, 401)
 assert.equal((await post("create-session", {}, "https://not-joy8.example")).status, 403)
 assert.equal((await post("create-session")).status, 403)
 assert.equal((await post("create-session", {}, origin)).status, 401)

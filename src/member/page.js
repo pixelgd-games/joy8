@@ -18,8 +18,6 @@ export function initMemberPanel(root, options = {}) {
   let busy = false
   let disposed = false
 
-
-
   if (authCode || callbackError) {
     const label = "Google"
     $("account-title").textContent = callbackError ? "登入沒有完成" : "正在完成登入"
@@ -57,7 +55,7 @@ export function initMemberPanel(root, options = {}) {
   async function refresh() {
     user = (await service.session())?.user ?? null
     if (disposed) return
-    $("account-title").textContent = user ? "我的帳號" : "登入 Joy8"
+    $("account-title").textContent = user ? "我的帳號" : "登入開始遊戲"
     $("account-description").textContent = user ? "" : entryDescription
     $("account-description").hidden = !$("account-description").textContent
     $("identity-summary").hidden = !user

@@ -3,13 +3,13 @@ import { callRpc } from "./rpc.ts"
 import { enforceRateLimit } from "./rate-limit.ts"
 import { mailboxOperation } from "./mailbox-routes.ts"
 import { serverOperation } from "./server-routes.ts"
-import { resolveMember, createSession, createPrivateSession, resolveBrandedEntry, getBalance } from "./member-routes.ts"
+import { resolveMember, createSession, createPrivateSession, resolveBrandedEntry, getBalance, getMemberWallet } from "./member-routes.ts"
 
 const ROUTES = new Set([
   "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
   "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
   "enroll-member", "create-session", "private-session", "branded-entry",
-  "balance", "mailbox", "admin-mailbox",
+  "balance", "wallet", "mailbox", "admin-mailbox",
 ])
 
 export async function handleRequest(request: Request): Promise<Response> {
@@ -94,6 +94,10 @@ async function dispatchRoute(
 
   if (route === "balance") {
     return getBalance(request, headers)
+  }
+
+  if (route === "wallet") {
+    return getMemberWallet(request, headers)
   }
 
   return jsonResponse({ error: "Route not found" }, 404, headers)

@@ -1,29 +1,38 @@
 import { fetchPublicGames } from "./data.js"
-import { renderGameGrid, renderGameGridError } from "./game-grid.js"
-import { renderLobby } from "./lobby.js"
+import { getDisplayName, getGameCover, renderGameGrid, renderGameGridError } from "./game-grid.js"
+import { noticeMarkup, renderLobby } from "./lobby.js"
+import { detectLayout } from "./layout.js"
+import { createHero } from "./hero.js"
+import { createMemberMenu } from "./member-menu.js"
+import { createMailSheet, formatPoint } from "./mail-sheet.js"
+import { HERO_SLIDES, NOTICES, PLACEHOLDERS } from "./content.js"
+import { buildGameUrl } from "./utils.js"
 import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { createMemberService, memberErrorMessage } from "../../member/service.js"
 import { createGameEntry } from "../../member/game-entry.js"
 import { memberSupabase } from "../../lib/memberClient.js"
 import { readEntryParams } from "../../member/callback.js"
+import { createMailboxService } from "../../mailbox/service.js"
 
-let deferredInstallPrompt = null
-
-window.addEventListener("beforeinstallprompt", (event) => {
-  event.preventDefault()
-  deferredInstallPrompt = event
-})
-
-window.addEventListener("appinstalled", () => {
-  deferredInstallPrompt = null
-})
+const layoutStyles = {
+  pc: () => import("../../styles/lobby-pc.css"),
+  mobile: () => import("../../styles/lobby-mobile.css"),
+}
 
 export async function initLobbyPage(appRoot) {
   if (!appRoot) return
 
-  appRoot.innerHTML = renderLobby()
-  setupInstallButton(appRoot)
-  const openEntry = setupMemberEntry(appRoot)
+  const layout = detectLayout()
+  document.documentElement.dataset.layout = layout
+  document.documentElement.dataset.auth = "guest"
+  await layoutStyles[layout]().catch(() => {})
+  appRoot.innerHTML = renderLobby(layout)
+
+  const renderHero = createHero(appRoot, layout)
+  renderHero(HERO_SLIDES.filter((slide) => !slide.play))
+  setupTicker(appRoot)
+  const lobby = setupMember(appRoot)
+
   const entryParams = readEntryParams(location, history)
   const memberMode = ["open", "callback"].includes(entryParams.get("member")) ? entryParams.get("member") : null
   const memberParams = memberMode ? new URLSearchParams(entryParams) : null
@@ -39,11 +48,13 @@ export async function initLobbyPage(appRoot) {
 
   try {
     const games = await fetchPublicGames()
+    lobby.setGames(games)
     renderGameGrid(gameGrid, games)
+    renderHero(HERO_SLIDES.filter((slide) => !slide.play || games.some((game) => game.slug === slide.play))
+      .map((slide) => slide.play ? { ...slide, href: buildGameUrl(slide.play) } : slide))
     if (requestedGame) {
-      const game = games.find((item) => item.slug === requestedGame)
-      const trigger = [...gameGrid.querySelectorAll("a")].find((link) => new URL(link.href).searchParams.get("slug") === requestedGame)
-      if (game && trigger) await openEntry(trigger, trigger.href, game.name)
+      const trigger = gameGrid.querySelector(`[data-play="${CSS.escape(requestedGame)}"]`)
+      if (trigger) await lobby.openGame(trigger, requestedGame)
       else showErrorModal({ code: ERROR_CODES.GAME_NOT_FOUND, title: "找不到遊戲", message: "請從大廳選擇目前開放的遊戲。", reload: false })
     }
   } catch (error) {
@@ -57,51 +68,101 @@ export async function initLobbyPage(appRoot) {
   }
 }
 
-function setupMemberEntry(appRoot) {
+function setupMember(appRoot) {
+  const root = document.documentElement
   const service = createMemberService(memberSupabase, { origin: location.origin })
-  const accountLink = appRoot.querySelector(".member-login-link:not(.mailbox-link)")
+  const toast = createToast(appRoot.querySelector("[data-toast]"))
+  const loginButton = appRoot.querySelector(".member-login-link")
+  const games = new Map()
   let accountRevision = 0
+  let walletRevision = 0
+  let walletFrame = 0
+  let publicId = ""
+  let walletValue = null
 
-  const renderAccount = (label, publicId = "") => {
-    accountLink.replaceChildren()
-    accountLink.classList.toggle("is-member", Boolean(publicId))
-    accountLink.removeAttribute("aria-busy")
-    if (!publicId) {
-      accountLink.textContent = label
-      accountLink.setAttribute("aria-label", label)
-      return
+  const isMember = () => root.dataset.auth === "member"
+
+  const renderWallet = (value, from) => {
+    walletValue = value
+    const frame = ++walletFrame
+    for (const node of document.querySelectorAll("[data-wallet]")) {
+      if (value == null) node.textContent = "—"
+      else if (from == null || from === value) node.textContent = formatPoint(value)
+      else countUp(node, from, value, () => frame === walletFrame)
     }
-    const prefix = document.createElement("span")
-    prefix.className = "member-login-prefix"
-    prefix.textContent = "Player"
-    const id = document.createElement("span")
-    id.className = "member-login-id"
-    id.textContent = publicId
-    accountLink.append(prefix, id)
-    accountLink.setAttribute("aria-label", `玩家帳號 Player ${publicId}`)
+  }
+
+  const renderUnread = (count) => {
+    for (const node of document.querySelectorAll("[data-unread]")) {
+      node.textContent = String(count)
+      node.hidden = !count
+    }
+    for (const node of document.querySelectorAll("[data-unread-text]")) node.textContent = count ? ` (${count})` : ""
+    for (const node of appRoot.querySelectorAll('[data-action="mail"]')) node.setAttribute("aria-label", count ? `信箱，${count} 封未讀` : "信箱")
+  }
+
+  const refreshWallet = async (animate = false) => {
+    const revision = ++walletRevision
+    const before = walletValue
+    try {
+      const wallet = await service.wallet()
+      if (revision !== walletRevision || !isMember()) return
+      const value = wallet ? Number(wallet.balance) : null
+      renderWallet(value, animate ? before : null)
+    } catch {
+      if (revision === walletRevision && isMember()) renderWallet(null)
+    }
+  }
+
+  const menu = createMemberMenu(appRoot, { onAction: (action, trigger) => runAction(action, trigger) })
+  const mail = createMailSheet({
+    api: createMailboxService(memberSupabase),
+    toast,
+    onUnread: renderUnread,
+    onClaimed: () => refreshWallet(true),
+  })
+
+  const applyGuest = () => {
+    root.dataset.auth = "guest"
+    publicId = ""
+    walletRevision++
+    menu.close()
+    mail.reset()
+    renderWallet(null)
+    loginButton.removeAttribute("aria-busy")
+  }
+
+  const applyMember = (user, member) => {
+    root.dataset.auth = "member"
+    publicId = member.public_id
+    loginButton.removeAttribute("aria-busy")
+    for (const node of document.querySelectorAll("[data-player-name]")) node.textContent = `Player ${publicId}`
+    for (const node of appRoot.querySelectorAll(".account")) node.setAttribute("aria-label", `會員資料 Player ${publicId}`)
+    menu.render({ publicId, email: user.email, joinedAt: user.created_at })
+    void refreshWallet()
+    void mail.refreshUnread()
   }
 
   const refreshAccount = (session, knownMember = null) => {
     const revision = ++accountRevision
     const user = session?.user
     if (!user) {
-      renderAccount("登入")
+      applyGuest()
       return
     }
-    const fallback = "我的帳號"
     if (knownMember?.public_id) {
-      renderAccount("", knownMember.public_id)
+      applyMember(user, knownMember)
       return
     }
-    renderAccount(fallback)
-    accountLink.setAttribute("aria-busy", "true")
+    loginButton.setAttribute("aria-busy", "true")
     setTimeout(async () => {
       try {
         const member = await service.membership()
         if (revision !== accountRevision) return
-        renderAccount(fallback, member?.public_id)
+        if (member?.public_id) applyMember(user, member)
+        else applyGuest()
       } catch {
-        if (revision === accountRevision) renderAccount(fallback)
+        if (revision === accountRevision) applyGuest()
       }
     }, 0)
   }
@@ -122,79 +183,89 @@ function setupMemberEntry(appRoot) {
     refreshAccount(await service.session(), event.detail)
   })
 
-  const openEntry = async (trigger, next, gameName) => {
+  const openEntry = async (trigger, next, game) => {
     try {
-      await enterGame({ trigger, next, gameName })
+      await enterGame({ trigger, next, gameName: game ? getDisplayName(game) : "", cover: game ? getGameCover(game) : "" })
     } catch (error) {
       showErrorModal({ title: "目前無法進入", message: memberErrorMessage(error), reload: false })
     }
   }
 
-  appRoot.addEventListener("click", (event) => {
-    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
-    const trigger = event.target.closest("a")
-    if (!trigger || !appRoot.contains(trigger)) return
-    const isLogin = trigger.matches(".member-login-link:not(.mailbox-link)")
-    const isGame = trigger.matches("#gameGrid .game-tile-poster")
-    if (!isLogin && !isGame) return
-    event.preventDefault()
-    const gameName = trigger.closest(".game-tile")?.querySelector(".game-tile-title")?.textContent || ""
-    void openEntry(trigger, isGame ? trigger.href : null, gameName)
-  })
-  return openEntry
-}
-
-function setupInstallButton(appRoot) {
-  const button = appRoot.querySelector("#installAppButton")
-  const help = appRoot.querySelector("#installHelp")
-  const actions = appRoot.querySelector(".header-actions")
-  if (!button || !help || !actions) return
-
-  if (isStandaloneApp()) {
-    hideInstallUi(button, help)
-    return
+  const openGame = (trigger, slug) => {
+    const game = games.get(slug)
+    if (!game) return toast("這款遊戲目前沒有開放")
+    return openEntry(trigger, buildGameUrl(slug), game)
   }
 
-  button.hidden = false
+  const runAction = (action, trigger) => {
+    if (action === "login") return openEntry(trigger, null)
+    if (action === "welcome") return isMember() ? appRoot.querySelector("#gamesSection").scrollIntoView({ behavior: "smooth" }) : openEntry(trigger, null)
+    if (action === "profile") return menu.toggle()
+    if (action === "mail") return isMember() ? mail.open() : openEntry(trigger, null)
+    if (action === "logout") {
+      return service.signOut().then(() => toast("已登出"), () => toast("目前無法登出，請稍後再試"))
+    }
+    if (action === "copy-id") {
+      return navigator.clipboard?.writeText(publicId).then(() => toast("已複製玩家 ID"), () => toast(`玩家 ID：${publicId}`))
+        ?? toast(`玩家 ID：${publicId}`)
+    }
+    if (action === "home") return window.scrollTo({ top: 0, behavior: "smooth" })
+    if (PLACEHOLDERS[action]) toast(PLACEHOLDERS[action])
+  }
 
-  button.addEventListener("click", async () => {
-    if (deferredInstallPrompt) {
-      help.hidden = true
-      button.setAttribute("aria-expanded", "false")
-      button.disabled = true
-
-      try {
-        deferredInstallPrompt.prompt()
-        const choice = await deferredInstallPrompt.userChoice
-        if (choice.outcome === "accepted") {
-          hideInstallUi(button, help)
-        }
-      } finally {
-        button.disabled = false
-        deferredInstallPrompt = null
-      }
+  appRoot.addEventListener("click", (event) => {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+    const player = event.target.closest("[data-play]")
+    if (player && appRoot.contains(player)) {
+      event.preventDefault()
+      void openGame(player, player.dataset.play)
       return
     }
-
-    const isOpen = help.hidden
-    help.hidden = !isOpen
-    button.setAttribute("aria-expanded", String(isOpen))
+    const trigger = event.target.closest("[data-action]")
+    if (!trigger || !appRoot.contains(trigger) || trigger.closest(".profile")) return
+    if (trigger.tagName === "A") event.preventDefault()
+    void runAction(trigger.dataset.action, trigger)
   })
 
-  document.addEventListener("click", (event) => {
-    if (actions.contains(event.target)) return
-
-    help.hidden = true
-    button.setAttribute("aria-expanded", "false")
-  })
+  return {
+    openGame,
+    setGames(list) {
+      games.clear()
+      for (const game of list) games.set(game.slug, game)
+    },
+  }
 }
 
-function hideInstallUi(button, help) {
-  button.hidden = true
-  help.hidden = true
-  button.setAttribute("aria-expanded", "false")
+function setupTicker(appRoot) {
+  const ticker = appRoot.querySelector("[data-ticker]")
+  if (!ticker || !NOTICES.length) return
+  let index = 0
+  const show = () => {
+    ticker.innerHTML = noticeMarkup(NOTICES[index])
+    index = (index + 1) % NOTICES.length
+  }
+  show()
+  if (NOTICES.length > 1) setInterval(show, 3500)
 }
 
-function isStandaloneApp() {
-  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true
+function createToast(node) {
+  let timer = 0
+  return (message) => {
+    node.textContent = message
+    node.classList.add("is-show")
+    clearTimeout(timer)
+    timer = setTimeout(() => node.classList.remove("is-show"), 2600)
+  }
+}
+
+function countUp(node, from, to, isCurrent) {
+  const start = performance.now()
+  const step = (now) => {
+    if (!isCurrent()) return
+    const t = Math.min(1, (now - start) / 900)
+    node.textContent = formatPoint(Math.round(from + (to - from) * (1 - Math.pow(1 - t, 3))))
+    if (t < 1) requestAnimationFrame(step)
+    else node.textContent = formatPoint(to)
+  }
+  requestAnimationFrame(step)
 }

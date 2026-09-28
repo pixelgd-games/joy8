@@ -83,9 +83,9 @@ test("game selection opens membership on the Lobby with the selected game's safe
   const opened = []
   const navigated = []
   const enter = createGameEntry({ origin, membership: async () => null, openMember: (...args) => opened.push(args), navigate: (path) => navigated.push(path) })
-  await enter({ next: "/game/?slug=game-a&token=discard", gameName: "Game A" })
+  await enter({ next: "/game/?slug=game-a&token=discard", gameName: "Game A", cover: "/games/game-a/cover.webp" })
   await enter({ next: "/game/?slug=game-b", gameName: "Game B" })
-  assert.deepEqual(opened.map(([, options]) => options), [{ next: "/game/?slug=game-a", gameName: "Game A" }, { next: "/game/?slug=game-b", gameName: "Game B" }])
+  assert.deepEqual(opened.map(([, options]) => options), [{ next: "/game/?slug=game-a", gameName: "Game A", cover: "/games/game-a/cover.webp" }, { next: "/game/?slug=game-b", gameName: "Game B", cover: "" }])
   assert.deepEqual(navigated, [])
 })
 

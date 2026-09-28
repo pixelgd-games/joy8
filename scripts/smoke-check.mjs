@@ -48,7 +48,7 @@ try {
     window.fetch = (input, options) => {
       const url = new URL(typeof input === 'string' ? input : input.url || input.href, location.origin);
       if (!url.hostname.endsWith('.supabase.co')) return smokeFetch(input, options);
-      if (url.pathname === '/rest/v1/public_games_v1') return Promise.resolve(Response.json([]));
+      if (url.pathname === '/rest/v1/public_games_v1') return Promise.resolve(Response.json(JSON.parse(localStorage.getItem('joy8-smoke-catalog') || '[]')));
       return Promise.resolve(Response.json({error:'Smoke external request blocked'}, {status:403}));
     };
   ` })
@@ -56,11 +56,12 @@ try {
   await expectPageText(client, appPort, "/", (text) => {
     const normalizedText = text.toLowerCase()
     return normalizedText.includes("joy8")
-      && normalizedText.includes("遊戲列表")
-      && normalizedText.includes("精選遊戲")
+      && normalizedText.includes("全部遊戲")
+      && normalizedText.includes("最新公告")
       && !normalizedText.includes("遊戲列表讀取失敗")
   }, "Home loads")
 
+  await expectLobbyLayouts(client, appPort)
   await expectMemberModal(client)
   await expectGameSelection(client, appPort)
   await expectMemberContinuation(client)
@@ -138,7 +139,6 @@ function verifyCanonicalHostRedirect() {
   const entryFiles = [
     "index.html",
     "account/index.html",
-    "mailbox/index.html",
     "admin/mail/index.html",
     "admin/login/index.html",
     "admin/games/index.html",
@@ -435,11 +435,11 @@ async function expectErrorPresentation(client) {
 
 async function expectMemberEntry(client, appPort) {
   await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
-    return text.includes("使用 Google 登入") && text.includes("白名單")
+    return text.includes("使用 Google 繼續") && text.includes("白名單")
   }, "Account entry returns to the Lobby member dialog")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `location.pathname === "/" && location.search === "" && document.querySelector("#member-dialog")?.open && document.querySelector(".hero-image")?.isConnected`,
+    expression: `location.pathname === "/" && location.search === "" && document.querySelector("#member-dialog")?.open && document.querySelector(".hero")?.isConnected`,
   })
   if (!returnCheck.result.value) throw new Error("Account entry left a standalone page behind")
   const controls = await client.send("Runtime.evaluate", {
@@ -448,10 +448,9 @@ async function expectMemberEntry(client, appPort) {
       const google = document.getElementById("google-button").getBoundingClientRect()
 
 
-      return document.getElementById("account-title").textContent === "登入 Joy8"
+      return document.getElementById("account-title").textContent === "登入開始遊戲"
         && google.width > 0 && !document.getElementById("facebook-button")
         && !document.getElementById("guest-button")
-        && document.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
         && !document.getElementById("email-form")
         && !document.getElementById("register-button")
         && !document.getElementById("reset-button")
@@ -607,18 +606,18 @@ async function expectGatewayCors(client) {
 
 async function expectMemberModal(client) {
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && text.includes("白名單"), "Member dialog opens on the Lobby")
+  await waitForText(client, (text) => text.includes("使用 Google 繼續") && text.includes("白名單"), "Member dialog opens on the Lobby")
   const opened = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {
       const dialog = document.querySelector("#member-dialog")
       const backdrop = getComputedStyle(dialog, "::backdrop")
       return location.pathname === "/" && dialog.open
-        && document.querySelector(".hero-image").isConnected
-        && dialog.querySelector(".account-kicker")?.textContent === "JOY8 PLAYER"
+        && document.querySelector(".hero").isConnected
+        && dialog.querySelector("#account-cover").hidden
         && !dialog.querySelector("#account-description").hidden
-        && backdrop.backgroundColor === "rgba(5, 7, 12, 0.72)"
-        && backdrop.backdropFilter.includes("blur(10px)")
+        && backdrop.backgroundColor === "rgba(6, 4, 14, 0.72)"
+        && backdrop.backdropFilter.includes("blur(4px)")
     })()`,
   })
   if (!opened.result.value) throw new Error("Member dialog replaces or obscures the Lobby")
@@ -641,7 +640,7 @@ async function expectMemberModal(client) {
   await client.send("Emulation.clearDeviceMetricsOverride")
   await client.send("Runtime.evaluate", { awaitPromise: true, expression: 'new Promise(resolve => { document.querySelector("#member-dialog").addEventListener("close", resolve, { once: true }); document.querySelector(".member-dialog-close").click() })' })
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入"), "Member dialog reopens")
+  await waitForText(client, (text) => text.includes("使用 Google 繼續"), "Member dialog reopens")
   await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
   await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
   const closed = await client.send("Runtime.evaluate", {
@@ -655,39 +654,34 @@ async function expectMemberModal(client) {
 }
 
 async function expectGameSelection(client, appPort) {
-  const deadline = Date.now() + 12000
-  while (Date.now() < deadline) {
-    const state = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ games: document.querySelectorAll("#gameGrid .game-tile-poster").length, empty: Boolean(document.querySelector("#gameGrid .empty-state")) })' })
-    if (state.result.value.games > 0 || state.result.value.empty) break
-    await sleep(100)
-  }
-  const catalogState = await client.send("Runtime.evaluate", {
-    returnByValue: true,
-    expression: '(() => { const link = document.querySelector("#gameGrid .game-tile-poster"); return { games: document.querySelectorAll("#gameGrid .game-tile-poster").length, title: document.querySelector("#gameGrid .empty-title")?.textContent || "", copy: document.querySelector("#gameGrid .empty-copy")?.textContent || "", error: document.querySelector("#gameGrid .empty-state")?.classList.contains("is-error") || false, first: link ? { path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent } : null } })()',
-  })
-  const state = catalogState.result.value
-  if (state.games === 0) {
-    if (state.title !== "目前沒有開放的遊戲" || state.copy !== "遊戲上架後會顯示在這裡。" || state.error) {
-      throw new Error(`Empty catalog state failed: ${JSON.stringify(state)}`)
+  const readCatalog = async () => {
+    const deadline = Date.now() + 12000
+    while (Date.now() < deadline) {
+      const state = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ games: [...document.querySelectorAll("#gameGrid .card")].map(card => ({ path: new URL(card.href).pathname + new URL(card.href).search, name: card.querySelector(".card__name").textContent })), empty: Boolean(document.querySelector("#gameGrid .empty-state")), title: document.querySelector("#gameGrid .empty-title")?.textContent || "", copy: document.querySelector("#gameGrid .empty-copy")?.textContent || "", error: document.querySelector("#gameGrid .empty-state")?.classList.contains("is-error") || false, count: document.querySelector("[data-grid-count]")?.textContent || "" })' })
+      if (state.result.value.games.length > 0 || state.result.value.empty) return state.result.value
+      await sleep(100)
     }
-    console.log("OK Empty public catalog")
-  } else if (state.error || !state.first) {
-    throw new Error(`Catalog state failed: ${JSON.stringify(state)}`)
+    throw new Error("Catalog did not render")
   }
-  const liveGame = state.first
-  await client.send("Runtime.evaluate", {
-    awaitPromise: true,
-    expression: `import("/src/pages/lobby/game-grid.js").then(({ renderGameGrid }) => renderGameGrid(document.querySelector("#gameGrid"), [
-      { name: "Smoke Game One", slug: "smoke-game-one", thumbnail: "", type: "arcade" },
-      { name: "Smoke Game Two", slug: "smoke-game-two", thumbnail: "", type: "card" },
-    ]))`,
-  })
-  const gameLinks = await client.send("Runtime.evaluate", {
-    returnByValue: true,
-    expression: `[...document.querySelectorAll("#gameGrid .game-tile-poster")].slice(0, 2).map(link => ({ path: new URL(link.href).pathname + new URL(link.href).search, name: link.closest(".game-tile").querySelector(".game-tile-title").textContent }))`,
-  })
-  const games = gameLinks.result.value
-  if (games.length < 2) throw new Error("Game selection fixture needs two catalog entries")
+  const empty = await readCatalog()
+  if (empty.title !== "目前沒有開放的遊戲" || empty.copy !== "遊戲上架後會顯示在這裡。" || empty.error || empty.count) {
+    throw new Error(`Empty catalog state failed: ${JSON.stringify(empty)}`)
+  }
+  await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("目前沒有開放的遊戲"), "Empty catalog rejects direct game link")
+  const emptyPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
+  if (emptyPath.result.value !== "/") throw new Error("Rejected direct link did not clear the pending game URL")
+
+  await client.send("Runtime.evaluate", { expression: `localStorage.setItem("joy8-smoke-catalog", ${JSON.stringify(JSON.stringify([
+    { name: "Smoke Mahjong", slug: "mahjong-clash", thumbnail: "/games/mahjong-clash/cover.webp", type: "card" },
+    { name: "Smoke Game Two", slug: "smoke-game-two", thumbnail: "", type: "arcade" },
+  ]))})` })
+  await client.send("Page.navigate", { url: `http://${host}:${appPort}/` })
+  await sleep(300)
+  const catalog = await readCatalog()
+  const games = catalog.games
+  if (games.length !== 2 || catalog.count !== "共 2 款") throw new Error(`Catalog fixture failed: ${JSON.stringify(catalog)}`)
+  const hero = await client.send("Runtime.evaluate", { returnByValue: true, expression: '[...document.querySelectorAll(".hero__slide")].map(slide => slide.dataset.play || slide.dataset.action)' })
+  if (JSON.stringify(hero.result.value) !== JSON.stringify(["welcome", "mahjong-clash"])) throw new Error(`Hero did not follow the published catalog: ${JSON.stringify(hero.result.value)}`)
   await client.send("Runtime.evaluate", {
     awaitPromise: true,
     expression: `import("/src/lib/memberClient.js").then(({ memberSupabase }) => {
@@ -698,38 +692,69 @@ async function expectGameSelection(client, appPort) {
       }
     })`,
   })
-  for (let index = 0; index < games.length; index++) {
-    await client.send("Runtime.evaluate", { expression: `document.querySelectorAll("#gameGrid .game-tile-poster")[${index}].click()` })
-    await waitForText(client, (text) => text.includes(`遊玩「${games[index].name}」`) && text.includes("白名單"), "Selected game opens login over the Lobby")
-    const path = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
-    if (path.result.value !== "/") throw new Error("Selecting a game removed the Lobby")
+  const selectors = ['#gameGrid .card:nth-child(1)', '#gameGrid .card:nth-child(2)', '.hero__slide[data-play="mahjong-clash"]']
+  for (const [index, selector] of selectors.entries()) {
+    const game = games[index % games.length]
+    await client.send("Runtime.evaluate", { expression: `document.querySelector(${JSON.stringify(selector)}).click()` })
+    await waitForText(client, (text) => text.includes(`遊玩《${game.name}》`) && text.includes("白名單"), "Selected game opens login over the Lobby")
+    const state = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ path: location.pathname + location.search, cover: document.querySelector("#account-cover:not([hidden]) img")?.getAttribute("src") || "" })' })
+    if (state.result.value.path !== "/") throw new Error("Selecting a game removed the Lobby")
+    if (state.result.value.cover !== (game.path.includes("mahjong-clash") ? "/games/mahjong-clash/cover.webp" : "")) throw new Error(`Login dialog cover mismatch: ${JSON.stringify(state.result.value)}`)
     const provider = "google"
     await client.send("Runtime.evaluate", { expression: `document.getElementById("${provider}-button").click()` })
     await waitForText(client, (text) => text.includes("目前無法完成操作"), "Provider fixture stays offline")
     const target = await client.send("Runtime.evaluate", { returnByValue: true, expression: '({ next: new URL(window.smokeCallback).searchParams.get("next"), provider: new URL(window.smokeCallback).searchParams.get("provider"), attempted: window.smokeProvider })' })
-    if (target.result.value.next !== games[index].path || target.result.value.provider !== provider || target.result.value.attempted !== provider) throw new Error("Authentication lost the selected game or provider")
+    if (target.result.value.next !== game.path || target.result.value.provider !== provider || target.result.value.attempted !== provider) throw new Error("Authentication lost the selected game or provider")
     await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
   }
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-login-link").click()' })
-  await waitForText(client, (text) => text.includes("使用 Google 登入") && !text.includes("遊玩「"), "Top-bar entry clears previous game choice")
+  await waitForText(client, (text) => text.includes("使用 Google 繼續") && !text.includes("遊玩《"), "Top-bar entry clears previous game choice")
   await client.send("Runtime.evaluate", { expression: 'document.getElementById("google-button").click()' })
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
-  if (!liveGame) {
-    await expectPageText(client, appPort, "/?play=smoke-game-one", (text) => text.includes("JOY8-GAME-002") && text.includes("目前沒有開放的遊戲"), "Empty catalog rejects direct game link")
-    const emptyPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
-    if (emptyPath.result.value !== "/") throw new Error("Rejected direct link did not clear the pending game URL")
-    await client.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
-    await client.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 })
-    console.log("OK Game selection, callback destination, cancellation and empty-catalog direct-link rejection")
-    return
-  }
-  await expectPageText(client, appPort, liveGame.path, (text) => text.includes(`遊玩「${liveGame.name}」`) && text.includes("白名單"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, games[1].path, (text) => text.includes(`遊玩《${games[1].name}》`) && text.includes("白名單"), "Direct game link returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
-  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click()' })
-  console.log("OK Game selection, callback destination, cancellation and direct-link entry")
+  await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click(); localStorage.removeItem("joy8-smoke-catalog")' })
+  console.log("OK Game cards, hero game slides, callback destination, cancellation, empty-catalog rejection and direct-link entry")
+}
+
+async function expectLobbyLayouts(client, appPort) {
+  const layoutState = 'new Promise(resolve => setTimeout(() => resolve({ layout: document.documentElement.dataset.layout, side: Boolean(document.querySelector(".side")), float: Boolean(document.querySelector(".float-reward")), ticker: Boolean(document.querySelector("[data-ticker]")?.textContent), overflow: document.documentElement.scrollWidth > innerWidth, path: location.pathname, dialogs: document.querySelectorAll("dialog.sheet").length }), 300))'
+  const pc = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: layoutState })
+  if (pc.result.value.layout !== "pc" || !pc.result.value.side || pc.result.value.float || pc.result.value.dialogs !== 1) throw new Error(`Desktop layout failed: ${JSON.stringify(pc.result.value)}`)
+  await client.send("Emulation.setUserAgentOverride", { userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36", userAgentMetadata: { platform: "Android", platformVersion: "14", architecture: "", model: "Pixel 8", mobile: true } })
+  await client.send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
+  try {
+    await client.send("Page.navigate", { url: `http://${host}:${appPort}/` })
+    await waitForText(client, (text) => text.includes("全部遊戲"), "Mobile Lobby loads")
+    const mobile = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: layoutState })
+    const value = mobile.result.value
+    if (value.layout !== "mobile" || value.side || !value.float || !value.ticker || value.overflow || value.path !== "/") throw new Error(`Mobile layout failed: ${JSON.stringify(value)}`)
+    await client.send("Runtime.evaluate", { expression: 'document.querySelector(".float-reward").click()' })
+    await waitForText(client, (text) => text.includes("每日獎勵即將開放"), "Mobile placeholder shows a notice")
+  } finally {
+    await client.send("Emulation.setUserAgentOverride", { userAgent: "" })
+    await client.send("Emulation.clearDeviceMetricsOverride")
+  }
+  await client.send("Page.navigate", { url: `http://${host}:${appPort}/` })
+  await waitForText(client, (text) => text.includes("全部遊戲"), "Desktop Lobby reloads")
+  const placeholders = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `(async () => {
+    const seen = []
+    for (const action of ["daily", "store", "settings", "social", "promo", "link"]) {
+      document.querySelector('[data-action="' + action + '"]').click()
+      seen.push(document.querySelector("[data-toast]").textContent)
+    }
+    document.querySelector('[data-action="mail"]').click()
+    await new Promise(resolve => setTimeout(resolve, 300))
+    const login = document.querySelector("#member-dialog")?.open
+    document.querySelector(".member-dialog-close")?.click()
+    return { seen, login, path: location.pathname + location.search }
+  })()` })
+  const result = placeholders.result.value
+  if (result.seen.some(text => !text.includes("即將") && !text.includes("準備中")) || !result.login || result.path !== "/") throw new Error(`Lobby placeholders failed: ${JSON.stringify(result)}`)
+  console.log("OK Device-selected PC/mobile layouts on one URL, placeholder notices and guest mailbox login")
 }
 
 async function expectMemberContinuation(client) {
@@ -911,11 +936,11 @@ async function expectLobbyThumbnailFallback(client) {
           type: "arcade",
         }])
 
-        const poster = root.querySelector(".game-tile-poster")
+        const art = root.querySelector(".card__art")
 
         return {
           hasImage: Boolean(root.querySelector("img")),
-          hasFallback: poster?.classList.contains("is-empty") || false,
+          hasFallback: (art?.classList.contains("is-empty") && art.textContent === "Broken Cover") || false,
         }
       })
     `,

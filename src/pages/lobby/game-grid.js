@@ -3,6 +3,7 @@ import { normalizeCoverPath } from "../../lib/urls.js"
 
 const TEXT = {
   openGame: "開啟遊戲",
+  playable: "可遊玩",
   emptyTitle: "目前沒有開放的遊戲",
   emptyCopy: "遊戲上架後會顯示在這裡。",
   errorTitle: "遊戲列表讀取失敗",
@@ -11,130 +12,83 @@ const TEXT = {
 
 export function renderGameGrid(gridElement, games) {
   if (!gridElement) return
-
+  gridElement.removeAttribute("aria-busy")
+  setCount(gridElement, games.length)
   if (games.length === 0) {
-    gridElement.replaceChildren(createEmptyState())
+    gridElement.replaceChildren(createGridState("empty-state", TEXT.emptyTitle, TEXT.emptyCopy))
     return
   }
-
-  const tileGrid = document.createElement("div")
-  tileGrid.className = "game-tile-grid"
-  tileGrid.append(...games.map(createGameTile))
-
-  gridElement.replaceChildren(tileGrid)
+  gridElement.replaceChildren(...games.map(createGameCard))
 }
 
 export function renderGameGridError(gridElement) {
   if (!gridElement) return
-
-  gridElement.replaceChildren(createGridState({
-    className: "empty-state is-error",
-    title: TEXT.errorTitle,
-    copy: TEXT.errorCopy,
-  }))
+  gridElement.removeAttribute("aria-busy")
+  setCount(gridElement, 0)
+  gridElement.replaceChildren(createGridState("empty-state is-error", TEXT.errorTitle, TEXT.errorCopy))
 }
 
-function createEmptyState() {
-  return createGridState({
-    className: "empty-state",
-    title: TEXT.emptyTitle,
-    copy: TEXT.emptyCopy,
-  })
+export function getGameCover(game) {
+  return normalizeCoverPath(game.thumbnail, game.slug)
 }
 
-function createGridState({ className, title: titleText, copy: copyText }) {
-  const wrapper = document.createElement("div")
-  wrapper.className = className
-
-  const title = document.createElement("div")
-  title.className = "empty-title"
-  title.textContent = titleText
-
-  const copy = document.createElement("div")
-  copy.className = "empty-copy"
-  copy.textContent = copyText
-
-  wrapper.append(title, copy)
-  return wrapper
-}
-
-function createGameTile(game) {
-  const card = document.createElement("article")
-  card.className = "game-tile"
-
-  const gameUrl = getGameUrl(game)
-  card.append(
-    createTilePoster(game, gameUrl),
-    createTileBody(game),
-  )
-
-  return card
-}
-
-function createTilePoster(game, gameUrl) {
-  const displayName = getDisplayName(game)
-  const thumbnail = normalizeCoverPath(game.thumbnail, game.slug)
-  const poster = document.createElement("a")
-  poster.className = "game-tile-poster"
-  poster.href = gameUrl
-  poster.setAttribute("aria-label", `${TEXT.openGame}: ${displayName}`)
-
-  if (thumbnail) {
-    const image = document.createElement("img")
-    image.className = "game-tile-poster-image"
-    image.alt = ""
-    image.loading = "lazy"
-    image.decoding = "async"
-    image.addEventListener("error", () => {
-      image.remove()
-      poster.classList.add("is-empty")
-    }, { once: true })
-    image.src = thumbnail
-    poster.append(image)
-  } else {
-    poster.classList.add("is-empty")
-  }
-
-  return poster
-}
-
-function createTileBody(game) {
-  const displayName = getDisplayName(game)
-  const body = document.createElement("div")
-  body.className = "game-tile-body"
-
-  const title = document.createElement("h3")
-  title.className = "game-tile-title"
-  title.textContent = displayName
-
-  const tags = document.createElement("div")
-  tags.className = "game-tile-tags"
-
-  const type = document.createElement("span")
-  type.className = "game-tile-tag"
-  type.textContent = getGameTypeLabel(game.type)
-
-  tags.append(type)
-
-  body.append(title, tags)
-  return body
-}
-
-function getGameUrl(game) {
-  return buildGameUrl(game.slug)
-}
-
-function getDisplayName(game) {
+export function getDisplayName(game) {
   const name = String(game.name || "").trim()
-  if (name) {
-    return name
-  }
-
+  if (name) return name
   const slugName = String(game.slug || "")
     .split("-")
     .filter(Boolean)
     .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`)
     .join(" ")
-
   return slugName || "未命名遊戲"
+}
+
+function setCount(gridElement, count) {
+  const counter = gridElement.closest(".shelf")?.querySelector("[data-grid-count]")
+  if (counter) counter.textContent = count ? `共 ${count} 款` : ""
+}
+
+function createGridState(className, titleText, copyText) {
+  const wrapper = element("div", className)
+  wrapper.append(element("div", "empty-title", titleText), element("div", "empty-copy", copyText))
+  return wrapper
+}
+
+function createGameCard(game) {
+  const displayName = getDisplayName(game)
+  const card = element("a", "card game-card")
+  card.href = buildGameUrl(game.slug)
+  card.dataset.play = game.slug
+  card.setAttribute("aria-label", `${TEXT.openGame}: ${displayName}`)
+
+  const art = element("span", "card__art")
+  const cover = getGameCover(game)
+  if (cover) {
+    const image = document.createElement("img")
+    image.alt = ""
+    image.loading = "lazy"
+    image.decoding = "async"
+    image.addEventListener("error", () => {
+      image.remove()
+      art.classList.add("is-empty")
+      art.append(element("span", "card__fallback", displayName))
+    }, { once: true })
+    image.src = cover
+    art.append(image)
+  } else {
+    art.classList.add("is-empty")
+    art.append(element("span", "card__fallback", displayName))
+  }
+
+  const meta = element("span", "card__meta")
+  meta.append(document.createElement("i"), `${TEXT.playable} · ${getGameTypeLabel(game.type)}`)
+  card.append(art, element("span", "card__name game-card-title", displayName), meta)
+  return card
+}
+
+function element(tag, className, text) {
+  const node = document.createElement(tag)
+  node.className = className
+  if (text !== undefined) node.textContent = text
+  return node
 }
