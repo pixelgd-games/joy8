@@ -135,7 +135,7 @@ Vite declares these entries in `vite.config.js`.
 | `src/main.js` | Lobby bootstrap |
 | `src/pages/lobby/` | Layout selection, catalog grid, hero carousel, member card, mailbox drawer and settings sheet |
 | `src/pages/lobby/content.js` | Fixed hero slides, notices, social links and placeholder messages |
-| `src/pages/game/` | Game lookup, session creation, and iframe handling |
+| `src/pages/game/` | Game lookup, session creation, iframe handling and the game top bar |
 | `src/pages/entry/` | Branded iframe entry, Google orchestration and callback completion |
 | `src/admin/` | Admin authentication and game CRUD |
 | `src/admin/access.js` | Verified-admin email allowlist management |
@@ -213,6 +213,11 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 5. It creates the iframe from the catalog URL without launch credentials.
 6. The game announces its Joy8 Client from an approved parent origin, then the
    Loader delivers the session parameters once through an origin-checked in-memory message.
+7. The Loader shell shows a top bar above the iframe: 回到大廳 (with a leave
+   confirmation), the JOY8 logo and a fullscreen toggle for the whole page. The
+   toggle is hidden where the browser has no Fullscreen API, such as iPhone
+   Safari. On touch phones in landscape the bar collapses into a floating menu
+   button at the top-left. Games need no change.
 
 The launch payload fields, lifetimes and handshake rules are defined in
 [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLATFORM_INTEGRATION.md#loader-in-memory-handoff).

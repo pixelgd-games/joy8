@@ -366,6 +366,16 @@ async function showSyntheticError(client) {
 
 async function expectPrivateEntry(client, appPort) {
   await expectPageText(client, appPort, "/play-test/?slug=mahjong-clash", text => text.includes("進入測試"), "Private entry waits for explicit start")
+  const bar = await client.send("Runtime.evaluate", { awaitPromise:true, returnByValue:true, expression:`(async () => {
+    const confirm = document.querySelector(".game-confirm")
+    document.querySelector('.game-bar [data-bar="home"]').click()
+    const asked = confirm.open
+    confirm.querySelector('[value="stay"]').click()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    return { asked, closed: !confirm.open, path: location.pathname, fullscreen: Boolean(document.querySelector('.game-bar [data-bar="fullscreen"]')), loaderTop: document.getElementById("loading").getBoundingClientRect().top >= document.querySelector(".game-bar").getBoundingClientRect().bottom - 1 }
+  })()` })
+  if (!bar.result.value.asked || !bar.result.value.closed || bar.result.value.path !== "/play-test/" || !bar.result.value.fullscreen || !bar.result.value.loaderTop) throw new Error(`Game top bar failed: ${JSON.stringify(bar.result.value)}`)
+  console.log("OK Game top bar asks before leaving and keeps the loader below it")
   await client.send("Runtime.evaluate", {
     awaitPromise: true,
     expression: `import("/src/lib/memberClient.js").then(({memberSupabase}) => {

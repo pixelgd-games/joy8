@@ -1,9 +1,11 @@
 import { mountGameFrame } from "./iframe.js"
 import { gameLaunchPayload } from "./launch.js"
 import { gameFailure } from "./errors.js"
+import { gameBarMarkup, gameConfirmMarkup, setupGameBar } from "./game-bar.js"
 
 export function renderLoader() {
-  document.body.innerHTML = `<div id="loading" class="loader" role="status" aria-live="polite"><div class="loader-card"><div class="loader-brand">Joy8</div><div class="loader-ring" aria-hidden="true"></div><p class="loader-copy">正在進入遊戲…</p></div></div><div id="game"></div><div class="scroll-handoff" aria-hidden="true"></div>`
+  document.body.innerHTML = `<div class="game-shell">${gameBarMarkup}<div id="game"></div></div><div id="loading" class="loader" role="status" aria-live="polite"><div class="loader-card"><div class="loader-brand">Joy8</div><div class="loader-ring" aria-hidden="true"></div><p class="loader-copy">正在進入遊戲…</p></div></div><div class="scroll-handoff" aria-hidden="true"></div>${gameConfirmMarkup}`
+  setupGameBar()
 }
 
 export function showGameError({ code, title, message, reload = true }) {
