@@ -23,7 +23,6 @@ export const SOCIAL = [
 export const PLACEHOLDERS = {
   daily: "每日獎勵即將開放，敬請期待",
   store: "商城即將開放，敬請期待",
-  settings: "設定即將開放，敬請期待",
   social: "社群連結即將公布，敬請期待",
   promo: "活動即將開放，敬請期待",
   link: "頁面準備中，敬請期待",

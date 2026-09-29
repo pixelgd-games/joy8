@@ -723,7 +723,7 @@ async function expectGameSelection(client, appPort) {
 async function expectLobbyLayouts(client, appPort) {
   const layoutState = 'new Promise(resolve => setTimeout(() => resolve({ layout: document.documentElement.dataset.layout, side: Boolean(document.querySelector(".side")), float: Boolean(document.querySelector(".float-reward")), ticker: Boolean(document.querySelector("[data-ticker]")?.textContent), overflow: document.documentElement.scrollWidth > innerWidth, path: location.pathname, dialogs: document.querySelectorAll("dialog.sheet").length }), 300))'
   const pc = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: layoutState })
-  if (pc.result.value.layout !== "pc" || !pc.result.value.side || pc.result.value.float || pc.result.value.dialogs !== 1) throw new Error(`Desktop layout failed: ${JSON.stringify(pc.result.value)}`)
+  if (pc.result.value.layout !== "pc" || !pc.result.value.side || pc.result.value.float || pc.result.value.dialogs !== 2) throw new Error(`Desktop layout failed: ${JSON.stringify(pc.result.value)}`)
   await client.send("Emulation.setUserAgentOverride", { userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36", userAgentMetadata: { platform: "Android", platformVersion: "14", architecture: "", model: "Pixel 8", mobile: true } })
   await client.send("Emulation.setDeviceMetricsOverride", { width: 375, height: 812, deviceScaleFactor: 1, mobile: true })
   try {
@@ -742,19 +742,25 @@ async function expectLobbyLayouts(client, appPort) {
   await waitForText(client, (text) => text.includes("全部遊戲"), "Desktop Lobby reloads")
   const placeholders = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `(async () => {
     const seen = []
-    for (const action of ["daily", "store", "settings", "social", "promo", "link"]) {
+    for (const action of ["daily", "store", "social", "promo", "link"]) {
       document.querySelector('[data-action="' + action + '"]').click()
       seen.push(document.querySelector("[data-toast]").textContent)
     }
+    document.querySelector('[data-action="settings"]').click()
+    const settings = document.querySelector(".sheet--settings")
+    const settingsOpen = settings.open
+    settings.querySelector('[data-setting="link"]').click()
+    const settingsToast = settings.contains(document.querySelector("[data-toast]"))
+    settings.querySelector('[data-setting="close"]').click()
     document.querySelector('[data-action="mail"]').click()
     await new Promise(resolve => setTimeout(resolve, 300))
     const login = document.querySelector("#member-dialog")?.open
     document.querySelector(".member-dialog-close")?.click()
-    return { seen, login, path: location.pathname + location.search }
+    return { seen, settingsOpen, settingsToast, login, path: location.pathname + location.search }
   })()` })
   const result = placeholders.result.value
-  if (result.seen.some(text => !text.includes("即將") && !text.includes("準備中")) || !result.login || result.path !== "/") throw new Error(`Lobby placeholders failed: ${JSON.stringify(result)}`)
-  console.log("OK Device-selected PC/mobile layouts on one URL, placeholder notices and guest mailbox login")
+  if (result.seen.some(text => !text.includes("即將") && !text.includes("準備中")) || !result.settingsOpen || !result.settingsToast || !result.login || result.path !== "/") throw new Error(`Lobby placeholders failed: ${JSON.stringify(result)}`)
+  console.log("OK Device-selected PC/mobile layouts on one URL, placeholder notices, settings sheet and guest mailbox login")
 }
 
 async function expectMemberContinuation(client) {

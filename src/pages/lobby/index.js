@@ -5,6 +5,7 @@ import { detectLayout } from "./layout.js"
 import { createHero } from "./hero.js"
 import { createMemberMenu } from "./member-menu.js"
 import { createMailSheet, formatPoint } from "./mail-sheet.js"
+import { createSettingsSheet } from "./settings-sheet.js"
 import { HERO_SLIDES, NOTICES, PLACEHOLDERS } from "./content.js"
 import { buildGameUrl } from "./utils.js"
 import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
@@ -71,7 +72,7 @@ export async function initLobbyPage(appRoot) {
 function setupMember(appRoot) {
   const root = document.documentElement
   const service = createMemberService(memberSupabase, { origin: location.origin })
-  const toast = createToast(appRoot.querySelector("[data-toast]"))
+  const toast = createToast(appRoot, appRoot.querySelector("[data-toast]"))
   const loginButton = appRoot.querySelector(".member-login-link")
   const games = new Map()
   let accountRevision = 0
@@ -121,6 +122,7 @@ function setupMember(appRoot) {
     onUnread: renderUnread,
     onClaimed: () => refreshWallet(true),
   })
+  const settings = createSettingsSheet({ toast, onAction: (action, trigger) => runAction(action, trigger) })
 
   const applyGuest = () => {
     root.dataset.auth = "guest"
@@ -139,6 +141,7 @@ function setupMember(appRoot) {
     for (const node of document.querySelectorAll("[data-player-name]")) node.textContent = `Player ${publicId}`
     for (const node of appRoot.querySelectorAll(".account")) node.setAttribute("aria-label", `會員資料 Player ${publicId}`)
     menu.render({ publicId, email: user.email, joinedAt: user.created_at })
+    settings.render({ publicId })
     void refreshWallet()
     void mail.refreshUnread()
   }
@@ -202,6 +205,7 @@ function setupMember(appRoot) {
     if (action === "welcome") return isMember() ? appRoot.querySelector("#gamesSection").scrollIntoView({ behavior: "smooth" }) : openEntry(trigger, null)
     if (action === "profile") return menu.toggle()
     if (action === "mail") return isMember() ? mail.open() : openEntry(trigger, null)
+    if (action === "settings") return settings.open()
     if (action === "logout") {
       return service.signOut().then(() => toast("已登出"), () => toast("目前無法登出，請稍後再試"))
     }
@@ -248,9 +252,11 @@ function setupTicker(appRoot) {
   if (NOTICES.length > 1) setInterval(show, 3500)
 }
 
-function createToast(node) {
+function createToast(appRoot, node) {
   let timer = 0
   return (message) => {
+    const host = document.querySelector("dialog[open]") || appRoot
+    host.append(node)
     node.textContent = message
     node.classList.add("is-show")
     clearTimeout(timer)
