@@ -209,6 +209,12 @@ referrerpolicy="no-referrer"
 For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader uses
 eager loading and the shared 30-second launch deadline described above.
 
+The Loader shell places a platform top bar above the iframe: 48px on desktop,
+44px on phones in portrait and 36px on phones in landscape. The iframe receives
+only the remaining height, so the game must lay out correctly in that area.
+Returning to the Lobby and page fullscreen belong to that bar; a Joy8 build must
+not add its own lobby-return or page-fullscreen button.
+
 The credential-ready message only proves that the game installed its Joy8 Client;
 it is not gameplay readiness. The current 30-second timeout still observes the
 iframe `load` event. A future gameplay-ready or heartbeat signal must extend this
