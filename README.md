@@ -140,14 +140,14 @@ Vite declares these entries in `vite.config.js`.
 | `src/admin/` | Admin authentication and game CRUD |
 | `src/admin/access.js` | Verified-admin email allowlist management |
 | `src/admin/mail.js` | Administrator mailbox composer and delivery audit |
-| `src/mailbox/` | Shared mailbox service and administrator presentation |
+| `src/mailbox/` | Shared mailbox service and mail detail rendering |
 | `src/admin/login.js` | Explicit admin login-page bootstrap; shared auth imports have no page startup side effects |
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
 | `src/member/` | H5 member UI and testable authentication flow |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
-| `src/styles/` | Shared tokens plus theme, Lobby (`lobby.css`, `lobby-pc.css`, `lobby-mobile.css`), Loader and error-modal styles |
+| `src/styles/` | Shared tokens plus theme, Lobby (`lobby.css`, `lobby-pc.css`, `lobby-mobile.css`), Loader, error-modal and the plain light Admin stylesheet (`admin.css`) shared by every admin page |
 | `supabase/functions/joy8-gateway/` | Gateway entry, HTTP/auth/RPC policies and route modules |
 | `supabase/migrations/` | Incremental database migrations |
 | `scripts/` | Local verification, operator tools and Supabase routing helpers |

@@ -1,3 +1,4 @@
+import "../styles/admin.css"
 import { supabase } from "../lib/supabaseClient.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
 import { signInWithGoogle, signOut, requireAdmin } from "./auth.js"

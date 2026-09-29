@@ -1,14 +1,13 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>編輯遊戲</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>編輯遊戲 · Joy8</title>
+  <script type="module" src="/src/admin/game-form.js"></script>
 </head>
-
 <body>
-<div id="admin-form"></div>
-<script type="module" src="/src/admin/game-form.js"></script>
-
+  <header class="admin-header"><span class="admin-brand">Joy8 管理</span><nav class="admin-nav"><a href="/admin/games/" aria-current="page">遊戲管理</a><a href="/admin/mail/">信件管理</a><a href="/admin/access/">遊玩白名單</a><button id="logout" type="button">登出</button></nav></header>
+  <div id="admin-form"></div>
 </body>
 </html>

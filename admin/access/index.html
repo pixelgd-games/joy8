@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Joy8｜遊玩白名單</title>
+  <title>遊玩白名單 · Joy8</title>
   <script type="module" src="/src/admin/access.js"></script>
 </head>
 <body>
+  <header class="admin-header"><span class="admin-brand">Joy8 管理</span><nav class="admin-nav"><a href="/admin/games/">遊戲管理</a><a href="/admin/mail/">信件管理</a><a href="/admin/access/" aria-current="page">遊玩白名單</a><button id="logout" type="button">登出</button></nav></header>
   <h1>遊玩白名單</h1>
-  <nav><a href="/admin/games/">遊戲管理</a> <button id="logout" type="button">登出</button></nav>
-  <p>大廳開放瀏覽，目前僅限名單內的 Google 帳號註冊與開啟遊戲。管理員 email 受保護，無法移除。</p>
-  <form id="access-form">
-    <label for="email">Google 帳號 email</label>
-    <input id="email" name="email" type="email" maxlength="254" required autocomplete="off" disabled>
-    <button id="add" type="submit" disabled>新增</button>
+  <p class="admin-note">大廳開放瀏覽，目前僅限名單內的 Google 帳號註冊與開啟遊戲。管理員 email 受保護，無法移除。</p>
+  <form id="access-form" class="admin-inline">
+    <label for="email">Google 帳號 email<input id="email" name="email" type="email" maxlength="254" required autocomplete="off" disabled></label>
+    <button id="add" type="submit" class="admin-primary" disabled>新增</button>
   </form>
   <p id="status" role="status" aria-live="polite">正在確認管理員權限…</p>
-  <ul id="emails"></ul>
+  <ul id="emails" class="admin-list"></ul>
 </body>
 </html>

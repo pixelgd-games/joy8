@@ -1,26 +1,16 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Joy8 Admin - Games</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>遊戲管理 · Joy8</title>
   <script type="module" src="/src/admin/games.js"></script>
 </head>
-
 <body>
-
-<h1>Games 管理</h1>
-
-<div style="margin:8px 0;">
-  <a href="/admin/games/new/">新增遊戲</a>
-  <a href="/admin/mail/" style="margin-left:8px;">信件管理</a>
-  <a href="/admin/access/" style="margin-left:8px;">遊玩白名單</a>
-  <button id="btnLogout" style="margin-left:8px;">登出</button>
-</div>
-
-<p id="status">載入中…</p>
-
-<div id="list"></div>
-
+  <header class="admin-header"><span class="admin-brand">Joy8 管理</span><nav class="admin-nav"><a href="/admin/games/" aria-current="page">遊戲管理</a><a href="/admin/mail/">信件管理</a><a href="/admin/access/">遊玩白名單</a><button id="logout" type="button">登出</button></nav></header>
+  <h1>遊戲管理</h1>
+  <p><a href="/admin/games/new/">新增遊戲</a></p>
+  <p id="status">載入中…</p>
+  <div id="list" class="admin-table-scroll"></div>
 </body>
 </html>

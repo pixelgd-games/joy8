@@ -1,3 +1,4 @@
+import "../styles/admin.css"
 import { supabase } from "../lib/supabaseClient.js"
 import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
@@ -15,7 +16,7 @@ async function main() {
   const admin = await requireAdmin()
   if (!admin) return
 
-  $("#btnLogout")?.addEventListener("click", signOut)
+  $("#logout")?.addEventListener("click", signOut)
   setStatus("讀取 games 中...")
 
   const { data, error } = await supabase
@@ -57,9 +58,6 @@ function renderGameList() {
 
 function createGamesTable(games) {
   const table = document.createElement("table")
-  table.border = "1"
-  table.cellPadding = "6"
-  table.style.borderCollapse = "collapse"
 
   table.append(
     createTableHead([
@@ -136,6 +134,7 @@ function createLinkCell(rawUrl, label, invalid = false) {
 
 function createActionsCell(game) {
   const cell = document.createElement("td")
+  cell.className = "admin-actions"
   const slug = String(game.slug || "")
   const editUrl = `/admin/games/edit/?id=${encodeURIComponent(game.id)}`
   const loaderUrl = `/game/?slug=${encodeURIComponent(slug)}`

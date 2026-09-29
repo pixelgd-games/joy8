@@ -1,0 +1,50 @@
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0 auto;padding:24px 16px 48px;max-width:1160px;font-family:system-ui,-apple-system,"Noto Sans TC",sans-serif;line-height:1.6;color:#1f2328;background:#fff}
+a{color:#0b57d0}
+h1{margin:16px 0 8px;font-size:28px}
+h2{margin:0 0 12px;font-size:20px;overflow-wrap:anywhere}
+button,input,select,textarea{font:inherit}
+button{padding:6px 14px;border:1px solid #8c959f;border-radius:4px;background:#f6f8fa;color:#1f2328;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid #0b57d0;outline-offset:2px}
+input:not([type=checkbox]),select,textarea{width:100%;min-width:0;padding:8px 10px;border:1px solid #8c959f;border-radius:4px;background:#fff;color:#1f2328}
+input[type=checkbox]{width:18px;height:18px;vertical-align:middle}
+textarea{resize:vertical;min-height:160px}
+fieldset{border:0;margin:0;padding:0;min-width:0}
+table{border-collapse:collapse;font-size:14px}
+th,td{padding:8px 10px;border:1px solid #d0d7de;text-align:left;vertical-align:top;overflow-wrap:break-word}
+th{background:#f6f8fa;white-space:nowrap}
+.admin-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid #d0d7de}
+.admin-brand{font-size:18px;font-weight:700}
+.admin-nav{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.admin-nav a[aria-current=page]{color:#1f2328;font-weight:700;text-decoration:none}
+.admin-note{font-size:13px;color:#59636e}
+.admin-form{display:grid;gap:14px;max-width:640px}
+.admin-form label{display:grid;gap:4px;font-weight:600}
+.admin-form label.admin-check{display:flex;align-items:center;gap:8px}
+.admin-inline{display:flex;flex-wrap:wrap;align-items:end;gap:8px;max-width:640px}
+.admin-inline label{flex:1 1 280px;display:grid;gap:4px;font-weight:600}
+.admin-list{padding:0;list-style:none;max-width:640px}
+.admin-list li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid #d0d7de;overflow-wrap:anywhere}
+.admin-primary,.mail-primary{background:#0b57d0;border-color:#0b57d0;color:#fff}
+.admin-actions{white-space:nowrap}
+.admin-table-scroll,.mail-table-scroll{overflow-x:auto}
+.mail-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mail-columns{display:grid;grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr);gap:16px;align-items:start}
+.mail-panel{padding:16px;border:1px solid #d0d7de;border-radius:6px;min-width:0}
+.mail-form,.mail-form fieldset,#reward-fields{display:grid;gap:14px}
+.mail-form label{display:grid;gap:4px;font-weight:600}
+.mail-help{margin:0;font-size:13px;font-weight:400;color:#59636e}
+.mail-kicker{margin:0;font-size:13px;color:#59636e}
+.mail-muted{font-size:14px;color:#59636e}
+.mail-body{margin:16px 0;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.8}
+.mail-reward{padding:10px 12px;border:1px solid #d0d7de;border-radius:4px;background:#f6f8fa;font-size:20px;font-weight:700}
+.mail-notice{padding:10px 12px;border-left:3px solid #0b57d0;background:#f6f8fa}
+.mail-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.mail-history{margin-top:32px}
+.mail-history table{width:100%}
+.mail-list-item{display:grid;gap:2px;width:100%;margin-bottom:8px;padding:10px 12px;text-align:left;background:#fff;overflow-wrap:anywhere}
+.mail-empty{padding:24px;text-align:center;color:#59636e}
+.mail-pager{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:16px}
+@media(max-width:720px){.mail-columns{grid-template-columns:1fr}.mail-heading{align-items:flex-start}}

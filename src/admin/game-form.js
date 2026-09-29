@@ -2,14 +2,15 @@ import { renderGameForm } from "./form-template.js"
 import { supabase } from "../lib/supabaseClient.js"
 import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
-import { requireAdmin } from "./auth.js"
-import "../styles/admin-form.css"
+import { requireAdmin, signOut } from "./auth.js"
+import "../styles/admin.css"
 import { GAME_SLUG_PATTERN } from "../../packages/joy8-game-sdk/contract.js"
 
 const params = new URLSearchParams(window.location.search)
 const isEditPage = window.location.pathname.startsWith("/admin/games/edit/")
 const gameId = isEditPage ? params.get("id") : null
 document.getElementById("admin-form").innerHTML = renderGameForm(isEditPage)
+document.getElementById("logout")?.addEventListener("click", signOut)
 const form = document.getElementById("gameForm")
 const fields = form.querySelector("fieldset")
 let canSubmit = false

@@ -1,3 +1,4 @@
+import "../styles/admin.css"
 import { supabase } from "../lib/supabaseClient.js"
 import { requireAdmin, signOut } from "./auth.js"
 
@@ -31,7 +32,9 @@ async function refresh() {
         await refresh()
       })
     })
-    item.append(document.createTextNode(`${row.email} `), remove)
+    const label = document.createElement("span")
+    label.textContent = row.email
+    item.append(label, remove)
     list.append(item)
   }
   loaded = true
