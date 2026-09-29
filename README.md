@@ -216,8 +216,8 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 7. The Loader shell shows a top bar above the iframe: 回到大廳 (with a leave
    confirmation), the JOY8 logo and a fullscreen toggle for the whole page. The
    toggle is hidden where the browser has no Fullscreen API, such as iPhone
-   Safari. On touch phones in landscape the bar collapses into a floating menu
-   button at the top-left. Games need no change.
+   Safari. Phones in landscape keep the same bar at a lower 36px height. Games
+   need no change.
 
 The launch payload fields, lifetimes and handshake rules are defined in
 [GAME_PLATFORM_INTEGRATION.md](docs/platform/GAME_PLATFORM_INTEGRATION.md#loader-in-memory-handoff).

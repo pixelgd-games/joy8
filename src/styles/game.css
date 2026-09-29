@@ -2,6 +2,7 @@
 
 :root{--game-bar-h:48px}
 @media (max-width:767px){:root{--game-bar-h:44px}}
+@media (orientation:landscape) and (max-height:540px){:root{--game-bar-h:36px}}
 
 body{
   margin:0;
@@ -160,7 +161,7 @@ body::-webkit-scrollbar{
 .game-bar__btn svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .game-bar__back{justify-self:start}
 .game-bar__fullscreen{justify-self:end;width:36px;padding:0;justify-content:center}
-.game-bar__fullscreen[hidden],.game-bar__toggle{display:none}
+.game-bar__fullscreen[hidden]{display:none}
 
 .game-bar__brand{
   font-family:"Lilita One",sans-serif;
@@ -172,14 +173,10 @@ body::-webkit-scrollbar{
 
 .game-bar__brand span{color:#ff4d8d}
 
-@media (orientation:landscape) and (max-height:540px) and (pointer:coarse){
-  :root{--game-bar-h:0px}
-  .game-bar{position:fixed;top:8px;left:8px;display:flex;flex-direction:column;align-items:stretch;gap:4px;height:auto;padding:4px;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(13,10,24,.72)}
-  .game-bar > *{display:none}
-  .game-bar .game-bar__toggle{display:inline-flex;width:36px;padding:0;justify-content:center}
-  .game-bar.is-open .game-bar__back,.game-bar.is-open .game-bar__fullscreen:not([hidden]){display:inline-flex}
-  .game-bar.is-open .game-bar__fullscreen{width:auto;padding:0 10px}
-  .game-bar.is-open .game-bar__fullscreen::after{content:attr(aria-label)}
+@media (orientation:landscape) and (max-height:540px){
+  .game-bar__btn{height:30px}
+  .game-bar__fullscreen{width:30px}
+  .game-bar__brand{font-size:18px}
 }
 
 .game-confirm{
