@@ -8,9 +8,11 @@ const settingsButton = `<button class="icon-btn" type="button" data-action="sett
 const heroTrack = `<div class="hero__track" data-hero-track></div><div class="hero__dots" data-hero-dots></div>`
 const noticeItems = NOTICES.map(notice => `<li>${noticeMarkup(notice)}</li>`).join("")
 const socialLinks = SOCIAL.map(item => `<a class="social__link" href="#" data-action="social" aria-label="${item.label}">${icon(item.icon)}</a>`).join("")
+const pointNote = "POINT 僅供平台內遊戲娛樂使用，不可提領、轉讓或兌換現金。"
+const footLinks = `<a href="#" data-action="link">服務條款</a><a href="#" data-action="link">隱私權政策</a><a href="#" data-action="link">聯絡我們</a>`
 const footerCopy = `
-  <p>POINT 僅供平台內遊戲娛樂使用，不可提領、轉讓或兌換現金。</p>
-  <p class="site-foot__links"><a href="#" data-action="link">服務條款</a><a href="#" data-action="link">隱私權政策</a><a href="#" data-action="link">聯絡我們</a></p>
+  <p>${pointNote}</p>
+  <p class="site-foot__links">${footLinks}</p>
   <p>© Joy8</p>`
 const shelf = `
   <section class="shelf" id="gamesSection" aria-labelledby="gamesTitle">
@@ -75,14 +77,11 @@ function pcMarkup() {
         </div>
       </section>
       <div class="wrap lobby">${shelf}</div>
-      <footer class="wrap site-foot">${footerCopy}</footer>
     </main>
-    <footer class="social" aria-label="社群平台">
-      <div class="social__inner">
-        <span class="social__label">關注 Joy8</span>
-        <div class="social__links">${socialLinks}</div>
-        <span class="social__note">最新活動與新遊戲消息</span>
-      </div>
+    <footer class="site-bar">
+      <p class="site-bar__links"><span>© Joy8</span>${footLinks}</p>
+      <p class="site-bar__note">${pointNote}</p>
+      <div class="social__links" aria-label="社群平台">${socialLinks}</div>
     </footer>
     <div class="toast" role="status" aria-live="polite" data-toast></div>`
 }

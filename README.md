@@ -133,7 +133,7 @@ Vite declares these entries in `vite.config.js`.
 | Path | Responsibility |
 | --- | --- |
 | `src/main.js` | Lobby bootstrap |
-| `src/pages/lobby/` | Layout selection, catalog grid, hero carousel, member card and mailbox drawer |
+| `src/pages/lobby/` | Layout selection, catalog grid, hero carousel, member card, mailbox drawer and settings sheet |
 | `src/pages/lobby/content.js` | Fixed hero slides, notices, social links and placeholder messages |
 | `src/pages/game/` | Game lookup, session creation, and iframe handling |
 | `src/pages/entry/` | Branded iframe entry, Google orchestration and callback completion |
@@ -173,7 +173,8 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    User-Agent) and loads either the PC or the mobile layout on the same URL; it
    never redirects, so `/?play=` and the `/account/` return keep working.
    PC: fixed top bar, left promotion/notice column, 1600 x 480 hero carousel,
-   one 「全部遊戲」 grid and a fixed social bar. Mobile: one-row top bar,
+   one 「全部遊戲」 grid and a fixed bottom bar with the footer links, the POINT
+   notice and social links. Mobile: one-row top bar,
    full-width 2:1 hero carousel, notice ticker, three-column grid, floating
    daily-reward button and footer social links.
 2. The Lobby reads published games from `public_games_v1`. Browsing does not
@@ -192,7 +193,12 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    `mailbox` Gateway route: opening a mail marks it read, and 「領取 POINT」 is a
    separate explicit claim. Visitors are sent to the member dialog instead.
    Sign-out clears the displayed mail and balance.
-6. 每日獎勵, 商城, 設定, the promotion banner, social links and footer links are
+6. The gear opens 設定, a right-side drawer on PC and a bottom sheet on mobile.
+   The sound switches and the language choice are display-only: switches reset
+   on reload and English only shows a notice. The account section is visible
+   to members only and its 登出 works. 服務條款, 隱私權政策 and 聯絡客服 only show
+   a notice.
+7. 每日獎勵, 商城, the promotion banner, social links and footer links are
    placeholders that only show a short notice. Hero slides, notices and social
    links are fixed in `src/pages/lobby/content.js`; changing them needs a deploy.
 
