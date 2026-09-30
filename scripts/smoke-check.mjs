@@ -10,6 +10,7 @@ import WebSocket from "ws"
 import { expectMailbox } from "./mailbox-browser-check.mjs"
 import { expectAllowlistAdmin } from "./allowlist-browser-check.mjs"
 import { expectProductionCsp } from "./production-csp-check.mjs"
+import { expectLobbyRecovery } from "./lobby-regression-check.mjs"
 
 const cwd = fileURLToPath(new URL("..", import.meta.url))
 const host = "127.0.0.1"
@@ -93,6 +94,7 @@ try {
   await expectAllowlistAdmin(client, appPort)
   await expectPageText(client, appPort, "/account/?error=access_denied&error_description=JOY8_EMAIL_NOT_ALLOWED&provider=google&flow=signin", text => text.includes("尚未開放") && text.includes("白名單 Google"), "Signup-hook rejection survives the Auth trampoline")
 
+  await expectLobbyRecovery(client, appPort)
   await expectProductionCsp(client, cwd)
   client.ws.close()
   console.log("Smoke check passed.")
@@ -499,7 +501,7 @@ async function expectAdminFormSafety(client) {
         check(table === "games", "Unexpected admin table")
         return {
           select: () => ({ eq: () => ({ maybeSingle: () => new Promise(resolve => { resolveRead = resolve }) }) }),
-          update: payload => ({ eq: (_, id) => { writes.push({ payload, id }); return new Promise(resolve => { resolveWrite = resolve }) } }),
+          update: payload => ({ eq: (_, id) => ({ select: () => ({ single: () => { writes.push({ payload, id }); return new Promise(resolve => { resolveWrite = resolve }) } }) }) }),
           insert: payload => { writes.push({ payload }); return Promise.resolve({ error: { message: "Save rejected" } }) },
         }
       }
@@ -550,8 +552,9 @@ async function expectAdminFormSafety(client) {
       submit(form)
       await tick()
       check(writes.length === 2, "Explicit retry did not run")
-      resolveWrite({ error: { message: "Save rejected" } })
+      resolveWrite({ error: null, data: null })
       await tick()
+      check(location.pathname === "/admin/games/edit/" && document.querySelector(".joy8-error-title")?.textContent === "更新遊戲失敗", "Zero-row update was treated as success")
       const newForm = await start("new", "/admin/games/new/")
       check(!newForm.querySelector("fieldset").disabled, "New game form stayed disabled")
       history.replaceState(null, "", "/admin/login/")

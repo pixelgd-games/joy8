@@ -2,6 +2,7 @@ import { resolveAuthUser } from "./auth.ts"
 import { callRpc, callUserRpc, statusFromRpcError } from "./rpc.ts"
 import { jsonResponse, readJsonBody } from "./http.ts"
 import type { JsonValue } from "./http.ts"
+import { enforceCounterRateLimit } from "./rate-limit.ts"
 
 export async function mailboxOperation(route: string, request: Request, headers: HeadersInit): Promise<Response> {
   const auth = await resolveAuthUser(request)
@@ -17,11 +18,8 @@ export async function mailboxOperation(route: string, request: Request, headers:
     return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
   }
   if (!admin) {
-    const admission = await callRpc("joy8_consume_gateway_rate_limit", {
-      p_key: `mail:${route}:${auth.userId}`, p_limit: 120, p_window_seconds: 60,
-    })
-    if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
-    if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+    const admission = await enforceCounterRateLimit(`mail:${route}:${auth.userId}`, headers)
+    if (admission) return admission
   }
   const args = { p_action: action, p_request: payload }
   const result = admin

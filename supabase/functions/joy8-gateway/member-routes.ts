@@ -1,7 +1,7 @@
 import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 import { resolveAuthUser } from "./auth.ts"
 import { callRpc, firstRpcRow, statusFromRpcError, toPublicRpcError } from "./rpc.ts"
-import { enforceSubjectRateLimit } from "./rate-limit.ts"
+import { enforceCounterRateLimit, enforceSubjectRateLimit } from "./rate-limit.ts"
 import { jsonResponse, readJsonBody, normalizeRequiredText } from "./http.ts"
 import type { JsonValue } from "./http.ts"
 
@@ -200,11 +200,8 @@ export async function getMemberWallet(request: Request, headers: HeadersInit): P
   const body = await readJsonBody(request)
   if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
   if (Object.keys(body.value).length) return jsonResponse({ error: "JOY8_INVALID_REQUEST" }, 400, headers)
-  const admission = await callRpc("joy8_consume_gateway_rate_limit", {
-    p_key: `wallet:${auth.userId}`, p_limit: 120, p_window_seconds: 60,
-  })
-  if (!admission.ok || typeof admission.body !== "boolean") return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
-  if (!admission.body) return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": "60" })
+  const admission = await enforceCounterRateLimit(`wallet:${auth.userId}`, headers)
+  if (admission) return admission
   const result = await callRpc("joy8_member_wallet_v1", { p_auth_user_id: auth.userId })
   if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
   const wallet = (result.body as { wallet?: JsonValue } | null)?.wallet

@@ -17,7 +17,7 @@ const next = `/entry/?slug=${encodeURIComponent(slug || "")}`
 const service = createMemberService(memberSupabase, {
   origin: location.origin, next,
 })
-const memberFlow = createMemberAuthFlow(service, { isActive: () => !failed && !issued, onRetained: () => showStatus("已保留目前的訪客帳號，沒有合併或轉移任何資料。") })
+const memberFlow = createMemberAuthFlow(service, { isActive: () => !failed && !issued })
 let frame
 let busy = true
 let issued = false
@@ -48,7 +48,7 @@ const handleRequest = createBrandedEntryRequests({
     await enterBrandedMember({ method, service, onGoogle: () => memberFlow.begin("google"),
       onLaunch: () => deliverSession(requestId) })
   },
-  onError: async (error, requestId) => showStatus(error.context ? (await gameFailure(error)).message : memberErrorMessage(error, "google"), true, requestId),
+  onError: async (error, requestId) => showStatus(error.context ? (await gameFailure(error)).message : memberErrorMessage(error), true, requestId),
 })
 
 async function main() {

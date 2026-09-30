@@ -1,4 +1,9 @@
 import "./styles/lobby.css"
-import { initLobbyPage } from "./pages/lobby/index.js"
+import { renderLobbyShell } from "./pages/lobby/lobby.js"
+import { showErrorModal } from "./ui/error-modal.js"
 
-initLobbyPage(document.querySelector("#app"))
+const appRoot = document.querySelector("#app")
+const renderHero = renderLobbyShell(appRoot)
+import("./pages/lobby/index.js")
+  .then(({ initLobbyPage }) => initLobbyPage(appRoot, { renderHero }))
+  .catch(() => showErrorModal({ title: "大廳載入未完成", message: "請重新整理後再試。" }))

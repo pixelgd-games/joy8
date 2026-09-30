@@ -193,12 +193,15 @@ async function handleListClick(event) {
 
   const id = button.dataset.unpublish
   if (!id) return
+  if (button.disabled) return
 
   if (!confirm("確定從大廳下架這個遊戲？遊戲資料與紀錄會保留；此操作不會取消進行中的對局或停用測試入口。")) return
 
-  const { error } = await supabase.from("games").update({ published: false }).eq("id", id)
+  button.disabled = true
+  const { data, error } = await supabase.from("games").update({ published: false }).eq("id", id).select("id").single()
 
-  if (error) {
+  if (error || data?.id !== id) {
+    button.disabled = false
     showErrorModal({
       code: ERROR_CODES.ADMIN_UNPUBLISH_FAILED,
       title: "下架遊戲失敗",

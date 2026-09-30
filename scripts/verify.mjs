@@ -14,7 +14,7 @@ for (const file of files.filter(file => file.endsWith(".mjs"))) {
 
 const checks = [
   ["--test", ...[
-    "google-member-check", "review-hardening-check", "callback-check", "auth-config-check", "mahjong-release-policy-check", "reviewed-cleanup-check", "email-allowlist-check", "build-environment-check", "member-unit-check", "iframe-check", "member-database-check",
+    "frontend-lifecycle-check", "google-member-check", "review-hardening-check", "callback-check", "auth-config-check", "mahjong-release-policy-check", "reviewed-cleanup-check", "email-allowlist-check", "build-environment-check", "member-unit-check", "iframe-check", "member-database-check",
     "public-player-id-check", "public-id-allocation-check", "product-registration-check", "mailbox-database-check", "member-wallet-check",
     "platform-database-check", "continuous-settlement-check", "seamless-wallet-check", "sdk-check", "backend-key-provision-check", "monster-lab-registration-check", "branded-entry-check",
     "private-entry-check", "session-scope-check", "product-ddl-check", "platform-bundle-check", "release-safety-check",

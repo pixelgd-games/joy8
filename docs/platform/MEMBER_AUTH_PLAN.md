@@ -70,7 +70,9 @@ Auth, access/refresh tokens and provider tokens remain platform-owned. Launch
 codes and Gateway tokens are delivered once in memory to the checked iframe.
 
 Successful enrollment dispatches `joy8:membership` containing the member object
-for Lobby presentation. This browser event grants no authorization.
+and `auth_user_id` for Lobby presentation. The Lobby accepts it only for the
+current Auth identity, so a late enrollment response cannot restore another
+account's UI. This browser event grants no authorization.
 
 ## Account Lifecycle
 

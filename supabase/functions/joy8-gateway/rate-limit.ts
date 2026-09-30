@@ -11,20 +11,24 @@ export async function enforceRateLimit(
   const config = route === "health" ? { limit: 30, windowSeconds: 60 } : INGRESS_LIMIT
 
   const clientAddress = getClientAddress(request)
+  return enforceCounterRateLimit(`${route === "health" ? "health" : "ingress"}:${clientAddress}`, headers, config.limit, config.windowSeconds)
+}
+
+export async function enforceCounterRateLimit(key: string, headers: HeadersInit, limit = 120, windowSeconds = 60): Promise<Response | null> {
   const rpcResult = await callRpc("joy8_consume_gateway_rate_limit", {
-    p_key: `${route === "health" ? "health" : "ingress"}:${clientAddress}`,
-    p_limit: config.limit,
-    p_window_seconds: config.windowSeconds,
+    p_key: key,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
   })
 
-  if (!rpcResult.ok) {
+  if (!rpcResult.ok || typeof rpcResult.body !== "boolean") {
     return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
   }
 
   if (rpcResult.body !== true) {
     return jsonResponse({ error: "Too many requests" }, 429, {
       ...headers,
-      "Retry-After": String(config.windowSeconds),
+      "Retry-After": String(windowSeconds),
     })
   }
 

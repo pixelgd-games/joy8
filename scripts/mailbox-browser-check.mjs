@@ -109,7 +109,7 @@ export async function expectMailbox(client, appPort) {
         if (action === "claim") return new Promise(resolve => { state.pending = resolve })
         throw new Error("Unexpected member action")
       }
-      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: { player_account_ref: "fixture-player", public_id: "482731", account_type: "registered" } }))
+      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: { auth_user_id: user.id, player_account_ref: "fixture-player", public_id: "482731", account_type: "registered" } }))
       for (let i = 0; i < 40 && $("[data-wallet]").textContent !== "1,200"; i++) await wait(25)
       check(document.documentElement.dataset.auth === "member", "Member state did not apply")
       check($("[data-wallet]").textContent === "1,200", "Wallet balance was not shown")

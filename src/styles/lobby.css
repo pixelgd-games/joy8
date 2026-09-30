@@ -1,4 +1,6 @@
 @import "./tokens.css";
+@import "./lobby-pc.css";
+@import "./lobby-mobile.css";
 
 :root{
   --font-family:"Noto Sans TC",system-ui,-apple-system,sans-serif;
@@ -65,7 +67,6 @@ svg{flex:none}
 .account[aria-expanded="true"]{border-color:var(--primary);background:var(--surface-2)}
 .account__avatar,.profile__avatar{flex:none;border-radius:50%;display:grid;place-items:center;font-weight:900;color:#fff;background:linear-gradient(135deg,var(--primary),var(--hot))}
 .account__avatar{width:34px;height:34px;font-size:14px}
-.account__meta{display:flex;align-items:center}
 .account__name{font-weight:700;font-size:14px;white-space:nowrap}
 
 .profile{z-index:70;padding:18px;border-radius:18px;background:var(--surface);border:1px solid var(--border-strong);box-shadow:0 24px 60px rgba(0,0,0,.55);animation:pop .2s ease}

@@ -145,6 +145,8 @@ Vite declares these entries in `vite.config.js`.
 | `src/lib/supabaseClient.js` | Shared browser Supabase client |
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
 | `src/member/` | H5 member UI and testable authentication flow |
+| `src/member/state.js` | Member identity transitions, duplicate-event suppression and stale-response isolation |
+| `src/lib/request.js` | Browser API deadline covering connection and response-body reads |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
 | `src/styles/` | Shared tokens plus theme, Lobby (`lobby.css`, `lobby-pc.css`, `lobby-mobile.css`), Loader, error-modal and the plain light Admin stylesheet (`admin.css`) shared by every admin page |
@@ -170,13 +172,19 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 
 1. `index.html` is the only Lobby page. When it opens, `src/pages/lobby/layout.js`
    reads the browser's mobile hint (User-Agent Client Hints, else the
-   User-Agent) and loads either the PC or the mobile layout on the same URL; it
+   User-Agent) and selects either the PC or the mobile layout on the same URL; it
    never redirects, so `/?play=` and the `/account/` return keep working.
    PC: fixed top bar, left promotion/notice column, 1600 x 480 hero carousel,
    one 「全部遊戲」 grid and a fixed bottom bar with the footer links, the POINT
    notice and social links. Mobile: one-row top bar,
    full-width 2:1 hero carousel, notice ticker, three-column grid, floating
    daily-reward button and footer social links.
+   Both layouts' scoped CSS ships with the initial stylesheet. The Lobby shell
+   and first hero image render independently of the member/catalog client;
+   the build preloads that module's static dependencies in parallel. Controls
+   become interactive once the client event handlers are installed.
+   Later hero images load on navigation or after the current image has loaded;
+   catalog completion preserves the existing first image.
 2. The Lobby reads published games from `public_games_v1`. Browsing does not
    require login. Cards and hero game slides come from that catalog; a hero game
    slide is shown only while its game is published. Missing covers show the game
@@ -193,6 +201,13 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    `mailbox` Gateway route: opening a mail marks it read, and 「領取 POINT」 is a
    separate explicit claim. Visitors are sent to the member dialog instead.
    Sign-out clears the displayed mail and balance.
+   Identity changes immediately clear the previous player's mail and balance;
+   late responses cannot restore them. Repeated same-user sign-in events do not
+   reload membership, wallet and mailbox. Token refresh and user updates still
+   revalidate membership. Opening mail can reuse the first page fetched for the
+   unread badge for up to 30 seconds; reading, claiming and identity changes
+   invalidate that cache. A failed next-page read retains existing rows and
+   retries the same offset.
 6. The gear opens 設定, a right-side drawer on PC and a bottom sheet on mobile.
    The sound switches and the language choice are display-only: switches reset
    on reload and English only shows a notice. The account section is visible
@@ -269,6 +284,10 @@ successful record loading. Failed reads cannot enable saving; an in-flight save
 blocks duplicate submissions and a rejected save permits an explicit retry.
 
 The front end does not write player, wallet, match, settlement, or session tables directly.
+Catalog edits and unpublish operations require one returned row before reporting
+success. Browser API fetches have a 15-second deadline through body completion;
+the deadline does not imply that a timed-out write was rolled back. Explicit
+mail retries retain the original message/request identity.
 
 ## Gateway
 
@@ -415,6 +434,12 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 
 These tests use synthetic data. They do not prove hosted Auth, real provider
 interaction, production capacity or backup restoration.
+
+Frontend lifecycle checks cover switched identities, stale responses, duplicate
+member reads and request cancellation. Browser smoke additionally covers mailbox
+pagination recovery. Most component fixtures run on Vite; the optimized build
+also exercises lazy sign-in, member read/claim/wallet refresh and Loader handoff
+under production CSP with isolated API and game fixtures.
 
 `npm run smoke:gateway` checks hosted health and rejection paths. It creates no
 business data but changes rate counters; hosted execution requires

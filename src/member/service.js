@@ -47,13 +47,24 @@ export function memberErrorMessage(error) {
 export function createMemberService(client, { origin, next = "/" } = {}) {
   const returnPath = safeReturnPath(next, origin)
   const callbackUrl = `${origin}${accountPath(returnPath, origin)}&flow=signin&provider=google`
+  let pendingMember = null
 
   async function session() {
     return checked(await client.auth.getSession()).session
   }
 
   async function membership(enroll = false) {
-    if (!(await session())) return null
+    const current = await session()
+    if (!current) return null
+    if (enroll) return requestMembership(true, current.user.id)
+    if (pendingMember && pendingMember.userId === current.user.id) return pendingMember.request
+    const request = requestMembership(false)
+    pendingMember = { userId: current.user.id, request }
+    try { return await request }
+    finally { if (pendingMember?.request === request) pendingMember = null }
+  }
+
+  async function requestMembership(enroll, authUserId = null) {
     const result = await client.functions.invoke(`joy8-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
     if (result.error) {
       if (result.error.context?.status === 429) throw Object.assign(new Error("Member request rate limited"), { code: "over_request_rate_limit", context: result.error.context })
@@ -68,8 +79,9 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     }
     const member = result.data?.member ?? null
     if (enroll && !member) throw new Error("Enrollment returned no member")
+    if (enroll && (await session())?.user.id !== authUserId) throw new Error("Member identity changed")
     if (enroll && member && typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: member }))
+      window.dispatchEvent(new CustomEvent("joy8:membership", { detail: { ...member, auth_user_id: authUserId } }))
     }
     return member
   }

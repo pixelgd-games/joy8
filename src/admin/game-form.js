@@ -148,8 +148,8 @@ async function submitForm(e) {
       }
     }
     if (gameId) {
-      const { error } = await supabase.from("games").update(payload).eq("id", gameId)
-      if (error) {
+      const { data, error } = await supabase.from("games").update(payload).eq("id", gameId).select("id").single()
+      if (error || data?.id !== gameId) {
         showSaveError("更新遊戲失敗", error)
         return
       }

@@ -13,12 +13,32 @@ const canonicalHostRedirect = {
   },
 }
 
+const lobbyPreload = {
+  name: "joy8-lobby-preload",
+  transformIndexHtml: {
+    order: "post",
+    handler(html, { path, bundle, chunk }) {
+      if (path !== "/index.html" || !bundle || !chunk) return
+      const files = new Set()
+      const visit = file => {
+        if (files.has(file)) return
+        files.add(file)
+        for (const dependency of bundle[file]?.imports ?? []) visit(dependency)
+      }
+      for (const file of chunk.dynamicImports) visit(file)
+      return [...files].filter(file => !html.includes(`"/${file}"`)).map(file => ({
+        tag: "link", attrs: { rel: "modulepreload", crossorigin: "", href: `/${file}` }, injectTo: "head",
+      }))
+    },
+  },
+}
+
 export default defineConfig(({ command, mode }) => {
   if (command === "build") validateBuildEnvironment(loadEnv(mode, process.cwd(), "VITE_"), {
     smoke: mode === "smoke", cloudflare: process.env.CF_PAGES === "1",
   })
   return {
-    plugins: [canonicalHostRedirect],
+    plugins: [canonicalHostRedirect, lobbyPreload],
     build: {
       outDir: mode === "smoke" ? ".smoke-dist.local" : "dist",
       rollupOptions: {

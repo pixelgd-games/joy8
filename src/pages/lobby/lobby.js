@@ -1,5 +1,7 @@
 import { ICON_SPRITE, icon } from "./icons.js"
-import { NOTICES, PROMO, SOCIAL } from "./content.js"
+import { HERO_SLIDES, NOTICES, PROMO, SOCIAL } from "./content.js"
+import { detectLayout } from "./layout.js"
+import { createHero } from "./hero.js"
 
 const brand = `<a class="brand" href="/" data-action="home" aria-label="Joy8 大廳">JOY<span>8</span></a>`
 const loginButton = `<button class="btn btn--primary guest-only member-login-link" type="button" data-action="login" aria-haspopup="dialog" aria-controls="member-dialog">登入</button>`
@@ -29,6 +31,18 @@ export function noticeMarkup(notice) {
 
 export function renderLobby(layout) {
   return ICON_SPRITE + (layout === "mobile" ? mobileMarkup() : pcMarkup())
+}
+
+export function renderLobbyShell(appRoot) {
+  appRoot.inert = true
+  appRoot.setAttribute("aria-busy", "true")
+  const layout = detectLayout()
+  document.documentElement.dataset.layout = layout
+  document.documentElement.dataset.auth = "guest"
+  appRoot.innerHTML = renderLobby(layout)
+  const renderHero = createHero(appRoot, layout)
+  renderHero(HERO_SLIDES.filter(slide => !slide.play))
+  return renderHero
 }
 
 function pcMarkup() {

@@ -1,10 +1,9 @@
 import { fetchPublicGames } from "./data.js"
 import { getDisplayName, getGameCover, renderGameGrid, renderGameGridError } from "./game-grid.js"
-import { noticeMarkup, renderLobby } from "./lobby.js"
-import { detectLayout } from "./layout.js"
-import { createHero } from "./hero.js"
+import { noticeMarkup, renderLobbyShell } from "./lobby.js"
 import { createMemberMenu } from "./member-menu.js"
-import { createMailSheet, formatPoint } from "./mail-sheet.js"
+import { createMailSheet } from "./mail-sheet.js"
+import { formatPoint } from "../../lib/format.js"
 import { createSettingsSheet } from "./settings-sheet.js"
 import { HERO_SLIDES, NOTICES, PLACEHOLDERS } from "./content.js"
 import { buildGameUrl } from "./utils.js"
@@ -14,25 +13,15 @@ import { createGameEntry } from "../../member/game-entry.js"
 import { memberSupabase } from "../../lib/memberClient.js"
 import { readEntryParams } from "../../member/callback.js"
 import { createMailboxService } from "../../mailbox/service.js"
+import { createMemberState } from "../../member/state.js"
 
-const layoutStyles = {
-  pc: () => import("../../styles/lobby-pc.css"),
-  mobile: () => import("../../styles/lobby-mobile.css"),
-}
-
-export async function initLobbyPage(appRoot) {
+export async function initLobbyPage(appRoot, { renderHero = null } = {}) {
   if (!appRoot) return
-
-  const layout = detectLayout()
-  document.documentElement.dataset.layout = layout
-  document.documentElement.dataset.auth = "guest"
-  await layoutStyles[layout]().catch(() => {})
-  appRoot.innerHTML = renderLobby(layout)
-
-  const renderHero = createHero(appRoot, layout)
-  renderHero(HERO_SLIDES.filter((slide) => !slide.play))
+  renderHero ??= renderLobbyShell(appRoot)
   setupTicker(appRoot)
   const lobby = setupMember(appRoot)
+  appRoot.inert = false
+  appRoot.removeAttribute("aria-busy")
 
   const entryParams = readEntryParams(location, history)
   const memberMode = ["open", "callback"].includes(entryParams.get("member")) ? entryParams.get("member") : null
@@ -75,7 +64,6 @@ function setupMember(appRoot) {
   const toast = createToast(appRoot, appRoot.querySelector("[data-toast]"))
   const loginButton = appRoot.querySelector(".member-login-link")
   const games = new Map()
-  let accountRevision = 0
   let walletRevision = 0
   let walletFrame = 0
   let publicId = ""
@@ -146,44 +134,28 @@ function setupMember(appRoot) {
     void mail.refreshUnread()
   }
 
-  const refreshAccount = (session, knownMember = null) => {
-    const revision = ++accountRevision
-    const user = session?.user
-    if (!user) {
-      applyGuest()
-      return
-    }
-    if (knownMember?.public_id) {
-      applyMember(user, knownMember)
-      return
-    }
-    loginButton.setAttribute("aria-busy", "true")
-    setTimeout(async () => {
-      try {
-        const member = await service.membership()
-        if (revision !== accountRevision) return
-        if (member?.public_id) applyMember(user, member)
-        else applyGuest()
-      } catch {
-        if (revision === accountRevision) applyGuest()
-      }
-    }, 0)
-  }
+  const account = createMemberState({
+    readMember: () => service.membership(),
+    onReset: applyGuest,
+    onMember: applyMember,
+    onPending: () => loginButton.setAttribute("aria-busy", "true"),
+  })
 
   const enterGame = createGameEntry({
     origin: location.origin,
-    membership: () => service.membership(),
+    membership: () => account.member ? Promise.resolve(account.member) : service.membership(),
     openMember: async (...args) => {
       const { openMemberModal } = await import("../../member/modal.js")
       await openMemberModal(...args)
     },
     navigate: (path) => location.assign(path),
   })
-  memberSupabase.auth.onAuthStateChange((_event, session) => {
-    refreshAccount(session)
+  memberSupabase.auth.onAuthStateChange((event, session) => {
+    void account.update(session, null, event === "TOKEN_REFRESHED" || event === "USER_UPDATED")
   })
   window.addEventListener("joy8:membership", async (event) => {
-    refreshAccount(await service.session(), event.detail)
+    const session = await service.session()
+    if (session?.user.id === event.detail.auth_user_id) void account.update(session, event.detail)
   })
 
   const openEntry = async (trigger, next, game) => {

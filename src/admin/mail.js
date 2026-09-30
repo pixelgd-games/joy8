@@ -1,7 +1,8 @@
 import "../styles/admin.css"
 import { supabase } from "../lib/supabaseClient.js"
 import { requireAdmin, signOut } from "./auth.js"
-import { createMailboxService, formatDate, formatPoints, mailAudiences, mailKinds, mailStatuses, renderMailDetail, textElement } from "../mailbox/service.js"
+import { createMailboxService, mailAudiences, mailKinds, mailStatuses } from "../mailbox/service.js"
+import { formatDate, formatPoints, renderMailDetail, textElement } from "../mailbox/view.js"
 
 const $ = selector => document.querySelector(selector)
 const form = $("#compose")

@@ -1,5 +1,6 @@
 import { mailKinds } from "../../mailbox/service.js"
 import { icon } from "./icons.js"
+import { formatPoint } from "../../lib/format.js"
 
 const PAGE_SIZE = 20
 const KIND_STYLE = {
@@ -9,7 +10,6 @@ const KIND_STYLE = {
   notification: { icon: "bell", tone: "muted" },
 }
 
-export const formatPoint = value => Number(value).toLocaleString("en-US", { maximumFractionDigits: 2 })
 const formatDay = value => value ? new Date(value).toLocaleDateString("zh-TW", { year: "numeric", month: "2-digit", day: "2-digit" }) : "—"
 
 export function createMailSheet({ api, toast, onUnread, onClaimed }) {
@@ -42,6 +42,18 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
   let hasMore = false
   let revision = 0
   let busy = false
+  let loading = false
+  let firstPage = null
+  let pendingPage = null
+
+  function readFirstPage() {
+    if (!pendingPage) {
+      const request = api("list", { offset: 0 })
+      pendingPage = request
+      void request.finally(() => { if (pendingPage === request) pendingPage = null }).catch(() => {})
+    }
+    return pendingPage
+  }
 
   const setUnread = (count) => {
     unread = Math.max(0, Number(count) || 0)
@@ -91,7 +103,10 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
   }
 
   async function load(append = false) {
+    if (loading || busy) return
+    loading = true
     const current = ++revision
+    const nextOffset = append ? offset + PAGE_SIZE : 0
     if (!append) {
       offset = 0
       mails = []
@@ -101,16 +116,25 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
     }
     more.hidden = true
     try {
-      const result = await api("list", { offset })
+      const result = append ? await api("list", { offset: nextOffset })
+        : firstPage && Date.now() - firstPage.at < 30000 ? firstPage.result : await readFirstPage()
       if (current !== revision) return
+      offset = nextOffset
+      if (!append) firstPage = { result, at: Date.now() }
       const items = Array.isArray(result.items) ? result.items : []
       mails = mails.concat(items.slice(0, PAGE_SIZE))
       hasMore = items.length > PAGE_SIZE
       setUnread(result.unread)
       showList()
+      more.textContent = "載入更多"
     } catch (error) {
       if (current !== revision) return
-      list.replaceChildren(stateNode(error.message))
+      showList()
+      list.append(stateNode(error.message))
+      more.textContent = "重試載入"
+      more.hidden = false
+    } finally {
+      if (current === revision) loading = false
     }
   }
 
@@ -139,6 +163,8 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
           const result = await api("claim", { id: mail.id })
           if (current !== revision) return
           mail.claimed_at = result.claimed_at
+          firstPage = null
+          if (!mail.read_at) setUnread(unread - 1)
           mail.read_at = mail.read_at || result.claimed_at
           claim.className = "btn btn--done"
           claim.textContent = "已領取"
@@ -150,7 +176,7 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
           note.textContent = error.message
           claim.disabled = false
         } finally {
-          busy = false
+          if (current === revision) busy = false
         }
       })
       reward.append(amount, claim)
@@ -168,6 +194,7 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
       api("read", { id: mail.id }).then((result) => {
         if (current !== revision || mail.read_at) return
         mail.read_at = result.read_at
+        firstPage = null
         setUnread(unread - 1)
       }, (error) => {
         if (current === revision && !note.textContent) note.textContent = error.message
@@ -182,8 +209,7 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
     if (control?.dataset.mail === "close") dialog.close()
     if (control?.dataset.mail === "back") showList()
     if (control?.dataset.mail === "more" && !busy) {
-      offset += PAGE_SIZE
-      void load(true)
+      void load(mails.length > 0)
     }
     if (item) {
       const mail = mails.find(entry => entry.id === item.dataset.id)
@@ -204,12 +230,19 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
     async refreshUnread() {
       const current = revision
       try {
-        const result = await api("list", { offset: 0 })
-        if (current === revision) setUnread(result.unread)
+        const result = await readFirstPage()
+        if (current === revision) {
+          firstPage = { result, at: Date.now() }
+          setUnread(result.unread)
+        }
       } catch {}
     },
     reset() {
       ++revision
+      busy = false
+      loading = false
+      firstPage = null
+      pendingPage = null
       mails = []
       hasMore = false
       if (dialog.open) dialog.close()
