@@ -212,7 +212,10 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    The sound switches and the language choice are display-only: switches reset
    on reload and English only shows a notice. The account section is visible
    to members only and its 登出 works. 服務條款, 隱私權政策 and 聯絡客服 only show
-   a notice.
+   a notice. On the mobile layout outside an installed app, 其他 also lists
+   加入桌面: it opens the browser install prompt when the browser offers one,
+   otherwise it shows Chrome/Safari add-to-home-screen steps
+   (`src/pages/lobby/install.js`).
 7. 每日獎勵, 商城, the promotion banner, social links and footer links are
    placeholders that only show a short notice. Hero slides, notices and social
    links are fixed in `src/pages/lobby/content.js`; changing them needs a deploy.

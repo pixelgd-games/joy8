@@ -1,4 +1,5 @@
 import { icon } from "./icons.js"
+import { canOfferInstall, promptInstall } from "./install.js"
 
 export function createSettingsSheet({ toast, onAction }) {
   const dialog = document.createElement("dialog")
@@ -37,6 +38,8 @@ export function createSettingsSheet({ toast, onAction }) {
           <a class="setting-link" href="#" data-setting="link">服務條款${icon("chev")}</a>
           <a class="setting-link" href="#" data-setting="link">隱私權政策${icon("chev")}</a>
           <a class="setting-link" href="#" data-setting="link">聯絡客服${icon("chev")}</a>
+          ${canOfferInstall() ? `<button class="setting-link" type="button" data-setting="install" aria-expanded="false" aria-controls="installHelp">加入桌面${icon("chev")}</button>
+          <p class="setting-help" id="installHelp" hidden>Chrome 請用右上角選單，Safari 請用下方分享按鈕，再選「加入主畫面」。</p>` : ""}
         </section>
       </div>
     </div>`
@@ -56,7 +59,25 @@ export function createSettingsSheet({ toast, onAction }) {
       onAction("logout", control)
     }
     if (action === "link") onAction("link", control)
+    if (action === "install") void install(control)
   })
+
+  async function install(control) {
+    const help = dialog.querySelector("#installHelp")
+    control.disabled = true
+    try {
+      const accepted = await promptInstall()
+      if (accepted) {
+        control.remove()
+        help.remove()
+      } else if (accepted === null) {
+        help.hidden = !help.hidden
+        control.setAttribute("aria-expanded", String(!help.hidden))
+      }
+    } finally {
+      control.disabled = false
+    }
+  }
 
   return {
     open() {

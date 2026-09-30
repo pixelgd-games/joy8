@@ -1,4 +1,5 @@
 import "./styles/lobby.css"
+import "./pages/lobby/install.js"
 import { renderLobbyShell } from "./pages/lobby/lobby.js"
 import { showErrorModal } from "./ui/error-modal.js"
 

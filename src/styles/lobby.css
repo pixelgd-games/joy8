@@ -197,6 +197,9 @@ svg{flex:none}
 .setting-link{display:flex;align-items:center;justify-content:space-between;height:50px;font-size:15px;text-decoration:none;color:var(--text)}
 .setting-link + .setting-link{border-top:1px solid var(--border)}
 .setting-link svg{width:16px;height:16px;color:var(--subtle)}
+button.setting-link{width:100%;padding:0;border:0;border-radius:0;background:none;font:inherit;text-align:left;cursor:pointer}
+.setting-link[aria-expanded="true"] svg{transform:rotate(90deg)}
+.setting-help{margin:0 0 12px;padding:12px 14px;border-radius:12px;background:var(--surface-2);font-size:13px;line-height:1.7;color:var(--muted)}
 .sheet--settings .sheet__body{padding-bottom:12px}
 
 
