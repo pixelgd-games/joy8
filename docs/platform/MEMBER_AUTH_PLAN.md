@@ -74,6 +74,34 @@ and `auth_user_id` for Lobby presentation. The Lobby accepts it only for the
 current Auth identity, so a late enrollment response cannot restore another
 account's UI. This browser event grants no authorization.
 
+### Game Page Return Policy
+
+The public `/game/` Loader requires a matching per-tab visit newer than two
+minutes. Explicit Lobby selection or successful member continuation records the
+slug and current time in `sessionStorage` under `joy8-game-visit-v1`. This is a
+navigation hint only; it carries no identity, credential, launch code or Gateway
+token and grants no backend access. Normal membership and launch checks still run.
+
+A live game page updates this timestamp while visible and when leaving the
+foreground. Switching tabs and returning to that same live document keeps the
+game, even after two minutes. This is not an inactivity logout. A reload, browser
+restoration or history return with a record at least two minutes old goes to the
+plain Lobby before starting another session. History-cache restores check the old
+timestamp before foreground events can renew it. Recent reloads retain the normal
+launch flow; they request a new session rather than reusing credentials.
+
+A direct game URL without a matching record, including a new tab or unavailable
+session storage, also returns to the plain Lobby. The player selects a game there;
+the platform does not carry the stale game into an automatic `?play=` continuation.
+The Google login remains intact when valid. The policy does not sign the player
+out, cancel a match, release reservations or modify game state or settlement.
+Private test and branded entries retain their separate explicit entry flows.
+
+Browsers cannot reliably identify the user's reason for hiding a page. Mobile
+browsers may discard a background tab; if recreated after two minutes, it returns
+to the Lobby. A surviving live page continues. These are observable page-lifecycle
+rules, not a guarantee of distinguishing every app close from a tab switch.
+
 ## Account Lifecycle
 
 Sign-out ends the selected local Auth session without deleting the player,

@@ -36,6 +36,8 @@ export async function expectProductionCsp(client, cwd) {
     window.cspViolations = [];
     document.addEventListener('securitypolicyviolation', event => window.cspViolations.push(event.violatedDirective));
     window.builtFixture = { claims: 0, read: false, claimed: false, handedOff: false };
+    if (location.search.includes('built=stale')) sessionStorage.setItem('joy8-game-visit-v1', JSON.stringify({slug:'built-game',at:Date.now()-120000}));
+    if (location.search.includes('built=missing')) sessionStorage.removeItem('joy8-game-visit-v1');
     window.addEventListener('message', event => {
       if (event.source === document.querySelector('#game iframe')?.contentWindow && event.data?.type === 'built-received' && event.data.protocol === 'server-v1') builtFixture.handedOff = true;
     });
@@ -53,7 +55,10 @@ export async function expectProductionCsp(client, cwd) {
       if (url.pathname === '/auth/v1/user') return Response.json(user);
       if (url.pathname.endsWith('/member')) return Response.json({member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'}});
       if (url.pathname.endsWith('/wallet')) return Response.json({wallet:{balance:builtFixture.claimed?'1500':'1000'}});
-      if (url.pathname.endsWith('/create-session')) return Response.json({session_id:'00000000-0000-4000-8000-000000000003',game_id:'00000000-0000-4000-8000-000000000002',launch_code:'a'.repeat(64),currency:'POINT',protocol:'server-v1'});
+      if (url.pathname.endsWith('/create-session')) {
+        sessionStorage.setItem('built-session-requests', String(Number(sessionStorage.getItem('built-session-requests') || 0)+1));
+        return Response.json({session_id:'00000000-0000-4000-8000-000000000003',game_id:'00000000-0000-4000-8000-000000000002',launch_code:'a'.repeat(64),currency:'POINT',protocol:'server-v1'});
+      }
       if (url.pathname.endsWith('/mailbox')) {
         const {action} = JSON.parse(options.body);
         if (action === 'read') { builtFixture.read = true; return Response.json({read_at:'2026-09-30'}); }
@@ -111,9 +116,20 @@ export async function expectProductionCsp(client, cwd) {
     assert.equal(await evaluate("builtFixture.claims"), 1)
     assert.deepEqual(await evaluate("cspViolations"), [])
 
-    await client.send("Page.navigate", { url: origin + "/game/?slug=built-game" })
+    await evaluate("document.querySelector('.sheet--mail [data-mail=close]').click(); sessionStorage.setItem('built-session-requests', '0'); document.querySelector('#gameGrid [data-play=built-game]').click()")
     await until("window.builtFixture?.handedOff && !document.querySelector('#loading')")
     assert.equal(await evaluate("new URL(document.querySelector('#game iframe').src).search"), "")
+    assert.equal(await evaluate("sessionStorage.getItem('built-session-requests')"), "1")
+    await client.send("Page.reload")
+    await until("window.builtFixture?.handedOff && !document.querySelector('#loading') && sessionStorage.getItem('built-session-requests') === '2'")
+    for (const state of ["stale", "missing"]) {
+      await client.send("Page.navigate", { url: origin + `/game/?slug=built-game&built=${state}` })
+      await until("location.pathname === '/' && location.search === '' && document.querySelector('[data-wallet]')?.textContent === '1,000'")
+      assert.equal(await evaluate("sessionStorage.getItem('built-session-requests')"), "2")
+      assert.equal(await evaluate("document.querySelectorAll('iframe, #member-dialog[open]').length"), 0)
+    }
+    await evaluate("document.querySelector('#gameGrid [data-play=built-game]').click()")
+    await until("window.builtFixture?.handedOff && sessionStorage.getItem('built-session-requests') === '3'")
     assert.deepEqual(await evaluate("cspViolations"), [])
     await evaluate("localStorage.removeItem('joy8-member-auth-v1')")
     const result = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `new Promise(resolve => {
@@ -122,7 +138,7 @@ export async function expectProductionCsp(client, cwd) {
     })` })
     assert.equal(result.result.value.executed, false)
     assert.ok(result.result.value.violations.some(value => value.startsWith("script-src")))
-    console.log("OK Built Lobby/Admin, lazy sign-in, member mailbox claim and Loader handoff work under CSP; inline script injection is blocked")
+    console.log("OK Built Lobby/Admin, lazy sign-in, mailbox claim, explicit game entry and recent reload work under CSP; stale/missing visits return without a session; inline scripts are blocked")
   } finally {
     await client.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: injected.identifier })
     server.closeAllConnections()

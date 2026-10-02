@@ -2,6 +2,7 @@ import { createMemberAuthFlow } from "./auth-flow.js"
 import "./account.css"
 import { memberSupabase } from "../lib/memberClient.js"
 import { createMemberService, memberErrorMessage } from "./service.js"
+import { prepareGameEntry } from "./game-visit.js"
 
 export function initMemberPanel(root, options = {}) {
   const $ = (id) => root.querySelector(`#${id}`)
@@ -109,6 +110,7 @@ export function initMemberPanel(root, options = {}) {
 
   function continuePlaying() {
     if (disposed) return
+    prepareGameEntry(service.returnPath)
     if (options.onContinue) options.onContinue(service.returnPath)
     else location.assign(service.returnPath)
   }

@@ -86,9 +86,11 @@ automatically or replace this authoritative wire specification.
 ## Joy8 Launch Flow
 
 1. A player opens `/game/?slug=<slug>`.
-   The Lobby checks membership before navigating there. Missing member
-   session/enrollment on a direct link returns to `/?play=<slug>`, where the
-   published game is selected and the shared member dialog opens over the Lobby.
+   The Lobby checks membership and records the explicit entry before navigating
+   there. The Loader applies the per-tab
+   [game-page return policy](MEMBER_AUTH_PLAN.md#game-page-return-policy) before
+   creating a session. A missing or stale visit returns to the plain Lobby.
+   A recent visit with missing member session/enrollment returns to `/?play=<slug>`.
    Entry UX and cancellation rules belong to `MEMBER_AUTH_PLAN.md`.
 2. The Loader reads the published game from `public_games_v1`.
 3. It normalizes the `launch_url`. Root-relative platform paths and HTTPS URLs are accepted. HTTP is accepted only between loopback hosts during local development.

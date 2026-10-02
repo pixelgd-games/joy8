@@ -4,11 +4,16 @@ import { normalizeLaunchUrl } from "../../lib/urls.js"
 import { lobbyGamePath, createMemberService } from "../../member/service.js"
 import { renderLoader, mountSession, failedGame, showGameError } from "./loader.js"
 import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
+import { trackGameVisit } from "../../member/game-visit.js"
 
-renderLoader()
 async function main() {
   const slug = new URLSearchParams(location.search).get("slug")
   if (!GAME_SLUG_PATTERN.test(slug || "")) return showGameError({ code: "JOY8-GAME-001", title: "缺少有效遊戲代碼", message: "請從遊戲列表重新進入。" })
+  if (!trackGameVisit(slug)) {
+    location.replace("/")
+    return
+  }
+  renderLoader()
   const service = createMemberService(memberSupabase, { origin: location.origin })
   const [member, { data: game, error }] = await Promise.all([
     service.membership(),

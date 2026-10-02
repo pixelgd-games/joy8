@@ -146,6 +146,7 @@ Vite declares these entries in `vite.config.js`.
 | `src/lib/memberClient.js` | Separate member Auth session and Gateway client |
 | `src/member/` | H5 member UI and testable authentication flow |
 | `src/member/state.js` | Member identity transitions, duplicate-event suppression and stale-response isolation |
+| `src/member/game-visit.js` | Per-tab game-entry recency and return-to-Lobby handling |
 | `src/lib/request.js` | Browser API deadline covering connection and response-body reads |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
@@ -222,9 +223,13 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 
 ### Game Launch
 
-1. The Loader reads `slug` from the URL. A direct link without member
-   session/enrollment redirects to `/?play=<slug>`, where the Lobby validates the
-   published game and opens the member dialog. Backend failures stop launch visibly.
+1. The Loader reads `slug` from the URL and requires a matching recent entry or
+   visit in that tab. A missing or two-minute-old record returns to `/` before
+   catalog/member reads, session creation or iframe loading. Lobby selection and
+   successful member continuation establish a fresh entry. See the
+   [return policy](docs/platform/MEMBER_AUTH_PLAN.md#game-page-return-policy).
+   A recent entry without member session/enrollment redirects to `/?play=<slug>`;
+   backend failures stop launch visibly.
 2. It loads the matching published game from `public_games_v1`.
 3. It normalizes `launch_url` as an HTTPS URL or a root-relative platform path. HTTP is accepted only between loopback hosts during local development.
 4. It calls `joy8-gateway/create-session` with only the game slug.
@@ -439,10 +444,11 @@ These tests use synthetic data. They do not prove hosted Auth, real provider
 interaction, production capacity or backup restoration.
 
 Frontend lifecycle checks cover switched identities, stale responses, duplicate
-member reads and request cancellation. Browser smoke additionally covers mailbox
-pagination recovery. Most component fixtures run on Vite; the optimized build
-also exercises lazy sign-in, member read/claim/wallet refresh and Loader handoff
-under production CSP with isolated API and game fixtures.
+member reads, request cancellation and game-page return timing. Browser smoke
+additionally covers mailbox pagination recovery. Most component fixtures run on
+Vite; the optimized build also exercises lazy sign-in, member read/claim/wallet refresh and Loader handoff
+under production CSP with isolated API and game fixtures, including recent game
+reloads and stale/missing visits returning without creating another game session.
 
 `npm run smoke:gateway` checks hosted health and rejection paths. It creates no
 business data but changes rate counters; hosted execution requires

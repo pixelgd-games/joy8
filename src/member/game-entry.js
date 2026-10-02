@@ -1,4 +1,5 @@
 import { safeReturnPath } from "./service.js"
+import { prepareGameEntry } from "./game-visit.js"
 
 export function createGameEntry({ origin, membership, openMember, navigate }) {
   let pending = false
@@ -14,8 +15,10 @@ export function createGameEntry({ origin, membership, openMember, navigate }) {
         return
       }
       const member = await membership()
-      if (member) navigate(path)
-      else await openMember(trigger, { next: path, gameName, cover })
+      if (member) {
+        prepareGameEntry(path)
+        navigate(path)
+      } else await openMember(trigger, { next: path, gameName, cover })
     } finally {
       pending = false
       trigger?.removeAttribute("aria-busy")

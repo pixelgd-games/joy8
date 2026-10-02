@@ -726,7 +726,11 @@ async function expectGameSelection(client, appPort) {
   await waitForText(client, (text) => text.includes("目前無法完成操作"), "Top-bar provider fixture")
   const headerTarget = await client.send("Runtime.evaluate", { returnByValue: true, expression: 'new URL(window.smokeCallback).searchParams.get("next")' })
   if (headerTarget.result.value !== "/") throw new Error("Top-bar login retained a cancelled game")
-  await expectPageText(client, appPort, games[1].path, (text) => text.includes(`遊玩《${games[1].name}》`) && text.includes("白名單"), "Direct game link returns to the Lobby login dialog")
+  await expectPageText(client, appPort, games[1].path, text => text.includes("全部遊戲") && !text.includes("遊玩《"), "Game URL without a recent entry returns to the plain Lobby")
+  const plainLobby = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname === '/' && location.search === '' && !document.querySelector('#member-dialog[open]')" })
+  if (!plainLobby.result.value) throw new Error("Missing game visit retained an automatic game continuation")
+  await client.send("Runtime.evaluate", { awaitPromise: true, expression: `import('/src/member/game-visit.js').then(({prepareGameEntry}) => prepareGameEntry(${JSON.stringify(games[1].path)}))` })
+  await expectPageText(client, appPort, games[1].path, (text) => text.includes(`遊玩《${games[1].name}》`) && text.includes("白名單"), "Recent game entry without membership returns to the Lobby login dialog")
   const deepLinkPath = await client.send("Runtime.evaluate", { returnByValue: true, expression: "location.pathname + location.search" })
   if (deepLinkPath.result.value !== "/") throw new Error("Direct link did not clear the pending game URL")
   await client.send("Runtime.evaluate", { expression: 'document.querySelector(".member-dialog-close").click(); localStorage.removeItem("joy8-smoke-catalog")' })
@@ -835,7 +839,7 @@ async function expectMemberContinuation(client) {
         const retiredFlowRejected = retired.root.querySelector("#account-status").dataset.error === "true"
           && retired.root.querySelector("#account-status").textContent.includes("目前無法完成操作")
         retired.panel.dispose()
-        return { paths, retiredFlowRejected, guestAbsent }
+        return { paths, retiredFlowRejected, guestAbsent, visit: JSON.parse(sessionStorage.getItem('joy8-game-visit-v1')) }
       } finally {
         for (const panel of panels) panel.dispose()
         for (const root of roots) root.remove()
@@ -847,7 +851,7 @@ async function expectMemberContinuation(client) {
   })
   const expectedPaths = ["/game/?slug=callback-game"]
   const value = result.result.value
-  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.guestAbsent) {
+  if (result.exceptionDetails || JSON.stringify(value?.paths) !== JSON.stringify(expectedPaths) || !value?.retiredFlowRejected || !value?.guestAbsent || value?.visit?.slug !== "callback-game") {
     throw new Error(`Member continuation fixture failed: ${JSON.stringify(result)}`)
   }
   console.log("OK Google callback continuation, guest entry absent, invalid callbacks fail closed")
