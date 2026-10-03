@@ -52,8 +52,8 @@ POINT rules belong in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-
 
 Mahjong Clash (`D:/Studio/Project-Gaming/production/table/products/mahjong-clash`)
 has a published catalog entry, a 25-table private `mahjong_clash` schema, a
-registered accounting adapter and full-balance table reservation without a
-`max_reserve_amount` cap. The 100,000,000-POINT payout safety ceiling and reviewed
+registered accounting adapter and capped reservation of each human's maximum
+one-hand loss (300 to 10,000 POINT). The 100,000,000-POINT payout safety ceiling and reviewed
 financial key scopes are active. Its localhost private entry remains disabled.
 The production URL is `https://mahjong-clash.pages.dev/`; the local authority
 connects through the Windows Tunnel service at `wss://mahjong-clash.joy8.cc/`.

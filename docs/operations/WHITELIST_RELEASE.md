@@ -109,7 +109,7 @@ Do not change provider switches, other hooks or tokens for this task.
 confirmed the retained administrator and zero player/accounting rows immediately
 after cleanup. New real membership has since created player/wallet/session rows;
 do not repeat cleanup. Three immutable-ledger triggers remain enabled. The policy
-uses full-balance without a reserve cap and a 100,000,000-POINT safety ceiling;
+uses capped reservations of 300 to 10,000 POINT and a 100,000,000-POINT safety ceiling;
 the key has all six reviewed scopes. Monster Lab D1 was not touched.
 The hosted CLI cannot SET ROLE to `supabase_auth_admin` or directly execute the
 private hook; its grants were not broadened to enable a probe.
@@ -147,10 +147,10 @@ Vendor contract: [Before User Created Hook](https://supabase.com/docs/guides/aut
 
 ## Mahjong activation dependencies
 
-The hosted policy has `max_payout_amount=100000000` and no `max_reserve_amount`
-cap. The user selected 100,000,000 POINT, matching Monster
-Lab's round safety limit. Mahjong caps each payer's payment at its balance
-(zero-floor cap); AI reserves its full balance, which can grow with results.
+The hosted policy has `max_payout_amount=100000000` and capped reservations of
+300 to 10,000 POINT. The user selected 100,000,000 POINT, matching Monster
+Lab's round safety limit. Mahjong caps each payer's payment at its seat's
+reserved amount (zero-floor cap); AI reserves its full balance, which can grow with results.
 The value is a mistake-prevention ceiling, not an intended bet or award.
 The payout migration changed only that field and rejected changed policy/adapter
 state. Key activation required this reviewed ceiling before expanding the existing
