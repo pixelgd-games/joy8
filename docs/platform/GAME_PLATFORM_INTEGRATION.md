@@ -362,6 +362,15 @@ delivery fails, the new database key is revoked; rotation revokes the specifical
 selected old key and registers the new key in one transaction, so two keys for
 the game are never active together.
 
+Baccarat's approved Windows host uses the scoped
+`scripts/supabase-joy8.cmd baccarat-host-provision --apply` operator instead of
+Worker delivery. It reuses the same credential factory and hash-registration
+SQL, creates only the restricted Baccarat database login, and delivers its
+runtime configuration through stdin to current-user Windows DPAPI. The local
+directory is limited to that user and SYSTEM. It refuses existing credentials;
+it cannot silently rotate or expand another game's access. Ordinary SQL and this
+host provisioning are covered by the user's deployment authorization.
+
 This direct path is used only when the operator is authorized for the provider
 backend. An external provider receives the same platform-generated value through
 an approved one-time secret channel and installs it in its own secret manager;

@@ -100,6 +100,9 @@
     "20260927123000_publish_mahjong_clash.sql": "Hosted Mahjong catalog activation at the verified Pages URL; synthetic fixtures keep games unpublished.",
     "20260927124000_mahjong_clash_cover.sql": "Hosted Mahjong cover metadata; synthetic fixtures use their own catalog assets.",
     "20261003100000_mahjong_max_loss_reservation.sql": "Hosted Mahjong capped-policy switch with product accounting functions; fresh Mahjong fixtures install the current product SQL and policy.",
-    "20261003101000_mahjong_hosted_schema_alignment.sql": "Product-owned forward alignment of accounting functions and trigger permission; fresh Mahjong fixtures install the current product SQL."
+    "20261003101000_mahjong_hosted_schema_alignment.sql": "Product-owned forward alignment of accounting functions and trigger permission; fresh Mahjong fixtures install the current product SQL.",
+    "20261003110000_baccarat_registration.sql": "Baccarat hosted catalog, policy and private entry; no shared runtime change.",
+    "20261003111000_baccarat_product_state.sql": "Private Baccarat product schema; installed by its own provider tests.",
+    "20261003112000_baccarat_tables.sql": "Baccarat operator table bindings and limits; no shared runtime change."
   }
 }

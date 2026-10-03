@@ -98,6 +98,11 @@ if ($SupabaseArgs[0] -eq "recovery-snapshot") {
   exit $LASTEXITCODE
 }
 
+if ($SupabaseArgs[0] -eq "baccarat-host-provision") {
+  & node (Join-Path $PSScriptRoot "baccarat-host-provision.mjs") @($SupabaseArgs | Select-Object -Skip 1)
+  exit $LASTEXITCODE
+}
+
 if ($SupabaseArgs.Count -ge 2 -and $SupabaseArgs[0] -eq "auth-config") {
   & node (Join-Path $PSScriptRoot "auth-config-joy8.mjs") @($SupabaseArgs | Select-Object -Skip 1)
   exit $LASTEXITCODE
