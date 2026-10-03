@@ -103,6 +103,7 @@
     "20261003101000_mahjong_hosted_schema_alignment.sql": "Product-owned forward alignment of accounting functions and trigger permission; fresh Mahjong fixtures install the current product SQL.",
     "20261003110000_baccarat_registration.sql": "Baccarat hosted catalog, policy and private entry; no shared runtime change.",
     "20261003111000_baccarat_product_state.sql": "Private Baccarat product schema; installed by its own provider tests.",
-    "20261003112000_baccarat_tables.sql": "Baccarat operator table bindings and limits; no shared runtime change."
+    "20261003112000_baccarat_tables.sql": "Baccarat operator table bindings and limits; no shared runtime change.",
+    "20261003113000_baccarat_publication.sql": "Baccarat catalog publication and existing key/policy review; no shared runtime change."
   }
 }
