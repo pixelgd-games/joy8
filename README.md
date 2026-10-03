@@ -40,7 +40,8 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   member's balance display still needs hosted player acceptance.
 - Hosted catalog administration and Lobby-to-Mahjong launch have scoped manual
   coverage. Hosted acceptance remains open for successful enabled independent
-  entry, a newly played Mahjong hand, production capacity and managed recovery.
+  entry, production capacity and managed recovery. A real Mahjong hand has
+  settled through the capped reservation.
   See [verification boundaries](docs/operations/KNOWN_ISSUES.md#test-gaps).
 
 ## Current Scope
