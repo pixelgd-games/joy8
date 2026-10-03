@@ -98,6 +98,8 @@
     "20260927121000_mahjong_reviewed_key_scopes.sql": "Reviewed hosted key scope activation; synthetic key fixture tests the same SQL.",
     "20260927122000_allow_johnny_google.sql": "User-authorized hosted email allowlist entry; synthetic fixtures use example.test identities.",
     "20260927123000_publish_mahjong_clash.sql": "Hosted Mahjong catalog activation at the verified Pages URL; synthetic fixtures keep games unpublished.",
-    "20260927124000_mahjong_clash_cover.sql": "Hosted Mahjong cover metadata; synthetic fixtures use their own catalog assets."
+    "20260927124000_mahjong_clash_cover.sql": "Hosted Mahjong cover metadata; synthetic fixtures use their own catalog assets.",
+    "20261003100000_mahjong_max_loss_reservation.sql": "Hosted Mahjong capped-policy switch with product accounting functions; fresh Mahjong fixtures install the current product SQL and policy.",
+    "20261003101000_mahjong_hosted_schema_alignment.sql": "Product-owned forward alignment of accounting functions and trigger permission; fresh Mahjong fixtures install the current product SQL."
   }
 }

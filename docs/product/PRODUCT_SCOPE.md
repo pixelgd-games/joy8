@@ -143,8 +143,9 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   match. That reservation is not a single bet and is not limited by the 10,000
   POINT ceiling. For such a game the minimum bet is the minimum available
   balance required to join the table.
-- Mahjong Clash uses full-balance reservations with no reserve cap and a
-  100,000,000-POINT payout safety ceiling. Its game server enforces
+- Mahjong Clash reserves each human's maximum one-hand loss with capped
+  reservations of 300 to 10,000 POINT, and has a 100,000,000-POINT payout
+  safety ceiling. Its game server enforces
   low/middle/high table thresholds of 300/800/3,000 POINT. AI funds remain in
   Mahjong-owned `ai_accounts`, initially 10,000 POINT per AI; Joy8 creates no
   human wallets for AI. Its reviewed Backend Key has the financial scopes and

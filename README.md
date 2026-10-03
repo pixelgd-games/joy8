@@ -163,6 +163,12 @@ Vite declares these entries in `vite.config.js`.
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
 
+Mahjong uses `capped` reservations of 300 to 10,000 POINT. The applied
+migration `20261003100000_mahjong_max_loss_reservation.sql` replaced
+`mahjong_clash.opening_request` and `mahjong_clash.prepare_hand_posting` so each
+human reserves `min(available balance, base + 30 tai × value)`; the matching
+Mahjong authority and client are deployed.
+
 ## Runtime Flows
 
 `src/styles/tokens.css` owns the shared font and palette. Loader and error-modal

@@ -330,8 +330,9 @@ entire available balance while holding the wallet lock. An optional
 `max_reserve_amount` can retain a temporary product guard. In this mode
 `min_bet_amount` is the minimum available balance required to join; a lower
 balance returns `JOY8_INSUFFICIENT_BALANCE`. The default `capped` mode continues
-to enforce the minimum and maximum bet, including the 10,000 POINT ceiling. Mahjong selects `full_balance`; the approved
-release removes the temporary reserve guard. Its game owns table thresholds
+to enforce the minimum and maximum bet, including the 10,000 POINT ceiling. Mahjong uses
+`capped` reservation of each human's maximum one-hand loss (300 to 10,000 POINT).
+Its game owns table thresholds
 (300/800/3,000 POINT) and AI accounts (initially 10,000 POINT). The pending
 policy and credential activation review is in [WHITELIST_RELEASE.md](../operations/WHITELIST_RELEASE.md).
 

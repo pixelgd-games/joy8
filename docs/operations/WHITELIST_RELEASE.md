@@ -34,6 +34,8 @@ Never edit applied migrations, reset the database, or apply all drafts together.
 | [Johnny access](../../supabase/migrations/20260927122000_allow_johnny_google.sql) | Adds the explicitly requested Google email | Applied; grants play access, not administrator access |
 | [Mahjong publication](../../supabase/migrations/20260927123000_publish_mahjong_clash.sql) | Publishes the verified Pages URL and keeps the localhost private entry disabled | Applied after successful WSS and Origin rejection checks |
 | [Mahjong cover](../../supabase/migrations/20260927124000_mahjong_clash_cover.sql) | Sets only `games.thumbnail` to `/games/mahjong-clash/cover.webp` | Applied with the reviewed catalog-state guard; draft removed |
+| [Mahjong max-loss reservation](../../supabase/migrations/20261003100000_mahjong_max_loss_reservation.sql) | Switches the policy from full-balance to capped 300–10,000 POINT and replaces the opening and posting functions | Applied with the authority stopped and no open match; new authority deployed |
+| [Mahjong schema alignment](../../supabase/migrations/20261003101000_mahjong_hosted_schema_alignment.sql) | Re-applies the two accounting functions outside the policy guard and removes PUBLIC execute from `guard_posted_hand` | Applied; hosted-schema replay equals the Mahjong product SQL |
 
 The key review binds game `faaa45eb-7d7d-40b5-9081-3dd73482adfa` and existing
 key ID `a2eeea4b-026b-4e32-bfd8-1d75223ad92b`. It retains the current secret/hash,
