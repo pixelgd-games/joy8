@@ -29,7 +29,8 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   at most 15 minutes and are renewed by the game backend.
 - Monster Lab is published in the public catalog with a production Backend Key;
   its private entry is disabled. Mahjong is published at its production Pages URL
-  with its localhost private entry disabled. Monster Lab has verified hosted launch, bets, win/loss settlement and
+  with its localhost private entry disabled; its policy uses capped reservations
+  of each human's maximum one-hand loss (300 to 10,000 POINT). Monster Lab has verified hosted launch, bets, win/loss settlement and
   complete Free Spins rounds reconciled against Joy8 settlements; the remaining
   hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
@@ -162,12 +163,6 @@ Vite declares these entries in `vite.config.js`.
 | `public/fonts/` | Self-hosted Lilita One logo font |
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
-
-Mahjong uses `capped` reservations of 300 to 10,000 POINT. The applied
-migration `20261003100000_mahjong_max_loss_reservation.sql` replaced
-`mahjong_clash.opening_request` and `mahjong_clash.prepare_hand_posting` so each
-human reserves `min(available balance, base + 30 tai × value)`; the matching
-Mahjong authority and client are deployed.
 
 ## Runtime Flows
 
