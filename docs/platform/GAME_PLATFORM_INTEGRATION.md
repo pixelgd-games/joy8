@@ -217,6 +217,10 @@ only the remaining height, so the game must lay out correctly in that area.
 Returning to the Lobby and page fullscreen belong to that bar; a Joy8 build must
 not add its own lobby-return or page-fullscreen button.
 
+The Loader hides both root and body scrollbars. Its 128px scroll-handoff region
+remains scrollable for mobile browser toolbar handling; hiding the scrollbar
+must not disable scrolling or remove that region.
+
 The credential-ready message only proves that the game installed its Joy8 Client;
 it is not gameplay readiness. The current 30-second timeout still observes the
 iframe `load` event. A future gameplay-ready or heartbeat signal must extend this
