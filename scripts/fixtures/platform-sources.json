@@ -104,6 +104,9 @@
     "20261003110000_baccarat_registration.sql": "Baccarat hosted catalog, policy and private entry; no shared runtime change.",
     "20261003111000_baccarat_product_state.sql": "Private Baccarat product schema; installed by its own provider tests.",
     "20261003112000_baccarat_tables.sql": "Baccarat operator table bindings and limits; no shared runtime change.",
-    "20261003113000_baccarat_publication.sql": "Baccarat catalog publication and existing key/policy review; no shared runtime change."
+    "20261003113000_baccarat_publication.sql": "Baccarat catalog publication and existing key/policy review; no shared runtime change.",
+    "20261004100000_baccarat_reservation_deadline.sql": "Baccarat reservation-expiry transition guard; the product fixture installs its current canonical schema.",
+    "20261004120000_baccarat_six_tables.sql": "Baccarat expansion from four to six public tables; no shared runtime change.",
+    "20261004121000_baccarat_weekly_retention.sql": "Baccarat-owned weekly retention and pg_cron operator schedule; core SQL is verified by the product's PGlite and native PostgreSQL tests."
   }
 }
