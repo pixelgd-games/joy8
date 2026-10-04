@@ -107,6 +107,9 @@
     "20261003113000_baccarat_publication.sql": "Baccarat catalog publication and existing key/policy review; no shared runtime change.",
     "20261004100000_baccarat_reservation_deadline.sql": "Baccarat reservation-expiry transition guard; the product fixture installs its current canonical schema.",
     "20261004120000_baccarat_six_tables.sql": "Baccarat expansion from four to six public tables; no shared runtime change.",
-    "20261004121000_baccarat_weekly_retention.sql": "Baccarat-owned weekly retention and pg_cron operator schedule; core SQL is verified by the product's PGlite and native PostgreSQL tests."
+    "20261004121000_baccarat_weekly_retention.sql": "Baccarat-owned weekly retention and pg_cron operator schedule; core SQL is verified by the product's PGlite and native PostgreSQL tests.",
+    "20261004130000_baccarat_pause_paytable_release.sql": "Hosted Baccarat maintenance pause; verified by the product's PGlite and native PostgreSQL release tests.",
+    "20261004130100_baccarat_lucky6_paytable_release.sql": "Hosted Baccarat Lucky 6 rule-version cutover after draining obligations; no shared runtime change.",
+    "20261004130200_baccarat_resume_paytable_release.sql": "Hosted Baccarat reopening guarded by matching current round versions; verified by the product's release tests."
   }
 }
