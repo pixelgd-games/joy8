@@ -695,6 +695,16 @@ games start unpublished; a consumer publishes what it needs after loading, as
 database suite loads this same bundle on PGlite and PostgreSQL 17; none loads a
 historical subset.
 
+Mahjong Clash keeps no copy of this bundle. Its local server and every test read
+the contract, bootstrap and migrations from the committed `HEAD` of the Joy8
+checkout at `D:\Studio\Project_Code\joy8` (`MAHJONG_TEST_PLATFORM_ROOT`
+overrides the path); uncommitted Joy8 edits are ignored. Commit each new
+migration together with its classification here: an unclassified committed
+migration stops Mahjong's local server and tests. Mahjong also replays every
+committed migration and skips only failures whose message is an uppercase error
+code, so a hosted-data guard must raise a code such as
+`BACCARAT_RELEASE_KEY_CHANGED`.
+
 ### Recovery and Errors
 
 `server-status-v1` and `server-cancel-v1` take only
