@@ -31,7 +31,7 @@ Local `npm pack` remains supported. Licensing and registry publication require
 an explicit decision; `UNLICENSED` does not grant third-party redistribution rights.
 
 ```bash
-npm install ./joy8-game-sdk-1.2.0.tgz
+npm install ./joy8-game-sdk-1.2.1.tgz
 ```
 
 Joy8 builds the tarball with:
@@ -124,9 +124,8 @@ const opened = await joy8.openMatch({
 For a single-player match, `openMatch` and `settleMatch` return
 `availableBalance` as a two-decimal POINT string. An opening with an embedded
 settlement also returns its `settlement` result. Multi-player matches return
-`availableBalances` keyed by player account UUID. During a Gateway rollout,
-the new SDK accepts older responses and returns `null` for missing balance
-fields.
+`availableBalances` keyed by player account UUID; the other field is `null`.
+A response without exactly one of them is rejected as `JOY8_INVALID_RESPONSE`.
 
 Top-level balances are read from the current wallet on each request, including
 historical retries; they are not immutable settlement snapshots. Saved settlement

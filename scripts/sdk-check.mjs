@@ -149,8 +149,8 @@ describe("Joy8 server SDK", () => {
         gateway_token: "gateway-token", gateway_token_expires_at: "2026-09-21T01:15:00Z",
         expires_at: "2026-09-21T02:00:00Z", scopes: ["balance"],
       })
-      if (route === "server-open-v1") return response({ version: 1, match_id: matchId, state: "open" })
-      if (route === "server-settle-v1") return response({ version: 1, settlement_id: settlementId, match_id: matchId, state: "settled", settlement_no: 1, final: true, request_hash: "c".repeat(64), settled_at: "2026-09-21T01:05:00Z" })
+      if (route === "server-open-v1") return response({ version: 1, match_id: matchId, state: "open", available_balance: "900.00" })
+      if (route === "server-settle-v1") return response({ version: 1, settlement_id: settlementId, match_id: matchId, state: "settled", settlement_no: 1, final: true, request_hash: "c".repeat(64), settled_at: "2026-09-21T01:05:00Z", available_balance: "1000.00" })
       return response({ version: 1, match_id: matchId, state: route === "server-cancel-v1" ? "cancelled" : "open", result: null, settlement_count: 0 })
     }
     const client = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch })
@@ -196,9 +196,19 @@ describe("Joy8 server SDK", () => {
     const settled = await client.settleMatch({ matchRef: "spin-1", ruleVersion: "rules-v1",
       operationKey: "spin-1:settle:2", settlementNo: 2, final: true, entries })
     assert.equal(settled.availableBalance, "125.00")
-    await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId,
-      fetch: async () => response({ version: 1, match_id: matchId, state: "open", available_balance: "12.3" })
-    }).openMatch({ matchRef: "bad", ruleVersion: "rules-v1", participants: [{ sessionId, reserve: "100.00" }] }),
+    assert.equal(opened.settlement.availableBalance, null)
+    for (const payload of [
+      { version: 1, match_id: matchId, state: "open", available_balance: "12.3" },
+      { version: 1, match_id: matchId, state: "open" },
+      { version: 1, match_id: matchId, state: "open", available_balance: "1.00", available_balances: { [playerId]: "1.00" } },
+      { version: 1, match_id: matchId, state: "settled", available_balance: "1.00", settlement: { ...savedSettlement, available_balance: "1.00" } },
+    ]) {
+      await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response(payload) })
+        .openMatch({ matchRef: "bad", ruleVersion: "rules-v1", participants: [{ sessionId, reserve: "100.00" }] }),
+      error => error.code === "JOY8_INVALID_RESPONSE")
+    }
+    await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response(savedSettlement) })
+      .settleMatch({ matchRef: "spin-1", ruleVersion: "rules-v1", operationKey: "spin-1:settle:3", settlementNo: 3, final: true, entries }),
     error => error.code === "JOY8_INVALID_RESPONSE")
   })
 
@@ -227,9 +237,17 @@ describe("Joy8 server SDK", () => {
       error => error.code === "JOY8_SDK_INVALID_ARGUMENT")
     await assert.rejects(client.increaseReserve({ matchRef: "bet-1", operationKey: "k", accountRef: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", amount: "1.00" }),
       error => error.code === "JOY8_SDK_INVALID_ARGUMENT")
-    await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({ version: 1, match_id: matchId,
-      state: "open", operation_key: "k", operation_state: "pending", amount: null, reserve: null }) }).getReserveStatus({ matchRef: "bet-1", operationKey: "k" }),
-    error => error.code === "JOY8_INVALID_RESPONSE")
+    const reserveReply = { version: 1, match_id: matchId, state: "open", operation_key: "k", operation_state: "applied", amount: "1.00", reserve: "2.00" }
+    for (const [method, payload] of [
+      ["getReserveStatus", { ...reserveReply, operation_state: "pending" }],
+      ["getReserveStatus", { ...reserveReply, available_balance: "1.00" }],
+      ["increaseReserve", reserveReply],
+      ["cancelReserve", reserveReply],
+    ]) {
+      await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response(payload) })[method]({
+        matchRef: "bet-1", operationKey: "k", accountRef: playerId, amount: "1.00" }),
+      error => error.code === "JOY8_INVALID_RESPONSE")
+    }
   })
 
   test("rejects invalid local input, another Game ID and safe API errors without leaking the key", async () => {
@@ -267,7 +285,7 @@ test("the npm package contains only the documented distributable SDK files", () 
   assert.equal(result.status, 0, result.stderr)
   const pack = JSON.parse(result.stdout)[0]
   assert.equal(pack.name, "@joy8/game-sdk")
-  assert.equal(pack.version, "1.2.0")
+  assert.equal(pack.version, "1.2.1")
   const paths = pack.files.map(file => file.path)
   for (const required of ["README.md", "browser.js", "browser.d.ts", "server.js", "server.d.ts", "index.js", "index.d.ts", "errors.js", "errors.d.ts", "http.js", "validation.js", "package.json"]) {
     assert.ok(paths.includes(required), required)

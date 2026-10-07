@@ -88,7 +88,7 @@ export class Joy8ServerClient {
       rule_version: ruleVersion,
       ...settlementFields({ operationKey, settlementNo, final, entries, productCommit }, this.#gameId, false),
     }
-    return settlementResponse(await this.#request("server-settle-v1", body))
+    return settlementResponse(await this.#request("server-settle-v1", body), true)
   }
 
   async getMatchStatus({ matchRef } = {}) {
@@ -105,15 +105,15 @@ export class Joy8ServerClient {
       account_ref: requireUuid(accountRef, "accountRef"),
       amount: requireAmount(amount, "amount", { positive: true }),
     }
-    return reserveResponse(await this.#request("server-reserve-v1", body))
+    return reserveResponse(await this.#request("server-reserve-v1", body), true)
   }
 
   async cancelReserve({ matchRef, operationKey } = {}) {
-    return reserveResponse(await this.#request("server-reserve-cancel-v1", reserveTarget(matchRef, operationKey)))
+    return reserveResponse(await this.#request("server-reserve-cancel-v1", reserveTarget(matchRef, operationKey)), true)
   }
 
   async getReserveStatus({ matchRef, operationKey } = {}) {
-    return reserveResponse(await this.#request("server-reserve-status-v1", reserveTarget(matchRef, operationKey)))
+    return reserveResponse(await this.#request("server-reserve-status-v1", reserveTarget(matchRef, operationKey)), false)
   }
 
   async #status(route, matchRef) {
@@ -197,13 +197,13 @@ function matchResponse(payload) {
   return validateResponse("match", () => {
     requireAllowedKeys(payload, ["version", "match_id", "state", "available_balance", "available_balances", "settlement"], ["version", "match_id", "state"], "match response")
     if (payload.version !== 1 || !MATCH_STATES.includes(payload.state)) throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 match response is invalid")
-    const balance = balanceResponse(payload)
+    const balance = balanceResponse(payload, true)
     return Object.freeze({ version: 1, matchId: requireUuid(payload.match_id, "match_id"), state: payload.state,
-      ...balance, settlement: payload.settlement === undefined ? null : settlementResponse(payload.settlement) })
+      ...balance, settlement: payload.settlement === undefined ? null : settlementResponse(payload.settlement, false) })
   })
 }
 
-function settlementResponse(payload) {
+function settlementResponse(payload, live) {
   return validateResponse("settlement", () => {
     requireAllowedKeys(payload, ["version", "settlement_id", "match_id", "state", "settlement_no", "final", "request_hash", "settled_at", "available_balance", "available_balances"], ["version", "settlement_id", "match_id", "state", "settlement_no", "final", "request_hash", "settled_at"], "settlement response")
     if (payload.version !== 1 || !["open", "settled"].includes(payload.state) || !Number.isInteger(payload.settlement_no) || typeof payload.final !== "boolean") {
@@ -218,14 +218,15 @@ function settlementResponse(payload) {
       final: payload.final,
       requestHash: requireText(payload.request_hash, "request_hash", 64, 64),
       settledAt: requireText(payload.settled_at, "settled_at", 1, 80),
-      ...balanceResponse(payload),
+      ...balanceResponse(payload, live),
     })
   })
 }
 
-function balanceResponse(payload) {
-  if (Object.hasOwn(payload, "available_balance") && Object.hasOwn(payload, "available_balances")) {
-    throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 balance response is ambiguous")
+function balanceResponse(payload, live) {
+  const fields = ["available_balance", "available_balances"].filter(key => Object.hasOwn(payload, key)).length
+  if (fields !== (live ? 1 : 0)) {
+    throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 balance response is invalid")
   }
   let availableBalance = null
   let availableBalances = null
@@ -267,7 +268,7 @@ function reserveTarget(matchRef, operationKey) {
   }
 }
 
-function reserveResponse(payload) {
+function reserveResponse(payload, live) {
   return validateResponse("reserve", () => {
     requireAllowedKeys(payload, ["version", "match_id", "state", "operation_key", "operation_state", "amount", "reserve", "available_balance", "available_balances"], ["version", "match_id", "state", "operation_key", "operation_state", "amount", "reserve"], "reserve response")
     if (payload.version !== 1 || !MATCH_STATES.includes(payload.state)
@@ -282,7 +283,7 @@ function reserveResponse(payload) {
       operationState: payload.operation_state,
       amount: payload.amount === null ? null : exactBalance(payload.amount),
       reserve: payload.reserve === null ? null : exactBalance(payload.reserve),
-      ...balanceResponse(payload),
+      ...balanceResponse(payload, live),
     })
   })
 }

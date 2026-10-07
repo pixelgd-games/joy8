@@ -36,7 +36,10 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 - [Reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
   are installed (`20261007100000_match_reserve_increase.sql`) and the Gateway
-  routes are deployed. No game policy or Backend Key enables them yet.
+  routes are deployed. Only Baccarat enables them: its raise table
+  (`20261008100000_baccarat_bet_raises.sql`), policy flag and `reserve` key scope
+  (`20261008100100_baccarat_reserve_increase.sql`) are applied. Raises stay off
+  until the Baccarat backend sets `BACCARAT_RAISES_ENABLED=true`.
 - The Lobby shows the member's POINT balance through the deployed Gateway
   `wallet` route and the applied `joy8_member_wallet_v1` migration
   (`supabase/migrations/20260929100000_member_wallet_balance.sql`). A real
@@ -167,12 +170,6 @@ Vite declares these entries in `vite.config.js`.
 | `public/fonts/` | Self-hosted Lilita One logo font |
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
-
-The pending `supabase/drafts/20261007100100_baccarat_reserve_increase.sql`
-enables [reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
-for Baccarat and adds `reserve` to its one active key. It requires individual
-approval and is applied only after the Baccarat backend ships SDK 1.2.0 support
-with raises still disabled.
 
 ## Runtime Flows
 
