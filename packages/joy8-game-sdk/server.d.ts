@@ -42,6 +42,18 @@ export interface Joy8MatchStatus {
   readonly settlementCount: number
 }
 
+export interface Joy8ReserveOperation {
+  readonly version: 1
+  readonly matchId: string
+  readonly state: "open" | "settled" | "cancelled"
+  readonly operationKey: string
+  readonly operationState: "applied" | "cancelled" | "not_found"
+  readonly amount: string | null
+  readonly reserve: string | null
+  readonly availableBalance: string | null
+  readonly availableBalances: Readonly<Record<string, string>> | null
+}
+
 export type Joy8SettlementEntry = {
   kind: "player" | "product" | "fee"
   accountRef: string
@@ -82,4 +94,12 @@ export class Joy8ServerClient {
   }): Promise<Joy8Settlement>
   getMatchStatus(request: { matchRef: string }): Promise<Joy8MatchStatus>
   cancelMatch(request: { matchRef: string }): Promise<Joy8MatchStatus>
+  increaseReserve(request: {
+    matchRef: string
+    operationKey: string
+    accountRef: string
+    amount: string
+  }): Promise<Joy8ReserveOperation>
+  cancelReserve(request: { matchRef: string; operationKey: string }): Promise<Joy8ReserveOperation>
+  getReserveStatus(request: { matchRef: string; operationKey: string }): Promise<Joy8ReserveOperation>
 }

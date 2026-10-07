@@ -14,6 +14,7 @@ import {
 } from "./validation.js"
 
 const MATCH_STATES = ["open", "settled", "cancelled"]
+const RESERVE_STATES = ["applied", "cancelled", "not_found"]
 
 export class Joy8ServerClient {
   #backendKey
@@ -96,6 +97,23 @@ export class Joy8ServerClient {
 
   async cancelMatch({ matchRef } = {}) {
     return statusResponse(await this.#status("server-cancel-v1", matchRef))
+  }
+
+  async increaseReserve({ matchRef, operationKey, accountRef, amount } = {}) {
+    const body = {
+      ...reserveTarget(matchRef, operationKey),
+      account_ref: requireUuid(accountRef, "accountRef"),
+      amount: requireAmount(amount, "amount", { positive: true }),
+    }
+    return reserveResponse(await this.#request("server-reserve-v1", body))
+  }
+
+  async cancelReserve({ matchRef, operationKey } = {}) {
+    return reserveResponse(await this.#request("server-reserve-cancel-v1", reserveTarget(matchRef, operationKey)))
+  }
+
+  async getReserveStatus({ matchRef, operationKey } = {}) {
+    return reserveResponse(await this.#request("server-reserve-status-v1", reserveTarget(matchRef, operationKey)))
   }
 
   async #status(route, matchRef) {
@@ -238,6 +256,34 @@ function statusResponse(payload) {
       throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 status response is invalid")
     }
     return Object.freeze({ version: 1, matchId: requireUuid(payload.match_id, "match_id"), state: payload.state, result: payload.result, settlementCount: payload.settlement_count })
+  })
+}
+
+function reserveTarget(matchRef, operationKey) {
+  return {
+    version: 1,
+    match_ref: requireText(matchRef, "matchRef", 1, 120),
+    operation_key: requireText(operationKey, "operationKey", 1, 180),
+  }
+}
+
+function reserveResponse(payload) {
+  return validateResponse("reserve", () => {
+    requireAllowedKeys(payload, ["version", "match_id", "state", "operation_key", "operation_state", "amount", "reserve", "available_balance", "available_balances"], ["version", "match_id", "state", "operation_key", "operation_state", "amount", "reserve"], "reserve response")
+    if (payload.version !== 1 || !MATCH_STATES.includes(payload.state)
+      || !RESERVE_STATES.includes(payload.operation_state)) {
+      throw new Joy8SdkError("JOY8_INVALID_RESPONSE", "Joy8 reserve response is invalid")
+    }
+    return Object.freeze({
+      version: 1,
+      matchId: requireUuid(payload.match_id, "match_id"),
+      state: payload.state,
+      operationKey: requireText(payload.operation_key, "operation_key", 1, 180),
+      operationState: payload.operation_state,
+      amount: payload.amount === null ? null : exactBalance(payload.amount),
+      reserve: payload.reserve === null ? null : exactBalance(payload.reserve),
+      ...balanceResponse(payload),
+    })
   })
 }
 

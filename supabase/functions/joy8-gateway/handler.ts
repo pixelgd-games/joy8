@@ -7,7 +7,8 @@ import { resolveMember, createSession, createPrivateSession, resolveBrandedEntry
 
 const ROUTES = new Set([
   "health", "server-exchange-v1", "server-renew-v1", "server-open-v1",
-  "server-settle-v1", "server-status-v1", "server-cancel-v1", "member",
+  "server-settle-v1", "server-status-v1", "server-cancel-v1", "server-reserve-v1",
+  "server-reserve-cancel-v1", "server-reserve-status-v1", "member",
   "enroll-member", "create-session", "private-session", "branded-entry",
   "balance", "wallet", "mailbox", "admin-mailbox",
 ])

@@ -8,7 +8,7 @@ import { GAME_SLUG_PATTERN } from "../packages/joy8-game-sdk/contract.js"
 
 const root = fileURLToPath(new URL("../", import.meta.url))
 const projectRef = "lsazydefvnuqglultqii"
-const allowedScopes = ["exchange", "renew", "open", "settle", "status", "cancel"]
+const allowedScopes = ["exchange", "renew", "open", "settle", "status", "cancel", "reserve"]
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 function requiredString(value, name) {

@@ -58,7 +58,8 @@
     "20260928101000_catalog_readiness.sql",
     "20260928102000_mailbox_and_function_permissions.sql",
     "20260928110000_google_only_members.sql",
-    "20260929100000_member_wallet_balance.sql"
+    "20260929100000_member_wallet_balance.sql",
+    "20261007100000_match_reserve_increase.sql"
   ],
   "drafts": [],
   "excluded": {

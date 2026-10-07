@@ -34,6 +34,9 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   complete Free Spins rounds reconciled against Joy8 settlements; the remaining
   hosted acceptance cases are still open. Launch risks are tracked in
   [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
+- [Reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
+  are installed (`20261007100000_match_reserve_increase.sql`) and the Gateway
+  routes are deployed. No game policy or Backend Key enables them yet.
 - The Lobby shows the member's POINT balance through the deployed Gateway
   `wallet` route and the applied `joy8_member_wallet_v1` migration
   (`supabase/migrations/20260929100000_member_wallet_balance.sql`). A real
@@ -164,6 +167,12 @@ Vite declares these entries in `vite.config.js`.
 | `public/fonts/` | Self-hosted Lilita One logo font |
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
+
+The pending `supabase/drafts/20261007100100_baccarat_reserve_increase.sql`
+enables [reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
+for Baccarat and adds `reserve` to its one active key. It requires individual
+approval and is applied only after the Baccarat backend ships SDK 1.2.0 support
+with raises still disabled.
 
 ## Runtime Flows
 
@@ -319,7 +328,8 @@ The hosted `joy8-gateway` implements these POST routes:
 
 - member, enroll-member, wallet, create-session, private-session, branded-entry, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
-  server-settle-v1, server-status-v1, server-cancel-v1.
+  server-settle-v1, server-status-v1, server-cancel-v1, server-reserve-v1,
+  server-reserve-cancel-v1, server-reserve-status-v1.
 
 The public base URL is:
 
@@ -353,6 +363,7 @@ Platform tables: `games`, `admin_users`, `player_accounts`, `wallet_accounts`,
 `joy8_wallet_policies`, `joy8_game_policies`, `joy8_backend_keys`,
 `joy8_private_entries`, `joy8_matches`, `joy8_match_participants`,
 `joy8_settlements`, `joy8_settlement_entries`, `joy8_fee_accounts`,
+`joy8_reserve_operations`,
 `joy8_match_recoveries` and `joy8_product_schemas`. The public catalog is the
 `public_games_v1` view.
 
@@ -436,6 +447,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `npm run test:platform-db` / `test:platform-pg` | Reservation, settlement, fees, frozen wallets and adapter isolation |
 | `npm run test:continuous-db` / `test:continuous-pg` | Per-hand table settlement |
 | `npm run test:seamless-wallet` | Bet/payout limits, table reservations and platform-funded settlement |
+| `npm run test:reserve-increase` / `test:reserve-increase-pg` | Reserve increase limits, retries, single cancel, match cancel, scopes and budgets; native PostgreSQL adds competing connections |
 | `npm run test:session-scope` / `test:session-scope-pg` | Balance-token scope and session validity |
 | `npm run test:product-ddl` / `test:hardening-pg` | Product DDL guard and combined native PostgreSQL hardening |
 | `npm run test:release-safety` | Administrator identity, entry pause, operator recovery and cleanup |

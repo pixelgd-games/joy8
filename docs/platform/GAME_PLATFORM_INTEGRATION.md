@@ -455,7 +455,9 @@ spin's total bet. A capped reserve must lie between the configured
 `min_bet_amount` and `max_bet_amount`. Product/AI reserves use `max_payout_amount`. Joy8 checks
 redeemed live sessions, active players/wallets, available funds and scope. A
 wallet can occupy only one open match across all integrated titles. This prevents
-simultaneous games from spending POINT already reserved elsewhere.
+simultaneous games from spending POINT already reserved elsewhere. A
+[reserve increase](#reserve-increase) adds to that same match and never opens
+another one.
 In full-balance mode, a configured table game instead reserves the exact
 available wallet balance, subject to its separate reserve guard. Slot
 openings continue to use the capped rule.
@@ -596,6 +598,63 @@ apply these rolling holds, retain its open state for `final:false`, validate the
 hand number and result, and release on final/cancel. An adapter implementing only
 the previous close-on-settle behavior is not suitable for activation.
 
+### Reserve Increase
+
+A game whose trusted policy enables `reserve_increase_enabled` can add stake to
+an open match before its first settlement, for example a Baccarat raise during
+the betting window. The policy flag is allowed only for `platform` funding,
+`capped` reservation and no product adapter, and is snapshotted when the match
+opens. Increases require a Backend Key with the `reserve` scope. The policy and
+key changes are separate reviewed migrations per game.
+[README.md](../../README.md) owns the hosted rollout state.
+
+`server-reserve-v1` takes:
+
+```json
+{"version":1,"match_ref":"bet-123","operation_key":"bet-123:raise:1",
+ "account_ref":"<player UUID>","amount":"100.00"}
+```
+
+- The match must be `open` with `settlement_count` 0, its game policy and
+  wallet policy must still be enabled, and the player must be an unreleased
+  participant with an active player, live redeemed session and active wallet.
+- The amount is a positive two-decimal string. The player's accumulated reserve
+  (opening reserve plus every applied increase) must not exceed the match's
+  snapshotted `max_bet_amount` or `max_payout_amount`. The opening minimum bet
+  is not checked again. A match accepts at most 50 increases.
+- Joy8 locks the amount immediately; the response's available balance already
+  excludes it. Settlement and cancellation use the accumulated reserve exactly
+  like an opening reserve, so the platform gross-payout limit covers the total
+  stake and `server-cancel-v1` releases every applied increase.
+- The operation key is unique within the game. An identical retry returns the
+  saved operation without another hold; changed content or reuse on another
+  match returns `JOY8_IDEMPOTENCY_CONFLICT`.
+- Any failure, including `JOY8_INSUFFICIENT_BALANCE` and `JOY8_LIMIT_EXCEEDED`,
+  leaves the existing reserve unchanged.
+
+`server-reserve-cancel-v1` and `server-reserve-status-v1` take only
+`{"version":1,"match_ref":"bet-123","operation_key":"bet-123:raise:1"}`.
+Cancel needs the `reserve` scope; status needs the `status` scope.
+
+- Cancel releases one applied increase and leaves the opening and other
+  increases in place. It is repeatable. It is allowed only while the match is
+  open with no settlement; afterwards it returns `JOY8_RESERVE_CLOSED`, or
+  `JOY8_MATCH_FINALIZED` once settled. On a cancelled match it reports the
+  operation without change.
+- Cancelling an operation key Joy8 has not received records it as cancelled.
+  A late increase with that key then returns `JOY8_RESERVE_CANCELLED` and holds
+  nothing. Use this to finish an uncertain increase before closing betting.
+- Status never writes. `not_found` while the match is open does not prove that
+  a delayed request will not arrive later; cancel the key to make it final.
+
+All three return `version`, `match_id`, match `state`, `operation_key`,
+`operation_state` (`applied`, `cancelled` or `not_found`), `amount` (null for
+an unseen key) and `reserve`, the player's current reservation in this match
+while it is open (otherwise null). Increase and cancel also add the current
+`available_balance` as described for open and settle. Operation fields are
+saved; `state`, `reserve` and the balance are read again on every response.
+`server-status-v1` keeps its existing response shape.
+
 ### Product Accounting Adapter
 
 Trusted configuration may register one `regprocedure` per game, snapshotted at
@@ -724,7 +783,7 @@ browser disconnection and token expiry do not authorize cancellation.
 | 401 | `JOY8_BACKEND_UNAUTHORIZED` |
 | 403 | `JOY8_GAME_NOT_READY`, `JOY8_PLAYER_INACTIVE`, `JOY8_WALLET_INACTIVE`, `JOY8_SESSION_INVALID` |
 | 404 | `JOY8_MATCH_NOT_FOUND` |
-| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED` |
+| 409 | `JOY8_IDEMPOTENCY_CONFLICT`, `JOY8_MATCH_FINALIZED`, `JOY8_SETTLEMENT_SEQUENCE`, `JOY8_RULE_MISMATCH`, `JOY8_WALLET_OCCUPIED`, `JOY8_INSUFFICIENT_BALANCE`, `JOY8_ADAPTER_REJECTED`, `JOY8_RESERVE_CLOSED`, `JOY8_RESERVE_CANCELLED` |
 | 429 | Existing Gateway rate-limit response with `Retry-After` |
 | 502/503 | Invalid/upstream-unavailable response; `JOY8_UPSTREAM_UNAVAILABLE` or `JOY8_ADAPTER_UNAVAILABLE` |
 
@@ -765,6 +824,8 @@ closed if admission SQL is unavailable. Git upload alone does not deploy it.
 | Settle | Existing match UUID belonging to the verified game | 30 | 60 seconds |
 | Cancel | Existing match UUID belonging to the verified game | 30 | 60 seconds |
 | Match status | Existing match UUID belonging to the verified game | 120 | 60 seconds |
+| Reserve increase and single reserve cancel together | Existing match UUID belonging to the verified game | 30 | 60 seconds |
+| Reserve operation status | Existing match UUID belonging to the verified game | 120 | 60 seconds |
 | All backend requests combined | Verified backend game UUID | 6,000 | 60 seconds |
 | Coarse ingress across gameplay/member routes | Client address | 10,000 | 60 seconds |
 | Health monitoring only | Client address | 30 | 60 seconds |
@@ -835,7 +896,7 @@ The Gateway currently operates through protected RPCs over:
 - `wallet_accounts`
 - `wallet_transactions`
 - `game_sessions`
-- `joy8_matches`, `joy8_match_participants`
+- `joy8_matches`, `joy8_match_participants`, `joy8_reserve_operations`
 - `joy8_settlements`, `joy8_settlement_entries`, `joy8_fee_accounts`
 - `joy8_wallet_policies`, `joy8_game_policies`, `joy8_backend_keys`
 - `gateway_rate_limits`
@@ -876,7 +937,7 @@ Before listing a game through the Joy8 Lobby:
    the server handoff.
 7. Use a stable `match_ref` that correlates with the authoritative game-database record and an idempotency key strategy.
 8. Handle Gateway errors without falling back to fake success.
-9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance.
+9. Verify launch, balance, open/settle/status/cancel, renewal, retries, isolation, frozen wallets, and insufficient balance. A game that uses reserve increases also verifies increase retries, single cancel before and after arrival, and status after a timeout.
 10. Confirm no launch code, Gateway token, member JWT, or provider credential reaches storage, logs, analytics, or save data.
 11. Add the Joy8-managed `750 x 1000` WebP cover in this repository.
 12. Test Lobby to Loader to iframe on the target production origin.

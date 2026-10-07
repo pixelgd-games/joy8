@@ -5,6 +5,7 @@ runPostgresChecks([
   "scripts/review-hardening-check.mjs",
   "scripts/mailbox-database-check.mjs",
   "scripts/seamless-wallet-check.mjs",
+  "scripts/reserve-increase-check.mjs",
   "scripts/session-scope-check.mjs",
   "scripts/member-database-check.mjs",
   "scripts/member-concurrency-check.mjs",

@@ -128,6 +128,24 @@ fields but read the available balance again; see the
 While a round remains open, Joy8
 continues to lock its winnings until the final settlement releases them.
 
+### `increaseReserve({ matchRef, operationKey, accountRef, amount })`
+
+Only for a game whose Joy8 policy and Backend Key enable reserve increases. Adds
+`amount` to the player's reservation in an open match before its first
+settlement. The accumulated reserve must stay within the maximum bet. The
+response contains `operationState`, `amount`, the current `reserve` and
+`availableBalance`. Exact retries hold nothing again.
+
+### `cancelReserve({ matchRef, operationKey })`
+
+Releases one applied increase, or records an unseen key as cancelled so a late
+increase with that key is rejected. Allowed until the first settlement.
+
+### `getReserveStatus({ matchRef, operationKey })`
+
+Reads one increase without writing: `applied`, `cancelled` or `not_found`.
+`not_found` is not final while the match is open; use `cancelReserve` to close it.
+
 ### `getMatchStatus({ matchRef })`
 
 Returns the current `matchId`, state, most recent result and settlement count.
@@ -136,8 +154,9 @@ retry. An exact retry must preserve the operation key and logical request body.
 
 ### `cancelMatch({ matchRef })`
 
-Releases the unfinished reservation only after the authoritative game marks the
-match void. Cancellation does not reverse a completed settlement.
+Releases the unfinished reservation, including every applied increase, only after
+the authoritative game marks the match void. Cancellation does not reverse a
+completed settlement.
 
 ## Errors
 

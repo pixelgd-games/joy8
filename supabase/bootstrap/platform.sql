@@ -218,10 +218,12 @@ begin
     select p.auth_user_id into v_subject from public.player_accounts p where p.id=v_subject;
     if v_subject is null then return jsonb_build_object('error','JOY8_PLAYER_INACTIVE'); end if;
     v_key:='player:'||v_subject::text||':balance';
-  elsif p_route in ('server-exchange-v1','server-renew-v1','server-open-v1','server-settle-v1','server-status-v1','server-cancel-v1') then
+  elsif p_route in ('server-exchange-v1','server-renew-v1','server-open-v1','server-settle-v1','server-status-v1',
+    'server-cancel-v1','server-reserve-v1','server-reserve-cancel-v1','server-reserve-status-v1') then
     v_action:=substring(p_route from 8 for length(p_route)-10);
     begin
-      v_game:=public.joy8_backend_game(p_secret,v_action);
+      v_game:=public.joy8_backend_game(p_secret,case v_action when 'reserve-cancel' then 'reserve'
+        when 'reserve-status' then 'status' else v_action end);
     exception when invalid_authorization_specification then
       return jsonb_build_object('error','JOY8_BACKEND_UNAUTHORIZED');
     end;
@@ -260,8 +262,8 @@ begin
       select m.id into v_subject from public.joy8_matches m
         where m.game_id=v_game and m.match_ref=p_request->>'match_ref';
       if not found then return jsonb_build_object('error','JOY8_MATCH_NOT_FOUND'); end if;
-      v_key:='match:'||v_subject::text||':'||v_action;
-      if v_action in ('settle','cancel') then v_limit:=30; end if;
+      v_key:='match:'||v_subject::text||':'||case when v_action='reserve-cancel' then 'reserve' else v_action end;
+      if v_action in ('settle','cancel','reserve','reserve-cancel') then v_limit:=30; end if;
     end if;
   else
     return jsonb_build_object('error','JOY8_INVALID_REQUEST');
@@ -685,6 +687,21 @@ $$;
 
 
 
+CREATE FUNCTION public.joy8_guard_reserve_operation() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO ''
+    AS $$
+begin
+  if tg_op='DELETE' or old.state<>'applied' or new.state<>'cancelled' or new.cancelled_at is null
+    or (to_jsonb(new)-array['state','cancelled_at'])<>(to_jsonb(old)-array['state','cancelled_at']) then
+    raise exception 'JOY8_RESERVE_OPERATION_IMMUTABLE';
+  end if;
+  return new;
+end;
+$$;
+
+
+
 CREATE FUNCTION public.joy8_hash_secret(p_secret text) RETURNS text
     LANGUAGE sql STABLE
     SET search_path TO 'public', 'extensions'
@@ -988,10 +1005,10 @@ begin
     order by w.id for update of w;
   insert into public.joy8_matches(game_id,match_ref,rule_version,open_hash,wallet_policy_id,
     max_bet_amount,max_payout_amount,funding_mode,product_adapter,product_participants,
-    reservation_mode,max_reserve_amount)
+    reservation_mode,max_reserve_amount,reserve_increase_enabled)
   values(v_game,p_request->>'match_ref',p_request->>'rule_version',v_hash,v_config.wallet_policy_id,
     v_config.max_bet_amount,v_config.max_payout_amount,v_config.funding_mode,v_config.product_adapter,v_products,
-    v_config.reservation_mode,v_config.max_reserve_amount)
+    v_config.reservation_mode,v_config.max_reserve_amount,v_config.reserve_increase_enabled)
   returning * into v_match;
   for v_item in select value from jsonb_array_elements(p_request->'participants') order by value->>'session_id' loop
     select s.* into v_session from public.game_sessions s where s.id=(v_item->>'session_id')::uuid
@@ -1335,6 +1352,204 @@ $$;
 
 
 
+CREATE FUNCTION public.joy8_reserve_operation_v1(p_secret text, p_action text, p_request jsonb) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO ''
+    AS $_$
+declare
+  v_game uuid;
+  v_match public.joy8_matches%rowtype;
+  v_operation public.joy8_reserve_operations%rowtype;
+  v_part public.joy8_match_participants%rowtype;
+  v_wallet public.wallet_accounts%rowtype;
+  v_hash text;
+  v_amount numeric;
+  v_count integer;
+begin
+  if p_action is null or p_action not in ('reserve','reserve-cancel','reserve-status') then
+    raise exception 'JOY8_INVALID_REQUEST' using errcode='22023';
+  end if;
+  v_game:=public.joy8_backend_game(p_secret,case when p_action='reserve-status' then 'status' else 'reserve' end);
+  if jsonb_typeof(p_request) is distinct from 'object' or p_request->>'version' is distinct from '1'
+    or (p_request-case when p_action='reserve' then array['version','match_ref','operation_key','account_ref','amount']
+      else array['version','match_ref','operation_key'] end)<>'{}'::jsonb
+    or coalesce(length(p_request->>'match_ref'),0) not between 1 and 120
+    or coalesce(length(p_request->>'operation_key'),0) not between 1 and 180
+    or (p_action='reserve' and coalesce(p_request->>'account_ref','')
+      !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$') then
+    raise exception 'JOY8_INVALID_REQUEST' using errcode='22023';
+  end if;
+  if p_action='reserve' then
+    v_amount:=public.joy8_point_amount(p_request->'amount');
+    v_hash:=public.joy8_hash_secret(p_request::text);
+  end if;
+  perform pg_advisory_xact_lock(hashtextextended(v_game::text||':'||(p_request->>'match_ref'),1));
+  perform pg_advisory_xact_lock(hashtextextended(v_game::text||':'||(p_request->>'operation_key'),3));
+  select m.* into v_match from public.joy8_matches m
+    where m.game_id=v_game and m.match_ref=p_request->>'match_ref' for update;
+  if not found then raise exception 'JOY8_MATCH_NOT_FOUND' using errcode='P0002'; end if;
+  select o.* into v_operation from public.joy8_reserve_operations o
+    where o.game_id=v_game and o.operation_key=p_request->>'operation_key';
+  if v_operation.operation_key is not null and v_operation.match_id<>v_match.id then
+    raise exception 'JOY8_IDEMPOTENCY_CONFLICT' using errcode='23505';
+  end if;
+
+  if p_action='reserve' then
+    if v_operation.operation_key is not null then
+      if v_operation.state='cancelled' then raise exception 'JOY8_RESERVE_CANCELLED' using errcode='55000'; end if;
+      if v_operation.request_hash<>v_hash then raise exception 'JOY8_IDEMPOTENCY_CONFLICT' using errcode='23505'; end if;
+      return public.joy8_reserve_result(v_match,v_operation);
+    end if;
+    if v_match.state<>'open' then raise exception 'JOY8_MATCH_FINALIZED' using errcode='55000'; end if;
+    if not v_match.reserve_increase_enabled or not exists(select 1 from public.joy8_game_policies g
+      join public.joy8_wallet_policies p on p.id=g.wallet_policy_id
+      where g.game_id=v_game and g.enabled and p.enabled) then
+      raise exception 'JOY8_GAME_NOT_READY' using errcode='42501';
+    end if;
+    if v_match.settlement_count>0 then raise exception 'JOY8_RESERVE_CLOSED' using errcode='55000'; end if;
+    select count(*) into v_count from public.joy8_reserve_operations where match_id=v_match.id;
+    if v_amount<=0 or v_count>=50 then raise exception 'JOY8_LIMIT_EXCEEDED' using errcode='22023'; end if;
+    select p.* into v_part from public.joy8_match_participants p
+      where p.match_id=v_match.id and p.player_account_id=(p_request->>'account_ref')::uuid;
+    if not found or v_part.released_at is not null then
+      raise exception 'JOY8_INVALID_ENTRY' using errcode='22023';
+    end if;
+    perform public.joy8_assert_player(v_part.player_account_id);
+    perform 1 from public.game_sessions s where s.id=v_part.game_session_id and s.game_id=v_game
+      and s.status='active' and s.expires_at>now() and s.launch_code_used_at is not null for share;
+    if not found then raise exception 'JOY8_SESSION_INVALID' using errcode='42501'; end if;
+    select w.* into v_wallet from public.wallet_accounts w where w.id=v_part.wallet_account_id for update;
+    if v_wallet.status<>'active' or v_wallet.wallet_policy_id<>v_match.wallet_policy_id
+      or v_wallet.locked_balance<v_part.reserved_amount then
+      raise exception 'JOY8_WALLET_INACTIVE' using errcode='42501';
+    end if;
+    if v_part.reserved_amount+v_amount>v_match.max_bet_amount
+      or v_part.reserved_amount+v_amount>v_match.max_payout_amount then
+      raise exception 'JOY8_LIMIT_EXCEEDED' using errcode='22023';
+    end if;
+    if v_wallet.balance-v_wallet.locked_balance<v_amount then
+      raise exception 'JOY8_INSUFFICIENT_BALANCE' using errcode='22003';
+    end if;
+    update public.wallet_accounts set locked_balance=locked_balance+v_amount,updated_at=now() where id=v_wallet.id;
+    update public.joy8_match_participants set reserved_amount=reserved_amount+v_amount
+      where match_id=v_match.id and player_account_id=v_part.player_account_id;
+    insert into public.joy8_reserve_operations(game_id,operation_key,match_id,player_account_id,amount,request_hash,state)
+      values(v_game,p_request->>'operation_key',v_match.id,v_part.player_account_id,v_amount,v_hash,'applied')
+      returning * into v_operation;
+    return public.joy8_reserve_result(v_match,v_operation);
+  end if;
+
+  if p_action='reserve-status' then
+    if v_operation.operation_key is null then
+      return jsonb_build_object('version',1,'match_id',v_match.id,'state',v_match.state,
+        'operation_key',p_request->>'operation_key','operation_state','not_found','amount',null,'reserve',null);
+    end if;
+    return public.joy8_reserve_result(v_match,v_operation);
+  end if;
+
+  if v_operation.operation_key is null then
+    select count(*) into v_count from public.joy8_reserve_operations where match_id=v_match.id;
+    if v_count>=100 then raise exception 'JOY8_LIMIT_EXCEEDED' using errcode='22023'; end if;
+    insert into public.joy8_reserve_operations(game_id,operation_key,match_id,state,cancelled_at)
+      values(v_game,p_request->>'operation_key',v_match.id,'cancelled',now())
+      returning * into v_operation;
+    return public.joy8_reserve_result(v_match,v_operation);
+  end if;
+  if v_operation.state='cancelled' or v_match.state='cancelled' then
+    return public.joy8_reserve_result(v_match,v_operation);
+  end if;
+  if v_match.state<>'open' then raise exception 'JOY8_MATCH_FINALIZED' using errcode='55000'; end if;
+  if v_match.settlement_count>0 then raise exception 'JOY8_RESERVE_CLOSED' using errcode='55000'; end if;
+  select p.* into strict v_part from public.joy8_match_participants p
+    where p.match_id=v_match.id and p.player_account_id=v_operation.player_account_id;
+  select w.* into strict v_wallet from public.wallet_accounts w where w.id=v_part.wallet_account_id for update;
+  if v_part.released_at is not null or v_part.reserved_amount-v_operation.amount<=0
+    or v_wallet.locked_balance<v_operation.amount then
+    raise exception 'JOY8_WALLET_INACTIVE' using errcode='42501';
+  end if;
+  update public.wallet_accounts set locked_balance=locked_balance-v_operation.amount,updated_at=now() where id=v_wallet.id;
+  update public.joy8_match_participants set reserved_amount=reserved_amount-v_operation.amount
+    where match_id=v_match.id and player_account_id=v_part.player_account_id;
+  update public.joy8_reserve_operations set state='cancelled',cancelled_at=now()
+    where game_id=v_game and operation_key=v_operation.operation_key returning * into v_operation;
+  return public.joy8_reserve_result(v_match,v_operation);
+end;
+$_$;
+
+
+
+CREATE TABLE public.joy8_matches (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    game_id uuid NOT NULL,
+    match_ref text NOT NULL,
+    rule_version text NOT NULL,
+    open_hash text NOT NULL,
+    wallet_policy_id uuid NOT NULL,
+    max_payout_amount numeric(18,2) NOT NULL,
+    product_adapter regprocedure,
+    product_participants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    state text DEFAULT 'open'::text NOT NULL,
+    opened_at timestamp with time zone DEFAULT now() NOT NULL,
+    finalized_at timestamp with time zone,
+    result jsonb,
+    settlement_count integer DEFAULT 0 NOT NULL,
+    max_bet_amount numeric(18,2) NOT NULL,
+    funding_mode text NOT NULL,
+    reservation_mode text DEFAULT 'capped'::text NOT NULL,
+    max_reserve_amount numeric(18,2),
+    reserve_increase_enabled boolean DEFAULT false NOT NULL,
+    CONSTRAINT joy8_matches_funding_mode_check CHECK ((funding_mode = ANY (ARRAY['participants'::text, 'platform'::text]))),
+    CONSTRAINT joy8_matches_match_ref_check CHECK (((length(match_ref) >= 1) AND (length(match_ref) <= 120))),
+    CONSTRAINT joy8_matches_max_bet_amount_check CHECK ((max_bet_amount > (0)::numeric)),
+    CONSTRAINT joy8_matches_max_bet_cap_check CHECK ((max_bet_amount <= (10000)::numeric)),
+    CONSTRAINT joy8_matches_max_payout_amount_check CHECK ((max_payout_amount > (0)::numeric)),
+    CONSTRAINT joy8_matches_max_reserve_amount_check CHECK (((max_reserve_amount IS NULL) OR (max_reserve_amount > (0)::numeric))),
+    CONSTRAINT joy8_matches_platform_products_check CHECK (((funding_mode <> 'platform'::text) OR (product_participants = '[]'::jsonb))),
+    CONSTRAINT joy8_matches_reservation_config_check CHECK ((((reservation_mode = 'capped'::text) AND (max_reserve_amount IS NULL)) OR ((reservation_mode = 'full_balance'::text) AND (funding_mode = 'participants'::text) AND (product_adapter IS NOT NULL)))),
+    CONSTRAINT joy8_matches_reservation_mode_check CHECK ((reservation_mode = ANY (ARRAY['capped'::text, 'full_balance'::text]))),
+    CONSTRAINT joy8_matches_reserve_increase_check CHECK (((NOT reserve_increase_enabled) OR ((funding_mode = 'platform'::text) AND (reservation_mode = 'capped'::text) AND (product_adapter IS NULL)))),
+    CONSTRAINT joy8_matches_rule_version_check CHECK (((length(rule_version) >= 1) AND (length(rule_version) <= 80))),
+    CONSTRAINT joy8_matches_settlement_count_check CHECK ((settlement_count >= 0)),
+    CONSTRAINT joy8_matches_state_check CHECK ((state = ANY (ARRAY['open'::text, 'settled'::text, 'cancelled'::text])))
+);
+
+
+
+CREATE TABLE public.joy8_reserve_operations (
+    game_id uuid NOT NULL,
+    operation_key text NOT NULL,
+    match_id uuid NOT NULL,
+    player_account_id uuid,
+    amount numeric(18,2),
+    request_hash text,
+    state text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    cancelled_at timestamp with time zone,
+    CONSTRAINT joy8_reserve_operations_amount_check CHECK ((amount > (0)::numeric)),
+    CONSTRAINT joy8_reserve_operations_check CHECK ((((player_account_id IS NULL) = (amount IS NULL)) AND ((amount IS NULL) = (request_hash IS NULL)))),
+    CONSTRAINT joy8_reserve_operations_check1 CHECK (((amount IS NOT NULL) OR (state = 'cancelled'::text))),
+    CONSTRAINT joy8_reserve_operations_check2 CHECK (((state = 'cancelled'::text) = (cancelled_at IS NOT NULL))),
+    CONSTRAINT joy8_reserve_operations_operation_key_check CHECK (((length(operation_key) >= 1) AND (length(operation_key) <= 180))),
+    CONSTRAINT joy8_reserve_operations_request_hash_check CHECK ((length(request_hash) = 64)),
+    CONSTRAINT joy8_reserve_operations_state_check CHECK ((state = ANY (ARRAY['applied'::text, 'cancelled'::text])))
+);
+
+
+
+CREATE FUNCTION public.joy8_reserve_result(p_match public.joy8_matches, p_operation public.joy8_reserve_operations) RETURNS jsonb
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO ''
+    AS $$
+  select jsonb_build_object('version',1,'match_id',p_match.id,'state',p_match.state,
+    'operation_key',p_operation.operation_key,'operation_state',p_operation.state,
+    'amount',p_operation.amount::numeric(18,2)::text,
+    'reserve',(select p.reserved_amount::numeric(18,2)::text from public.joy8_match_participants p
+      where p_match.state='open' and p.match_id=p_match.id and p.player_account_id=p_operation.player_account_id
+        and p.released_at is null));
+$$;
+
+
+
 CREATE FUNCTION public.joy8_resolve_branded_entry(p_game_slug text, p_origin text) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO ''
@@ -1461,10 +1676,12 @@ begin
       v_result:=public.joy8_settle_match_v1(p_secret,p_request);
     elsif v_action in ('status','cancel') then
       v_result:=public.joy8_match_status_v1(p_secret,p_request,v_action='cancel');
+    elsif v_action in ('reserve','reserve-cancel','reserve-status') then
+      v_result:=public.joy8_reserve_operation_v1(p_secret,v_action,p_request);
     else
       return jsonb_build_object('admission_error','JOY8_INVALID_REQUEST');
     end if;
-    if v_action in ('open','settle') then
+    if v_action in ('open','settle','reserve','reserve-cancel') then
       v_result:=v_result||public.joy8_match_available_points_v1((v_result->>'match_id')::uuid);
     end if;
   exception when others then
@@ -1868,7 +2085,7 @@ CREATE TABLE public.joy8_backend_keys (
     revoked_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT joy8_backend_keys_key_hash_check CHECK ((length(key_hash) = 64)),
-    CONSTRAINT joy8_backend_keys_scopes_check CHECK (((cardinality(scopes) > 0) AND (scopes <@ ARRAY['exchange'::text, 'renew'::text, 'open'::text, 'settle'::text, 'status'::text, 'cancel'::text])))
+    CONSTRAINT joy8_backend_keys_scopes_check CHECK (((cardinality(scopes) > 0) AND (scopes <@ ARRAY['exchange'::text, 'renew'::text, 'open'::text, 'settle'::text, 'status'::text, 'cancel'::text, 'reserve'::text])))
 );
 
 
@@ -1902,6 +2119,7 @@ CREATE TABLE public.joy8_game_policies (
     reservation_mode text DEFAULT 'capped'::text NOT NULL,
     max_reserve_amount numeric(18,2),
     min_bet_amount numeric(18,2) DEFAULT 1 NOT NULL,
+    reserve_increase_enabled boolean DEFAULT false NOT NULL,
     CONSTRAINT joy8_game_policies_funding_mode_check CHECK ((funding_mode = ANY (ARRAY['participants'::text, 'platform'::text]))),
     CONSTRAINT joy8_game_policies_max_bet_amount_check CHECK ((max_bet_amount > (0)::numeric)),
     CONSTRAINT joy8_game_policies_max_bet_cap_check CHECK ((max_bet_amount <= (10000)::numeric)),
@@ -1912,7 +2130,8 @@ CREATE TABLE public.joy8_game_policies (
     CONSTRAINT joy8_game_policies_min_bet_range_check CHECK (((reservation_mode = 'full_balance'::text) OR (min_bet_amount <= max_bet_amount))),
     CONSTRAINT joy8_game_policies_platform_adapter_check CHECK (((funding_mode <> 'platform'::text) OR (product_adapter IS NULL))),
     CONSTRAINT joy8_game_policies_reservation_config_check CHECK ((((reservation_mode = 'capped'::text) AND (max_reserve_amount IS NULL)) OR ((reservation_mode = 'full_balance'::text) AND (funding_mode = 'participants'::text) AND (product_adapter IS NOT NULL)))),
-    CONSTRAINT joy8_game_policies_reservation_mode_check CHECK ((reservation_mode = ANY (ARRAY['capped'::text, 'full_balance'::text])))
+    CONSTRAINT joy8_game_policies_reservation_mode_check CHECK ((reservation_mode = ANY (ARRAY['capped'::text, 'full_balance'::text]))),
+    CONSTRAINT joy8_game_policies_reserve_increase_check CHECK (((NOT reserve_increase_enabled) OR ((funding_mode = 'platform'::text) AND (reservation_mode = 'capped'::text) AND (product_adapter IS NULL))))
 );
 
 
@@ -1978,41 +2197,6 @@ CREATE TABLE public.joy8_match_recoveries (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT joy8_match_recoveries_evidence_ref_check CHECK (((length(evidence_ref) >= 10) AND (length(evidence_ref) <= 1000))),
     CONSTRAINT joy8_match_recoveries_reason_check CHECK (((length(reason) >= 10) AND (length(reason) <= 1000)))
-);
-
-
-
-CREATE TABLE public.joy8_matches (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    game_id uuid NOT NULL,
-    match_ref text NOT NULL,
-    rule_version text NOT NULL,
-    open_hash text NOT NULL,
-    wallet_policy_id uuid NOT NULL,
-    max_payout_amount numeric(18,2) NOT NULL,
-    product_adapter regprocedure,
-    product_participants jsonb DEFAULT '[]'::jsonb NOT NULL,
-    state text DEFAULT 'open'::text NOT NULL,
-    opened_at timestamp with time zone DEFAULT now() NOT NULL,
-    finalized_at timestamp with time zone,
-    result jsonb,
-    settlement_count integer DEFAULT 0 NOT NULL,
-    max_bet_amount numeric(18,2) NOT NULL,
-    funding_mode text NOT NULL,
-    reservation_mode text DEFAULT 'capped'::text NOT NULL,
-    max_reserve_amount numeric(18,2),
-    CONSTRAINT joy8_matches_funding_mode_check CHECK ((funding_mode = ANY (ARRAY['participants'::text, 'platform'::text]))),
-    CONSTRAINT joy8_matches_match_ref_check CHECK (((length(match_ref) >= 1) AND (length(match_ref) <= 120))),
-    CONSTRAINT joy8_matches_max_bet_amount_check CHECK ((max_bet_amount > (0)::numeric)),
-    CONSTRAINT joy8_matches_max_bet_cap_check CHECK ((max_bet_amount <= (10000)::numeric)),
-    CONSTRAINT joy8_matches_max_payout_amount_check CHECK ((max_payout_amount > (0)::numeric)),
-    CONSTRAINT joy8_matches_max_reserve_amount_check CHECK (((max_reserve_amount IS NULL) OR (max_reserve_amount > (0)::numeric))),
-    CONSTRAINT joy8_matches_platform_products_check CHECK (((funding_mode <> 'platform'::text) OR (product_participants = '[]'::jsonb))),
-    CONSTRAINT joy8_matches_reservation_config_check CHECK ((((reservation_mode = 'capped'::text) AND (max_reserve_amount IS NULL)) OR ((reservation_mode = 'full_balance'::text) AND (funding_mode = 'participants'::text) AND (product_adapter IS NOT NULL)))),
-    CONSTRAINT joy8_matches_reservation_mode_check CHECK ((reservation_mode = ANY (ARRAY['capped'::text, 'full_balance'::text]))),
-    CONSTRAINT joy8_matches_rule_version_check CHECK (((length(rule_version) >= 1) AND (length(rule_version) <= 80))),
-    CONSTRAINT joy8_matches_settlement_count_check CHECK ((settlement_count >= 0)),
-    CONSTRAINT joy8_matches_state_check CHECK ((state = ANY (ARRAY['open'::text, 'settled'::text, 'cancelled'::text])))
 );
 
 
@@ -2248,6 +2432,11 @@ ALTER TABLE ONLY public.joy8_product_schemas
 
 
 
+ALTER TABLE ONLY public.joy8_reserve_operations
+    ADD CONSTRAINT joy8_reserve_operations_pkey PRIMARY KEY (game_id, operation_key);
+
+
+
 ALTER TABLE ONLY public.joy8_settlement_entries
     ADD CONSTRAINT joy8_settlement_entries_pkey PRIMARY KEY (settlement_id, entry_index);
 
@@ -2335,6 +2524,10 @@ CREATE UNIQUE INDEX joy8_one_active_match_per_wallet ON public.joy8_match_partic
 
 
 
+CREATE INDEX joy8_reserve_operations_match ON public.joy8_reserve_operations USING btree (match_id);
+
+
+
 CREATE UNIQUE INDEX player_accounts_auth_user_id_key ON public.player_accounts USING btree (auth_user_id) WHERE (auth_user_id IS NOT NULL);
 
 
@@ -2376,6 +2569,10 @@ CREATE TRIGGER joy8_product_schema_registration AFTER INSERT OR DELETE OR UPDATE
 
 
 CREATE TRIGGER joy8_recovery_immutable BEFORE DELETE OR UPDATE ON public.joy8_match_recoveries FOR EACH ROW EXECUTE FUNCTION public.joy8_recovery_immutable();
+
+
+
+CREATE TRIGGER joy8_reserve_operations_guard BEFORE DELETE OR UPDATE ON public.joy8_reserve_operations FOR EACH ROW EXECUTE FUNCTION public.joy8_guard_reserve_operation();
 
 
 
@@ -2500,6 +2697,16 @@ ALTER TABLE ONLY public.joy8_matches
 
 ALTER TABLE ONLY public.joy8_private_entries
     ADD CONSTRAINT joy8_private_entries_game_id_fkey FOREIGN KEY (game_id) REFERENCES public.games(id) ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY public.joy8_reserve_operations
+    ADD CONSTRAINT joy8_reserve_operations_match_id_fkey FOREIGN KEY (match_id) REFERENCES public.joy8_matches(id) ON DELETE RESTRICT;
+
+
+
+ALTER TABLE ONLY public.joy8_reserve_operations
+    ADD CONSTRAINT joy8_reserve_operations_match_id_player_account_id_fkey FOREIGN KEY (match_id, player_account_id) REFERENCES public.joy8_match_participants(match_id, player_account_id) ON DELETE RESTRICT;
 
 
 
@@ -2628,6 +2835,9 @@ ALTER TABLE public.joy8_product_ddl_checks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.joy8_product_schemas ENABLE ROW LEVEL SECURITY;
 
 
+ALTER TABLE public.joy8_reserve_operations ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE public.joy8_settlement_entries ENABLE ROW LEVEL SECURITY;
 
 
@@ -2749,6 +2959,10 @@ REVOKE ALL ON FUNCTION public.joy8_guard_play_access() FROM PUBLIC;
 
 
 
+REVOKE ALL ON FUNCTION public.joy8_guard_reserve_operation() FROM PUBLIC;
+
+
+
 REVOKE ALL ON FUNCTION public.joy8_hash_secret(p_secret text) FROM PUBLIC;
 
 
@@ -2830,6 +3044,15 @@ REVOKE ALL ON FUNCTION public.joy8_recovery_immutable() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION public.joy8_reject_accounting_change() FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION public.joy8_reserve_operation_v1(p_secret text, p_action text, p_request jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.joy8_reserve_operation_v1(p_secret text, p_action text, p_request jsonb) TO service_role;
+
+
+
+REVOKE ALL ON FUNCTION public.joy8_reserve_result(p_match public.joy8_matches, p_operation public.joy8_reserve_operations) FROM PUBLIC;
 
 
 

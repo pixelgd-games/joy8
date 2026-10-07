@@ -31,7 +31,7 @@ Local `npm pack` remains supported. Licensing and registry publication require
 an explicit decision; `UNLICENSED` does not grant third-party redistribution rights.
 
 ```bash
-npm install ./joy8-game-sdk-1.1.0.tgz
+npm install ./joy8-game-sdk-1.2.0.tgz
 ```
 
 Joy8 builds the tarball with:
@@ -161,6 +161,25 @@ response, call `getMatchStatus` and retry the exact same operation key and body.
 Continuous settlement uses increasing `settlementNo` values. Set `final:false`
 until the final result, then use `final:true`. Exact retries keep the same number,
 operation key and request body.
+
+When Joy8 has enabled reserve increases for the game, add stake to an open match
+before its first settlement:
+
+```js
+const raised = await joy8.increaseReserve({
+  matchRef: bet.id,
+  operationKey: `${bet.id}:raise:${raise.no}`,
+  accountRef: session.playerAccountRef,
+  amount: "100.00",
+})
+```
+
+The result has `operationState`, `amount`, the player's current `reserve` and
+`availableBalance`. After an uncertain response, retry the same key and body
+while betting is open. To finish an uncertain increase, call
+`cancelReserve({ matchRef, operationKey })`: it releases an applied increase or
+blocks one that has not arrived. `getReserveStatus` reads without writing. See the
+[reserve increase contract](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase).
 
 ## Errors
 

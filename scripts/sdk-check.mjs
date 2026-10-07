@@ -202,6 +202,36 @@ describe("Joy8 server SDK", () => {
     error => error.code === "JOY8_INVALID_RESPONSE")
   })
 
+  test("maps reserve increase, single cancel and status with the current reserve", async () => {
+    const calls = []
+    const fetch = async (url, options) => {
+      const route = url.split("/").at(-1)
+      calls.push({ route, body: JSON.parse(options.body) })
+      const cancelled = route === "server-reserve-cancel-v1"
+      return response({ version: 1, match_id: matchId, state: "open", operation_key: "bet-1:raise:1",
+        operation_state: route === "server-reserve-status-v1" ? "not_found" : cancelled ? "cancelled" : "applied",
+        amount: route === "server-reserve-status-v1" ? null : "100.00", reserve: cancelled ? "100.00" : "200.00",
+        ...(route === "server-reserve-status-v1" ? {} : { available_balance: "900.00" }) })
+    }
+    const client = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch })
+    const raised = await client.increaseReserve({ matchRef: "bet-1", operationKey: "bet-1:raise:1", accountRef: playerId, amount: "100.00" })
+    assert.deepEqual({ ...raised }, { version: 1, matchId, state: "open", operationKey: "bet-1:raise:1", operationState: "applied",
+      amount: "100.00", reserve: "200.00", availableBalance: "900.00", availableBalances: null })
+    assert.equal((await client.cancelReserve({ matchRef: "bet-1", operationKey: "bet-1:raise:1" })).operationState, "cancelled")
+    const status = await client.getReserveStatus({ matchRef: "bet-1", operationKey: "bet-1:raise:1" })
+    assert.deepEqual([status.operationState, status.amount, status.availableBalance], ["not_found", null, null])
+    assert.deepEqual(calls.map(call => call.route), ["server-reserve-v1", "server-reserve-cancel-v1", "server-reserve-status-v1"])
+    assert.deepEqual(calls[0].body, { version: 1, match_ref: "bet-1", operation_key: "bet-1:raise:1", account_ref: playerId, amount: "100.00" })
+    assert.deepEqual(calls[1].body, { version: 1, match_ref: "bet-1", operation_key: "bet-1:raise:1" })
+    await assert.rejects(client.increaseReserve({ matchRef: "bet-1", operationKey: "k", accountRef: playerId, amount: "0.00" }),
+      error => error.code === "JOY8_SDK_INVALID_ARGUMENT")
+    await assert.rejects(client.increaseReserve({ matchRef: "bet-1", operationKey: "k", accountRef: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", amount: "1.00" }),
+      error => error.code === "JOY8_SDK_INVALID_ARGUMENT")
+    await assert.rejects(new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({ version: 1, match_id: matchId,
+      state: "open", operation_key: "k", operation_state: "pending", amount: null, reserve: null }) }).getReserveStatus({ matchRef: "bet-1", operationKey: "k" }),
+    error => error.code === "JOY8_INVALID_RESPONSE")
+  })
+
   test("rejects invalid local input, another Game ID and safe API errors without leaking the key", async () => {
     assert.throws(() => new Joy8ServerClient({ gatewayUrl, backendKey: "bad", gameId }), error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
     const wrongGame = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({
@@ -237,7 +267,7 @@ test("the npm package contains only the documented distributable SDK files", () 
   assert.equal(result.status, 0, result.stderr)
   const pack = JSON.parse(result.stdout)[0]
   assert.equal(pack.name, "@joy8/game-sdk")
-  assert.equal(pack.version, "1.1.0")
+  assert.equal(pack.version, "1.2.0")
   const paths = pack.files.map(file => file.path)
   for (const required of ["README.md", "browser.js", "browser.d.ts", "server.js", "server.d.ts", "index.js", "index.d.ts", "errors.js", "errors.d.ts", "http.js", "validation.js", "package.json"]) {
     assert.ok(paths.includes(required), required)

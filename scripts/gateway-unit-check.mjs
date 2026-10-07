@@ -301,7 +301,7 @@ try {
     serverCalls.push({ name, args: JSON.parse(options.body) })
     return Response.json(serverError ? { error: serverError } : { result: { version: 1, state: "open" } })
   }
-  for (const action of ["exchange", "renew", "open", "settle", "status", "cancel"]) {
+  for (const action of ["exchange", "renew", "open", "settle", "status", "cancel", "reserve", "reserve-cancel", "reserve-status"]) {
     const route = `server-${action}-v1`
     assert.equal((await request(route, {}, key)).status, 403)
     assert.equal((await request(route, {}, "member-token", null)).status, 401)
