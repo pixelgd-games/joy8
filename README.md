@@ -38,8 +38,10 @@ See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
   are installed (`20261007100000_match_reserve_increase.sql`) and the Gateway
   routes are deployed. Only Baccarat enables them: its raise table
   (`20261008100000_baccarat_bet_raises.sql`), policy flag and `reserve` key scope
-  (`20261008100100_baccarat_reserve_increase.sql`) are applied. Raises stay off
-  until the Baccarat backend sets `BACCARAT_RAISES_ENABLED=true`.
+  (`20261008100100_baccarat_reserve_increase.sql`) are applied and the Baccarat
+  backend enables raises. One hosted raise and its settlement reconcile with
+  Joy8; the remaining hosted cases are in
+  [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md#test-gaps).
 - The Lobby shows the member's POINT balance through the deployed Gateway
   `wallet` route and the applied `joy8_member_wallet_v1` migration
   (`supabase/migrations/20260929100000_member_wallet_balance.sql`). A real
