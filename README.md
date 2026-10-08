@@ -246,7 +246,9 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 5. It creates the iframe from the catalog URL without launch credentials.
 6. The game announces its Joy8 Client from an approved parent origin, then the
    Loader delivers the session parameters once through an origin-checked in-memory message.
-7. The Loader shell shows a top bar above the iframe: 回到大廳 (with a leave
+7. The game iframe has a black background, which shows while a game repaints
+   after a resize or orientation change.
+8. The Loader shell shows a top bar above the iframe: 回到大廳 (with a leave
    confirmation), the JOY8 logo and a fullscreen toggle for the whole page. The
    toggle is hidden where the browser has no Fullscreen API, such as iPhone
    Safari. Phones in landscape keep the same bar at a lower 36px height. Games

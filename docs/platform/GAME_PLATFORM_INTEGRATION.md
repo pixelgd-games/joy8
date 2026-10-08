@@ -211,6 +211,14 @@ referrerpolicy="no-referrer"
 For a cross-origin game, the Loader also adds `allow-same-origin`. The Loader uses
 eager loading and the shared 30-second launch deadline described above.
 
+Every Joy8 game iframe (`/game/`, `/play-test/` and `/entry/`) has a black
+background. It shows while the game has not painted, including the moment after
+a resize or orientation change before the next frame. A game should paint an
+opaque background on `html`, `body` and its canvas from the first frame, and
+match its engine boot and clear colors to it. Joy8 declares no `color-scheme`;
+a game should not declare one either, because a scheme mismatch makes the
+browser paint an opaque canvas in the game's scheme color.
+
 The Loader shell places a platform top bar above the iframe: 48px on desktop,
 44px on phones in portrait and 36px on phones in landscape. The iframe receives
 only the remaining height, so the game must lay out correctly in that area.
