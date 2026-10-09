@@ -1,6 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import { accountPath, createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath } from "../src/member/service.js"
+import { createMemberService, lobbyGamePath, memberErrorMessage, safeReturnPath, signinReturnUrl } from "../src/member/service.js"
 import { createGameEntry } from "../src/member/game-entry.js"
 import { enterBrandedMember } from "../src/member/branded-entry.js"
 import { gameFailure } from "../src/pages/game/errors.js"
@@ -72,9 +72,10 @@ test("return paths reject external destinations and remove unrelated parameters"
   assert.equal(safeReturnPath("/play-test/?slug=mahjong-clash&launch_url=https://evil.example&token=secret", origin), "/play-test/?slug=mahjong-clash")
   assert.equal(safeReturnPath("/entry/?slug=mahjong-clash&code=secret&flow=signin", origin), "/entry/?slug=mahjong-clash")
   assert.equal(safeReturnPath("https://evil.example/play-test/?slug=mahjong-clash", origin), "/")
-  assert.equal(accountPath("/play-test/?slug=mahjong-clash", origin), "/account/?next=%2Fplay-test%2F%3Fslug%3Dmahjong-clash")
-  assert.equal(accountPath("/game/?slug=test", origin), "/account/?next=%2Fgame%2F%3Fslug%3Dtest")
-  assert.equal(accountPath("/entry/?slug=mahjong-clash", origin), "/account/?next=%2Fentry%2F%3Fslug%3Dmahjong-clash")
+  assert.equal(signinReturnUrl("/play-test/?slug=mahjong-clash", origin), `${origin}/?member=callback&next=%2Fplay-test%2F%3Fslug%3Dmahjong-clash&flow=signin&provider=google`)
+  assert.equal(signinReturnUrl("/game/?slug=test&token=discard", origin), `${origin}/?member=callback&next=%2Fgame%2F%3Fslug%3Dtest&flow=signin&provider=google`)
+  assert.equal(signinReturnUrl("https://evil.example/game/?slug=test", origin), `${origin}/?member=callback&next=%2F&flow=signin&provider=google`)
+  assert.equal(signinReturnUrl("/entry/?slug=mahjong-clash", origin), `${origin}/entry/?slug=mahjong-clash&flow=signin&provider=google`)
   assert.equal(lobbyGamePath("/game/?slug=test&token=discard", origin), "/?play=test")
   assert.equal(lobbyGamePath("https://evil.example/game/?slug=test", origin), "/")
 })

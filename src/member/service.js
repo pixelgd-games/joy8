@@ -14,8 +14,16 @@ export function safeReturnPath(value, origin) {
   }
 }
 
-export function accountPath(next, origin) {
-  return `/account/?next=${encodeURIComponent(safeReturnPath(next, origin))}`
+export function signinReturnUrl(next, origin) {
+  const path = safeReturnPath(next, origin)
+  const url = new URL(path.startsWith("/entry/") ? path : "/", origin)
+  if (!path.startsWith("/entry/")) {
+    url.searchParams.set("member", "callback")
+    url.searchParams.set("next", path)
+  }
+  url.searchParams.set("flow", "signin")
+  url.searchParams.set("provider", "google")
+  return url.href
 }
 
 export function lobbyGamePath(next, origin) {
@@ -46,7 +54,7 @@ export function memberErrorMessage(error) {
 
 export function createMemberService(client, { origin, next = "/" } = {}) {
   const returnPath = safeReturnPath(next, origin)
-  const callbackUrl = `${origin}${accountPath(returnPath, origin)}&flow=signin&provider=google`
+  const callbackUrl = signinReturnUrl(returnPath, origin)
   let pendingMember = null
 
   async function session() {

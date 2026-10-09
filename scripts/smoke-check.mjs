@@ -93,7 +93,7 @@ try {
   await expectErrorPresentation(client)
   await expectMailbox(client, appPort)
   await expectAllowlistAdmin(client, appPort)
-  await expectPageText(client, appPort, "/account/?error=access_denied&error_description=JOY8_EMAIL_NOT_ALLOWED&provider=google&flow=signin", text => text.includes("尚未開放") && text.includes("白名單 Google"), "Signup-hook rejection survives the Auth trampoline")
+  await expectGoogleReturn(client, appPort)
 
   await expectLobbyRecovery(client, appPort)
   await expectProductionCsp(client, cwd)
@@ -141,7 +141,6 @@ function verifyCanonicalHostRedirect() {
   }
   const entryFiles = [
     "index.html",
-    "account/index.html",
     "admin/mail/index.html",
     "admin/login/index.html",
     "admin/games/index.html",
@@ -445,15 +444,26 @@ async function expectErrorPresentation(client) {
   console.log("OK Shared error theme, mobile layout and close/button/overlay behavior")
 }
 
-async function expectMemberEntry(client, appPort) {
-  await expectPageText(client, appPort, "/account/?next=%2Fgame%2F%3Fslug%3Dtest", (text) => {
-    return text.includes("使用 Google 繼續") && text.includes("白名單")
-  }, "Account entry returns to the Lobby member dialog")
+async function expectGoogleReturn(client, appPort) {
+  await expectPageText(client, appPort, "/?member=callback&next=%2Fgame%2F%3Fslug%3Dtest&flow=signin&provider=google&error=access_denied&error_description=JOY8_EMAIL_NOT_ALLOWED#error=access_denied", text => text.includes("尚未開放") && text.includes("白名單 Google"), "Signup-hook rejection returns to the Lobby member dialog")
   const returnCheck = await client.send("Runtime.evaluate", {
     returnByValue: true,
-    expression: `location.pathname === "/" && location.search === "" && document.querySelector("#member-dialog")?.open && document.querySelector(".hero")?.isConnected`,
+    expression: `location.pathname === "/" && location.search === "" && location.hash === "" && document.querySelector("#member-dialog")?.open && document.querySelector(".hero")?.isConnected`,
   })
-  if (!returnCheck.result.value) throw new Error("Account entry left a standalone page behind")
+  if (!returnCheck.result.value) throw new Error("Google return left callback parameters or a standalone page behind")
+}
+
+async function expectMemberEntry(client, appPort) {
+  await expectPageText(client, appPort, "/", text => text.includes("登入"), "Lobby loads for member entry")
+  const opened = await client.send("Runtime.evaluate", {
+    awaitPromise: true, returnByValue: true,
+    expression: `(async () => {
+      for (let attempt = 0; attempt < 100 && document.querySelector("#app").inert; attempt++) await new Promise(resolve => setTimeout(resolve, 100))
+      document.querySelector(".member-login-link").click()
+    })()`,
+  })
+  if (opened.exceptionDetails) throw new Error("Lobby login button did not respond")
+  await waitForText(client, text => text.includes("使用 Google 繼續") && text.includes("白名單"), "Lobby login opens the member dialog")
   const controls = await client.send("Runtime.evaluate", {
     returnByValue: true,
     expression: `(() => {

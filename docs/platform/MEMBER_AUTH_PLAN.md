@@ -57,12 +57,14 @@ an unenrolled visitor sees the Google dialog over the public Lobby. Closing the
 dialog cancels the pending game. Account entry clears the prior destination.
 Network failure never creates a replacement player.
 
-`/account/` is a PKCE callback trampoline. Return paths are limited to the Lobby
-and validated `/game/`, `/play-test/` and `/entry/` slugs. Callback forwarding
-uses a fragment, removed immediately by the receiving page. The initial provider
-request still carries its one-use code in a query; exclude callback queries from
-analytics and access-log exports. Only `provider=google&flow=signin` callbacks
-are accepted. Replay, cancellation and invalid callbacks fail closed.
+Google returns directly to the page that started sign-in: the Lobby at
+`/?member=callback&next=...`, or branded entry at `/entry/?slug=...`. Return
+paths are limited to the Lobby and validated `/game/`, `/play-test/` and
+`/entry/` slugs. The receiving page removes the one-use code from the address bar
+before using it. The initial request still carries the code in a query; exclude
+callback queries from analytics and access-log exports. Only
+`provider=google&flow=signin` callbacks are accepted. Replay, cancellation and
+invalid callbacks fail closed.
 
 `/entry/?slug=...` completes Google authentication before retrieving protected
 metadata or loading a game. Explicit backend entry configuration and exact

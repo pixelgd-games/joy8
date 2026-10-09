@@ -46,8 +46,8 @@ Joy8 currently provides:
 - A reusable branded game-entry shell with Joy8-controlled Google entry before
   protected game metadata and artwork; Joy8 retains enrollment and session authority.
 - A reusable Lobby dialog for Google entry, with explicit
-  player enrollment. `/account/` is a narrow Auth return trampoline back to that
-  dialog.
+  player enrollment. Google returns directly to the Lobby, which completes
+  sign-in in that dialog.
 - A stable six-digit public player ID displayed as `Player 123456`, separate
   from the internal player UUID used by trusted platform and product backends.
 - Google OAuth for game administration, with server-side administrator verification.
@@ -107,7 +107,6 @@ game-facing protocol is `server-v1`, defined in
 | Route | Entry | Responsibility |
 | --- | --- | --- |
 | `/` | `index.html` | Public Lobby, member card, POINT balance and mailbox drawer |
-| `/account/` | `account/index.html` | Auth return trampoline that restores the Lobby member dialog or a validated branded entry |
 | `/admin/access/` | `admin/access/index.html` | Google email allowlist management |
 | `/admin/mail/` | `admin/mail/index.html` | Administrator compose, preview, send and recipient audit |
 | `/game/` | `game/index.html` | Published-game Loader and iframe shell |
@@ -171,7 +170,7 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
 1. `index.html` is the only Lobby page. When it opens, `src/pages/lobby/layout.js`
    reads the browser's mobile hint (User-Agent Client Hints, else the
    User-Agent) and selects either the PC or the mobile layout on the same URL; it
-   never redirects, so `/?play=` and the `/account/` return keep working.
+   never redirects, so `/?play=` and the Google return keep working.
    PC: fixed top bar, left promotion/notice column, 1600 x 480 hero carousel,
    one 「全部遊戲」 grid and a fixed bottom bar with the footer links, the POINT
    notice and social links. Mobile: one-row top bar,
@@ -255,11 +254,11 @@ offers no guest entry, and the enabled Before User Created Hook rejects guest an
 non-Google signup server-side. Logout is local to the selected Auth session and
 does not create a replacement guest. Provider linking is not implemented.
 
-The Auth trampoline forwards the one-use OAuth code from `/account/` in a URL
-fragment, not another query. The Lobby or branded entry removes that fragment
-before using the callback.
-This does not remove the initial request from infrastructure logs; do not collect
-callback queries in analytics or access-log exports.
+Google returns to `/?member=callback&next=...` or to the branded
+`/entry/?slug=...` page. The Lobby removes the one-use OAuth code from the
+address bar before loading its member client; branded entry removes it before
+exchanging it. The code still reaches infrastructure logs in the initial
+request; do not collect callback queries in analytics or access-log exports.
 
 `POST /member` resolves existing enrollment; `POST /enroll-member` explicitly
 enrolls the authenticated identity. Both take an empty JSON object, require an
@@ -602,12 +601,13 @@ for the complete safety rules.
 - Admin redirect allowlist entries are `https://joy8.pages.dev/admin/login/`,
   `https://joy8.cc/admin/login/`, `https://www.joy8.cc/admin/login/`, and
   `http://localhost:5173/admin/login/`.
-- Member redirect allowlist entries are `https://joy8.pages.dev/account/*`,
-  `https://joy8.cc/account/*`, `https://www.joy8.cc/account/*`,
-  `http://127.0.0.1:5173/account/*`, `http://localhost:5173/account/*`,
-  `http://127.0.0.1:4173/account/*`, and `http://localhost:4173/account/*`.
-  The suffix accommodates the encoded `next` and `flow` query parameters while
-  keeping the host and member route fixed.
+- Member returns go to `https://joy8.cc/` and `https://joy8.cc/entry/`. Supabase
+  Auth accepts them because they share the Site URL's scheme and host;
+  `joy8.pages.dev` and `www.joy8.cc` redirect to that host first. The older
+  member allowlist entries end in `/account/*` and no longer match any return.
+  A local Google sign-in on `localhost` falls back to the Site URL until the
+  local origins (for example `http://localhost:5173/**`) are added to the
+  allowlist.
 - No outbound email is configured: Cloudflare Email Sending is disabled and no
   SMTP credential exists.
 - Cloudflare Turnstile configuration remains hosted. The Google-only frontend

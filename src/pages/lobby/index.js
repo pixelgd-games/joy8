@@ -11,11 +11,10 @@ import { ERROR_CODES, showErrorModal } from "../../ui/error-modal.js"
 import { createMemberService, memberErrorMessage } from "../../member/service.js"
 import { createGameEntry } from "../../member/game-entry.js"
 import { memberSupabase } from "../../lib/memberClient.js"
-import { readEntryParams } from "../../member/callback.js"
 import { createMailboxService } from "../../mailbox/service.js"
 import { createMemberState } from "../../member/state.js"
 
-export async function initLobbyPage(appRoot, { renderHero = null } = {}) {
+export async function initLobbyPage(appRoot, { renderHero = null, entryParams = new URLSearchParams() } = {}) {
   if (!appRoot) return
   renderHero ??= renderLobbyShell(appRoot)
   setupTicker(appRoot)
@@ -23,11 +22,8 @@ export async function initLobbyPage(appRoot, { renderHero = null } = {}) {
   appRoot.inert = false
   appRoot.removeAttribute("aria-busy")
 
-  const entryParams = readEntryParams(location, history)
-  const memberMode = ["open", "callback"].includes(entryParams.get("member")) ? entryParams.get("member") : null
-  const memberParams = memberMode ? new URLSearchParams(entryParams) : null
-  const requestedGame = memberMode ? null : entryParams.get("play")
-  if (entryParams.has("play") || memberMode) history.replaceState(null, "", "/")
+  const memberParams = entryParams.get("member") === "callback" ? new URLSearchParams(entryParams) : null
+  const requestedGame = memberParams ? null : entryParams.get("play")
 
   if (memberParams) {
     const { openMemberModal } = await import("../../member/modal.js")

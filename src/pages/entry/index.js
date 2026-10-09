@@ -7,9 +7,8 @@ import { createMemberAuthFlow } from "../../member/auth-flow.js"
 import { createBrandedEntryRequests, enterBrandedMember } from "../../member/branded-entry.js"
 import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 import { gameFailure } from "../game/errors.js"
-import { readEntryParams } from "../../member/callback.js"
 
-const params = readEntryParams(location, history)
+const params = new URLSearchParams(location.search)
 const slug = params.get("slug")
 const root = document.getElementById("entry")
 const status = document.getElementById("entry-status")
