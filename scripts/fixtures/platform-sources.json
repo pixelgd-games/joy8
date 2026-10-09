@@ -115,6 +115,7 @@
     "20261004130200_baccarat_resume_paytable_release.sql": "Hosted Baccarat reopening guarded by matching current round versions; verified by the product's release tests.",
     "20261005100000_baccarat_clear_play_history.sql": "Hosted Baccarat play-history clearing; data only, no shared runtime change.",
     "20261008100000_baccarat_bet_raises.sql": "Baccarat same-round raise state and guards; the product fixture installs its current canonical schema.",
-    "20261008100100_baccarat_reserve_increase.sql": "Hosted Baccarat reserve-increase policy flag and key scope; no shared runtime change."
+    "20261008100100_baccarat_reserve_increase.sql": "Hosted Baccarat reserve-increase policy flag and key scope; no shared runtime change.",
+    "20261009110000_close_baccarat_private_entry.sql": "Hosted Baccarat private-entry closure after publication; synthetic fixtures keep private entries paused."
   }
 }
