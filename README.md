@@ -420,12 +420,12 @@ Database suites run against isolated in-memory PGlite by default. The `test:*-pg
 commands run the same suites plus competing-connection cases on a temporary
 native PostgreSQL 17 cluster bound to `127.0.0.1`; they take no database URL and
 never read `.env` credentials. Set `JOY8_TEST_PG_BIN` to an absolute PostgreSQL 17
-bin directory. On Windows a portable runtime can be prepared outside the repository:
+bin directory. On the Studio computer, the portable PostgreSQL 17.11 in
+`D:\Studio\Project_Tool\postgresql-17` includes `pg_dump` and every extension
+the suites need:
 
 ```powershell
-$joy8PgTools = Join-Path $env:TEMP 'joy8-pg17-tools'
-npm install --prefix $joy8PgTools --ignore-scripts --no-audit --no-fund --save-exact '@embedded-postgres/windows-x64@17.6.0-beta.15'
-$env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\windows-x64\native\bin'
+$env:JOY8_TEST_PG_BIN = 'D:\Studio\Project_Tool\postgresql-17\bin'
 ```
 
 | Command | Covers |
