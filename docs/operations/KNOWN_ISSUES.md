@@ -102,6 +102,35 @@ The Gateway's per-player, Session, table and backend budgets are initial abuse
 limits, not measured production capacity. Local tests do not prove hosted header
 trust, real Auth or production capacity.
 
+Three verified limits block slot-scale traffic. Each game may open 120 matches
+per minute, about two slot Spins per second across all players. Server-route
+ingress is counted by client address, and every Cloudflare Worker reaches the
+Gateway from the same Cloudflare address, so Worker-hosted games share one
+10,000-per-minute bucket. Counter rows are updated at the start of the server
+transaction and stay locked until commit, so one game's server requests queue
+behind each other. The unapplied redesign is
+[RATE_LIMIT_REDESIGN.md](../../supabase/drafts/RATE_LIMIT_REDESIGN.md).
+
+### Hosted Database Tail Latency
+
+On the current compute, `joy8_server_request_v1` takes a median of about 56 ms
+in PostgREST and the database, but its p90 is about 0.5 s and single calls
+reached 5.6 s with one player and no lock contention (2026-10-09 Supabase
+logs). The cause is not established; compare after a compute upgrade.
+
+### Cloudflare Routing and Request Quota
+
+From Taiwan HiNet, Free-plan custom hostnames such as `joy8.cc` and
+`workers.dev` enter Cloudflare at San Jose, adding about 0.14 s per connection;
+`*.pages.dev` and the Supabase Gateway enter at Taipei. Games therefore proxy
+their browser traffic through their own Pages origin
+([execution region](../platform/GAME_PLATFORM_INTEGRATION.md#execution-region)).
+The Lobby on `joy8.cc` still loads through San Jose; gameplay calls do not.
+Those proxies count against the account-wide Workers Free quota of 100,000
+requests per UTC day; Baccarat's polling alone uses about 5,400 per player-hour.
+When the quota runs out, proxied game traffic fails until the reset, so add
+Workers Paid or reduce polling before wider play.
+
 ## Test Gaps
 
 `npm run verify:release` requires native PostgreSQL 17 concurrency coverage and
