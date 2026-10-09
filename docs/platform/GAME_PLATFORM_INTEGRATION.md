@@ -261,6 +261,15 @@ Host each game backend and its game database in Tokyo as well, so the backend's
 Gateway calls stay inside the region. Placement evidence is part of
 [provider acceptance](../../integrations/third-party/ACCEPTANCE.md#performance-and-placement).
 
+Serve the game's browser traffic (HTTP API, WebSocket and event streams) from
+the game page's own Cloudflare `*.pages.dev` origin through Pages Functions that
+forward to the backend. Measured on 2026-10-09 from Taiwan HiNet, Free-plan
+custom hostnames and `workers.dev` entered Cloudflare at San Jose (about 0.14 s
+connect), while `*.pages.dev` and the Supabase Gateway entered at Taipei; the
+same-origin path also removes CORS preflights. Players still see only the Joy8
+address because the game runs in the Loader iframe. Each Function call counts
+toward the account's Workers request quota.
+
 ## Session Creation
 
 Endpoint:

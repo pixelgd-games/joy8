@@ -46,6 +46,7 @@ profile. Passing local tests does not activate a public game.
 
 - [ ] A round whose result is known at opening uses one browser request to the backend with no CORS preflight, and one Gateway request (`openMatch` with its settlement).
 - [ ] The backend and game database run in the same region as Joy8, Tokyo (`ap-northeast-1`), and the SDK region pin stays enabled. See [execution region](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region).
+- [ ] Browser traffic to the backend uses the game page's own `*.pages.dev` origin, not a Free-plan custom hostname or `workers.dev`. See [execution region](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region).
 - [ ] p50 and p95 latency of Joy8 calls, measured from the production backend location, are reported.
 
 ## Joint private acceptance

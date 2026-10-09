@@ -4,7 +4,7 @@
     "slug": "monster-lab",
     "gameId": "9f0df218-a0fd-40bc-a018-151fd7a1d996",
     "gameUrl": "https://monster-lab-7aj.pages.dev/client/",
-    "backendUrl": "https://monster-lab-api.pixelgd-games.workers.dev"
+    "backendUrl": "https://monster-lab-7aj.pages.dev/"
   },
   "platform": {
     "protocol": "server-v1",
