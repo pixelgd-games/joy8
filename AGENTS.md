@@ -33,6 +33,7 @@ Read the smallest complete set for the task:
 | Cross-module Flash context | `docs/platform/FLASH.md` |
 | Confirmed limitations, risks, or launch blockers | `docs/operations/KNOWN_ISSUES.md` |
 | Analytics, KPI, logging, alerts, or monitoring | `docs/operations/ANALYTICS_MONITORING.md` |
+| Third-party provider handoff, SDK, or Backend Key operations | `integrations/third-party/README.md` and the files it lists; `packages/joy8-game-sdk/README.md` |
 
 For a routine Git upload or download, this file and `README.md` are sufficient unless the change itself requires another document. A first upload must follow the complete Studio Git workflow.
 

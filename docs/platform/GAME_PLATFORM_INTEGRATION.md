@@ -104,7 +104,7 @@ automatically or replace this authoritative wire specification.
 9. The game backend exchanges the launch code once, then gives the client a balance-only token.
 10. The client keeps that token in memory; financial operations belong to the game backend.
 
-The current Loader requests `POINT` with a 12-hour session expiry.
+The Gateway fixes the session currency to `POINT` and its lifetime to 12 hours.
 
 ## Loader In-Memory Handoff
 
@@ -344,10 +344,8 @@ entire available balance while holding the wallet lock. An optional
 balance returns `JOY8_INSUFFICIENT_BALANCE`. The default `capped` mode continues
 to enforce the minimum and maximum bet, including the 10,000 POINT ceiling.
 
-Mahjong uses `capped` reservation of each human's maximum one-hand loss (300 to
-10,000 POINT). Its game owns table thresholds (300/800/3,000 POINT) and AI
-accounts (initially 10,000 POINT). The applied policy and credential migrations
-are listed in [WHITELIST_RELEASE.md](../operations/WHITELIST_RELEASE.md).
+Per-game policy values are owned by
+[PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
 Backend routes use `Authorization: Bearer <64 lowercase hex characters>`, with
 `Content-Type: application/json` and no browser Origin. Joy8 stores a SHA-256
@@ -358,39 +356,15 @@ checks are additional protection, not proof of identity. Products never receive
 the project service-role key or direct platform table grants.
 
 Before provider implementation begins, Joy8 creates a hidden integration record
-with its non-secret Game ID and a restricted test Backend Key. The
-authoritative operator path is `npm run key:backend`: it uses a cryptographically
-secure random source, registers only the SHA-256 hash in Joy8, and passes the
-plaintext through standard input directly to an explicitly named Cloudflare
-Worker secret. The plaintext is never a command argument, profile value,
-temporary SQL value or terminal result. The command verifies the linked Joy8
-project before each database operation and requires an enabled POINT policy.
-Private-integration provisioning requires an unpublished game. Published games
-support production-purpose rotation of a specified existing game key without
-expanding its scopes. Every mutation requires user approval, the matching
-`--reviewed-plan` file and `--apply`; see the operator commands in README.
-Cloudflare installation deploys immediately. If
-delivery fails, the new database key is revoked; rotation revokes the specifically
-selected old key and registers the new key in one transaction, so two keys for
-the game are never active together.
-
-Baccarat's approved Windows host uses the scoped
-`scripts/supabase-joy8.cmd baccarat-host-provision --apply` operator instead of
-Worker delivery. It reuses the same credential factory and hash-registration
-SQL, creates only the restricted Baccarat database login, and delivers its
-runtime configuration through stdin to current-user Windows DPAPI. The local
-directory is limited to that user and SYSTEM. It refuses existing credentials;
-it cannot silently rotate or expand another game's access. Ordinary SQL and this
-host provisioning are covered by the user's deployment authorization.
-
-This direct path is used only when the operator is authorized for the provider
-backend. An external provider receives the same platform-generated value through
-an approved one-time secret channel and installs it in its own secret manager;
-chat, email and source control are not secret channels. A provider-generated
-value is invalid unless Joy8 separately registers its hash, so the normal
-contract keeps key generation under Joy8. Joy8 does not edit the provider's
-frontend or source repository. No self-service credential UI is required for
-the initial workflow.
+with its non-secret Game ID and a restricted test Backend Key. Joy8 generates
+every key, registers only its SHA-256 hash and delivers the plaintext once
+through an approved secret channel; chat, email and source control are not
+secret channels. A provider-generated value is invalid unless Joy8 registers its
+hash. Rotation never leaves two keys for the same game active together. Joy8
+does not edit the provider's frontend or source repository. The operator
+commands, delivery targets and rotation rules are in the
+[platform operator flow](../../integrations/third-party/README.md#platform-operator-flow);
+host-specific provisioning is in [README.md](../../README.md#supabase-operations).
 
 A test key enables only the reviewed private integration work. It does not
 publish a catalog entry or authorize public release. Before release, review the
@@ -760,17 +734,8 @@ a proposed-schema test artifact, not evidence of hosted deployment. The bootstra
 games start unpublished; a consumer publishes what it needs after loading, as
 `loadCurrentPlatform()` in `scripts/fixtures/platform-bundle.mjs` does. Every Joy8
 database suite loads this same bundle on PGlite and PostgreSQL 17; none loads a
-historical subset.
-
-Mahjong Clash keeps no copy of this bundle. Its local server and every test read
-the contract, bootstrap and migrations from the committed `HEAD` of the Joy8
-checkout at `D:\Studio\Project_Code\joy8` (`MAHJONG_TEST_PLATFORM_ROOT`
-overrides the path); uncommitted Joy8 edits are ignored. Commit each new
-migration together with its classification here: an unclassified committed
-migration stops Mahjong's local server and tests. Mahjong also replays every
-committed migration and skips only failures whose message is an uppercase error
-code, so a hosted-data guard must raise a code such as
-`BACCARAT_RELEASE_KEY_CHANGED`.
+historical subset. Consumers that read the committed Joy8 checkout impose
+commit rules described in [README.md](../../README.md#supabase-operations).
 
 ### Recovery and Errors
 
@@ -825,6 +790,7 @@ closed if admission SQL is unavailable. Git upload alone does not deploy it.
 | Operation | Verified counting identity | Requests | Fixed window |
 | --- | --- | ---: | ---: |
 | Member lookup | Auth user UUID + route | 120 | 60 seconds |
+| Member wallet | Auth user UUID | 120 | 60 seconds |
 | Enroll / create public session / create private session | Auth user UUID + route | 30 | 300 seconds |
 | Balance | Player's Auth user UUID resolved from the active Gateway token | 120 | 60 seconds |
 | Backend exchange and renewal together | Existing game-bound Session UUID | 30 | 60 seconds |

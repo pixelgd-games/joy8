@@ -6,51 +6,32 @@ This file is the source of truth for the repository's current implementation and
 
 ## Current State
 
-The approved whitelist SQL, reviewed test-player cleanup and Mahjong reserve
-release are installed. The Before User Created Hook is enabled in Dashboard;
-other Auth settings were preserved. The admin allowlist page, Gateway checks
-and guest-button removal are deployed. The requested Johnny Google account is
-allowlisted and its verified Google signup is recorded in hosted Auth. A fresh
-outside-list Google signup still needs real-provider acceptance.
-See [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md).
+Open acceptance items and launch risks are tracked only in
+[KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
 
 - Public Lobby browsing, Google member entry, six-digit public player IDs,
   the shared POINT wallet and trusted settlement are deployed.
-- Google is the only supported member provider. The sign-in decision is owned by
+- Google is the only supported member provider. The Google email allowlist,
+  its admin page and the Before User Created Hook are active; inside-list signup
+  and outside-list rejection are verified with real Google accounts. The
+  sign-in decision is owned by
   [MEMBER_AUTH_PLAN.md](docs/platform/MEMBER_AUTH_PLAN.md#release-identity-scope).
 - The in-app mailbox, administrator composer and claim-once POINT attachments
-  are deployed. See [MAILBOX.md](docs/platform/MAILBOX.md) for operation and the
-  remaining real-player acceptance boundary.
+  are deployed. See [MAILBOX.md](docs/platform/MAILBOX.md).
 - The POINT rules in [PRODUCT_SCOPE.md](docs/product/PRODUCT_SCOPE.md#wallet-and-point-direction)
   are installed: one-time Google enrollment grants, per-game minimum
   bet, maximum bet (at most 10,000 POINT) and per-round payout limit for
   platform-funded games.
 - Game sessions last 12 hours; launch codes last 2 minutes; balance tokens last
   at most 15 minutes and are renewed by the game backend.
-- Monster Lab is published in the public catalog with a production Backend Key;
-  its private entry is disabled. Mahjong is published at its production Pages URL
-  with its localhost private entry disabled; its policy uses capped reservations
-  of each human's maximum one-hand loss (300 to 10,000 POINT). Monster Lab has verified hosted launch, bets, win/loss settlement and
-  complete Free Spins rounds reconciled against Joy8 settlements; the remaining
-  hosted acceptance cases are still open. Launch risks are tracked in
-  [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md).
+- Monster Lab, Mahjong Clash and Baccarat are published in the public catalog
+  with game-scoped Backend Keys; their private entries are disabled. Hosted
+  settlements from each game reconcile with Joy8. Each game tracks its own
+  release acceptance in its repository.
 - [Reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
-  are installed (`20261007100000_match_reserve_increase.sql`) and the Gateway
-  routes are deployed. Only Baccarat enables them: its raise table
-  (`20261008100000_baccarat_bet_raises.sql`), policy flag and `reserve` key scope
-  (`20261008100100_baccarat_reserve_increase.sql`) are applied and the Baccarat
-  backend enables raises. One hosted raise and its settlement reconcile with
-  Joy8; the remaining hosted cases are in
-  [KNOWN_ISSUES.md](docs/operations/KNOWN_ISSUES.md#test-gaps).
-- The Lobby shows the member's POINT balance through the deployed Gateway
-  `wallet` route and the applied `joy8_member_wallet_v1` migration
-  (`supabase/migrations/20260929100000_member_wallet_balance.sql`). A real
-  member's balance display still needs hosted player acceptance.
-- Hosted catalog administration and Lobby-to-Mahjong launch have scoped manual
-  coverage. Hosted acceptance remains open for successful enabled independent
-  entry, production capacity and managed recovery. A real Mahjong hand has
-  settled through the capped reservation.
-  See [verification boundaries](docs/operations/KNOWN_ISSUES.md#test-gaps).
+  and their Gateway routes are deployed. Only Baccarat enables them, with the
+  policy flag and `reserve` key scope applied.
+- The Lobby shows the member's POINT balance through the Gateway `wallet` route.
 
 ## Current Scope
 
@@ -173,6 +154,11 @@ Vite declares these entries in `vite.config.js`.
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
 
+`supabase/drafts/20261001000100_mahjong_single_hand_reset.sql` is a pending
+Mahjong data reset awaiting individual migration approval; its scope and checks
+are owned by
+`D:/Studio/Project-Gaming/production/table/products/mahjong-clash/docs/DEPLOYMENT.md`.
+
 ## Runtime Flows
 
 `src/styles/tokens.css` owns the shared font and palette. Loader and error-modal
@@ -262,10 +248,10 @@ into the iframe.
 ### Member Entry
 
 Google uses PKCE and explicit callback exchange. The public member UI does not
-offer Email/password signup, sign-in, verification, or recovery. Guest creation
-is disabled in the prepared frontend; the reviewed signup hook and anonymous
-Auth setting enforce this server-side at rollout. Logout is local to the selected Auth
-session and does not create a replacement guest. Guest creation and provider linking are not implemented.
+offer Email/password signup, sign-in, verification, or recovery. The frontend
+offers no guest entry, and the enabled Before User Created Hook rejects guest and
+non-Google signup server-side. Logout is local to the selected Auth session and
+does not create a replacement guest. Provider linking is not implemented.
 
 The Auth trampoline forwards the one-use OAuth code from `/account/` in a URL
 fragment, not another query. The Lobby or branded entry removes that fragment
@@ -327,7 +313,8 @@ Tests exercise the actual handler and import HTTP/auth/RPC helpers directly.
 
 The hosted `joy8-gateway` implements these POST routes:
 
-- member, enroll-member, wallet, create-session, private-session, branded-entry, balance, health.
+- member, enroll-member, wallet, mailbox, admin-mailbox, create-session,
+  private-session, branded-entry, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1, server-reserve-v1,
   server-reserve-cancel-v1, server-reserve-status-v1.
@@ -364,9 +351,9 @@ Platform tables: `games`, `admin_users`, `player_accounts`, `wallet_accounts`,
 `joy8_wallet_policies`, `joy8_game_policies`, `joy8_backend_keys`,
 `joy8_private_entries`, `joy8_matches`, `joy8_match_participants`,
 `joy8_settlements`, `joy8_settlement_entries`, `joy8_fee_accounts`,
-`joy8_reserve_operations`,
-`joy8_match_recoveries` and `joy8_product_schemas`. The public catalog is the
-`public_games_v1` view.
+`joy8_reserve_operations`, `joy8_match_recoveries`, `joy8_product_schemas`,
+`joy8_product_ddl_checks`, `joy8_email_allowlist`, `joy8_mail_messages` and
+`joy8_mail_recipients`. The public catalog is the `public_games_v1` view.
 
 Protected tables use RLS and service-only RPCs. Products receive no project-wide
 service-role key. Every player/currency pair has one wallet that remains unique
@@ -554,14 +541,20 @@ for the complete safety rules.
   migration applied with `db push --linked` after user approval. A migration must
   stop on a failed precondition; never force it with CASCADE, a data reset or by
   erasing a pending settlement. Never edit an applied migration; rollback is a new
-  forward migration.
+  forward migration. Mahjong's local server and tests read the platform contract
+  and migrations from this checkout's committed `HEAD`, so commit each new
+  migration together with its `scripts/fixtures/platform-sources.json`
+  classification; an unclassified committed migration stops them. Mahjong skips
+  replayed migration failures only when the message is an uppercase error code,
+  so a hosted-data guard must raise one, such as `BACCARAT_RELEASE_KEY_CHANGED`.
 - **Read-only checks.** `db query --linked` runs as a restricted Management API
   role that cannot execute internal health, admin or validator functions; do not
   broaden production grants to make a check pass. The queries in `scripts/sql/`
   are read-only status checks: `platform-reconciliation.sql` (wallet, reservation
   and fee consistency), `point-rules-status.sql` (POINT policy, grants and game
   limits), `release-safety-status.sql` (entry pause, administrator identity,
-  recovery grants and cleanup job; needs the password-authenticated connection)
+  recovery grants and cleanup job; needs the password-authenticated connection),
+  `email-allowlist-status.sql` (allowlist, Hook permissions and insert guards)
   and `mahjong-readiness.sql` (Mahjong runtime contract).
 - **Operator recovery.** To void an open match the product confirms is void,
   inspect the match and product state, then run a reviewed single transaction
@@ -570,19 +563,24 @@ for the complete safety rules.
   It is not granted to anon, authenticated, service_role or game runtimes. Never
   put the project administrator password or player credentials in command
   arguments or chat.
-- **Whitelist rollout and reviewed cleanup.** Follow
-  [WHITELIST_RELEASE.md](docs/operations/WHITELIST_RELEASE.md); drafts are not
-  installed until individually approved. The enabled Before User Created Hook
-  rejects guests and nonlisted/non-Google signup. Provider settings are unchanged.
+- **Allowlist.** Add or remove player emails at `/admin/access/`, never through
+  new migrations. Drafts are not installed until individually approved.
 - **Backend Keys.** Use `npm run key:backend`; the operator flow is in
-  [integrations/third-party/README.md](integrations/third-party/README.md).
+  [integrations/third-party/README.md](integrations/third-party/README.md#platform-operator-flow).
+  Baccarat's Windows host instead uses
+  `scripts/supabase-joy8.cmd baccarat-host-provision --apply`, which reuses the
+  same key factory and hash registration, creates only the restricted Baccarat
+  database login and refuses to replace existing credentials. Its host-side
+  handling is owned by
+  `D:/Studio/Project-Gaming/production/table/products/baccarat/docs/DEPLOYMENT.md`.
+  Each run is a hosted database change and needs separate user confirmation.
 
 ### Hosted Auth Configuration
 
 - The enabled `public.joy8_before_user_created` Postgres Hook accepts only
-  allowlisted Google signup and rejects anonymous account creation. The provider
-  switches and manual identity linking settings were left unchanged. The local
-  member UI and hosted Pages build remove guest entry.
+  allowlisted Google signup and rejects anonymous account creation. It is the
+  only enabled Auth hook. Provider switches and manual identity linking settings
+  are not changed by Joy8 releases.
 - The Email provider is enabled: public Auth settings report `external.email=true`,
   `disable_signup=false` and `mailer_autoconfirm=false`. The Hook rejects new
   Email-provider accounts. Disabling the provider is a separate release step
@@ -590,8 +588,7 @@ for the complete safety rules.
   `scripts/supabase-joy8.cmd auth-config disable-email --apply`; it disables only
   the Email provider and preserves Google and the current anonymous setting. Never set the global
   `disable_signup` flag. The local Joy8 access token currently receives HTTP 403
-  `Missing required permission(s): auth_config_read`. Hook activation used the
-  signed-in Dashboard without updating, creating or displaying a token.
+  `Missing required permission(s): auth_config_read`.
 - Facebook is disabled. The Joy8 Meta app (`1385504273217738`) is unpublished
   with no business portfolio, and no Meta App Secret is stored in this
   repository or hosted Auth.
@@ -657,8 +654,15 @@ for the complete safety rules.
 | `docs/platform/MAILBOX.md` | In-app mailbox, administrator workflow, claim accounting and activation procedure |
 | `docs/platform/CRAZYGAMES_INTEGRATION.md` | CrazyGames build and submission requirements |
 | `docs/platform/FLASH.md` | Stable cross-module Flash context |
-| `docs/operations/WHITELIST_RELEASE.md` | Pending whitelist rollout, exact cleanup review and activation gates |
-| `docs/operations/KNOWN_ISSUES.md` | Active limitations, risks, and launch blockers |
+| `docs/operations/KNOWN_ISSUES.md` | Active limitations, risks, launch blockers and open acceptance |
 | `docs/operations/ANALYTICS_MONITORING.md` | Analytics, KPI, logging, dashboards, and alerts |
+| `integrations/third-party/README.md` | Provider integration kit and Backend Key operator flow |
+| `integrations/third-party/API.md` | Concise SDK method reference |
+| `integrations/third-party/ACCEPTANCE.md` | Provider and joint acceptance checklist |
+| `integrations/third-party/AI_HANDOFF.md` | Prompt template for an AI-led game-side integration |
+| `packages/joy8-game-sdk/README.md` | SDK installation and usage |
+
+Each game's own operation, capacity and release acceptance belong in its
+repository; Joy8 records only what the platform must know.
 
 Do not copy whole sections between these documents. Link to the owning document when another subject needs context.

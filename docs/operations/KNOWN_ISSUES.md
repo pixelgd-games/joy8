@@ -16,18 +16,12 @@ must still implement and verify authoritative gameplay before activation.
 
 ### Release Gates
 
-- The whitelist SQL, reviewed cleanup and Mahjong reserve release are applied;
-  the Before User Created Hook, Gateway and Pages controls are deployed.
-  Inside-list Google signup is verified for Johnny; fresh outside-list Google
-  rejection still needs a designated test account. Acceptance gates are owned by
-  [WHITELIST_RELEASE.md](WHITELIST_RELEASE.md).
-
-- Monster Lab is published in the public catalog with its private entry disabled;
-  Mahjong is also published with its localhost private entry disabled. Monster Lab's hosted
-  launch, bets, win/loss settlement and complete Free Spins rounds were
-  verified, with each round's player settlement total matching the game's round
-  win minus the bet. Refresh during Free Spins, timeout and restart recovery,
-  physical-device QA, and release math/compliance review remain open. Do not treat publication as completion of those checks.
+- Hosted allowlist add/remove followed by session denial still needs a
+  designated disposable Google identity. Catalog draft editing does not verify
+  allowlist management; automated access/RLS tests cover the database boundary.
+- Catalog publication is not completion of a game's own release acceptance.
+  Each game tracks its open items in its repository, for example
+  `D:/Studio/Project-Gaming/production/slot/products/monster-lab/docs/STATUS.md`.
 - The hosted Email provider switch remains enabled, but the Hook rejects new
   non-Google signup. Any separate decision to disable only the
   Email provider remains under user control;
@@ -48,55 +42,18 @@ The integration requirements and acceptance cases belong in
 [GAME_PLATFORM_INTEGRATION.md](../platform/GAME_PLATFORM_INTEGRATION.md#operational-protocol-v1).
 POINT rules belong in [PRODUCT_SCOPE.md](../product/PRODUCT_SCOPE.md#wallet-and-point-direction).
 
-### Mahjong Activation
+### Game Credentials
 
-Mahjong Clash (`D:/Studio/Project-Gaming/production/table/products/mahjong-clash`)
-has a published catalog entry, a 25-table private `mahjong_clash` schema, a
-registered accounting adapter and capped reservation of each human's maximum
-one-hand loss (300 to 10,000 POINT). The 100,000,000-POINT payout safety ceiling and reviewed
-financial key scopes are active. Its localhost private entry remains disabled.
-The production URL is `https://mahjong-clash.pages.dev/`; the local authority
-connects through the Windows Tunnel service at `wss://mahjong-clash.joy8.cc/`.
-Correct-Origin WebSocket upgrade and wrong/missing-Origin blocking are verified.
-
-Its restricted database login and game-scoped exchange/renew/open/settle/status/cancel
-Backend Key have no expiry; they stay valid until revoked.
-Replacement requires a reviewed operator action through the
-[credential workflow](../../integrations/third-party/README.md#platform-operator-flow)
-or a secret manager; never write plaintext credential files into this repository.
-
-Remaining acceptance:
-
-- `20260924150000_mahjong_per_table_storage.sql` (applied) moved the
-  schema to 25 tables with per-table storage, the quarantined-table void and the
-  operator queue. Its `mahjong_clash_operator` role has no login; an operator
-  login needs a separate reviewed credential action.
-- Economy operations lock one singleton `economy_state` row, serializing them
-  across tables. A local PostgreSQL 17 snapshot test completed 124 mixed win/draw
-  hands across 1/5/25-table scenarios with no accounting mismatch or duplicate
-  retry credit. At 25 tables, settlement p95 was 711 ms, maximum 1,279 ms and up
-  to 24 connections waited for locks. Throughput rose from 44.64 hands/s at five
-  tables to 49.54 at 25; this is a short local SQL measurement, not hosted capacity
-  or full game-server throughput. Reproduce with `scripts/mahjong-capacity-check.mjs`.
-- Hosted allowlisted Lobby-to-Mahjong launch reached the real iframe and restored
-  an existing game screen. The user will verify a newly played hand, player/balance
-  continuity and reconciliation of human POINT and product-owned AI funding.
-  Reconnecting an existing screen is not proof of a new settlement.
-- The game server runs in a visible local terminal and needs manual restart after
-  reboot. Only the Tunnel is an automatic Windows service. Per-IP connection
-  limits remain deferred until public operation, as explicitly requested.
-- To withdraw activation, disable the entry and keys first and preserve
-  committed hands and audit data. Verify hosted backup availability before
-  operating.
-
-The game owns its runtime verification in its own `server/README.md`.
+Game Backend Keys and restricted product database logins have no expiry; they
+stay valid until revoked. Replacement requires a reviewed operator action through
+the [credential workflow](../../integrations/third-party/README.md#platform-operator-flow);
+never write plaintext credential files into this repository. To withdraw a game,
+disable its entry and keys first and preserve committed matches and audit data.
 
 ## Member Risks
 
 Account closure and retention remain product decisions. Google is the only
 supported member provider; Guest/Facebook/linking implementations are removed.
-Real outside-list Google rejection still needs provider acceptance. Automated
-Hook, Gateway and SQL checks do not stand in for that provider interaction.
 
 
 ## Scale and Operations
@@ -158,9 +115,9 @@ Manual hosted coverage and remaining boundaries:
 | --- | --- | --- |
 | Catalog Admin | Unpublished draft creation/readback/edit, sort-value persistence, invalid URL rejection, incomplete readiness blocking, retry after rejection, and ordinary Player Session denied Admin access | Successful publish/unpublish through the hosted UI and visible ordering changes; valid publish transitions are covered by native SQL tests |
 | Game entry | Public Lobby browsing and allowlisted Lobby-to-Mahjong iframe launch; disabled `/play-test/` and `/entry/` reject access | Successful enabled independent entry in a hosted browser; native tests cover enabled entry, publication transitions, origin checks and permissions |
-| Financial gameplay | Isolated snapshot capacity and retry/reconciliation checks described above | A new real Mahjong hand and reconciliation; the user will perform gameplay acceptance |
+| Financial gameplay | Hosted Monster Lab rounds and a real Mahjong hand settled and reconciled with Joy8; isolated snapshot capacity and retry checks | Hosted production capacity |
 | Baccarat raises | One hosted raise of an open bet, its single final settlement and platform reconciliation | Hosted timeout retry, cancel at betting close, cancel before arrival, rejected raise and void after a raise; Joy8 and Baccarat automated tests cover them, and the user will test them once the game is more complete |
-| Identity and mailbox | Automated Google-only access guards and atomic mail claim/retry checks | The user will test fresh outside-list Google rejection and hosted mail reward send/read/claim |
+| Identity and mailbox | Real inside-list Google signup and outside-list rejection; automated Google-only access guards and atomic mail claim/retry checks | Hosted allowlist add/remove with session denial, a real member's Lobby balance display, and hosted mail reward send/read/claim |
 | Operations | Direct hosted IP-header probe and local snapshot restore described in this document | Production capacity, Worker/native IPv6 paths and managed backup/PITR recovery |
 
 The temporary catalog draft used for hosted checks was removed. Those checks did

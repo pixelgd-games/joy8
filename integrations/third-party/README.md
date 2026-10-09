@@ -84,7 +84,8 @@ delivery and reviewed-plan arguments. Use `plan --operation revoke` and `revoke`
 with the same `--key-id` and profile; revocation needs no delivery target. Each
 operation needs its own reviewed file. `status --profile ...` remains read-only.
 The tool verifies `Joy8 / lsazydefvnuqglultqii / linked: true` before every database
-operation. No secret is printed or written into the reviewed file.
+operation and requires an enabled POINT policy. No secret is printed or written
+into the reviewed file.
 
 Cloudflare secret installation deploys the Worker immediately. The target
 backend must have its own local Wrangler dependency and an already-authenticated

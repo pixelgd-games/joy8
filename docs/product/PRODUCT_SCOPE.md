@@ -2,7 +2,7 @@
 
 This document defines what Joy8 is, what it owns, and which product directions are approved. It does not define implementation details, database history, or the game runtime protocol.
 
-Last reviewed: 2026-09-27.
+Last reviewed: 2026-10-09.
 
 ## Product Definition
 
@@ -145,11 +145,9 @@ and must not initialize Joy8 Auth, sessions, or wallets.
   balance required to join the table.
 - Mahjong Clash reserves each human's maximum one-hand loss with capped
   reservations of 300 to 10,000 POINT, and has a 100,000,000-POINT payout
-  safety ceiling. Its game server enforces
-  low/middle/high table thresholds of 300/800/3,000 POINT. AI funds remain in
-  Mahjong-owned `ai_accounts`, initially 10,000 POINT per AI; Joy8 creates no
-  human wallets for AI. Its reviewed Backend Key has the financial scopes and
-  settles only through the existing controlled adapter.
+  safety ceiling. The ceiling prevents mistakes; it is not an intended award.
+  AI funds remain in Mahjong-owned accounts and Joy8 creates no wallets for AI.
+  Table thresholds and AI funding rules are owned by Mahjong.
 - Starting POINT is granted once per player when the player enrolls, not per
   title and not at game launch:
 

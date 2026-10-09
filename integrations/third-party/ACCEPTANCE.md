@@ -45,7 +45,7 @@ profile. Passing local tests does not activate a public game.
 ## Joint private acceptance
 
 - [ ] Valid launch and one-time exchange.
-- [ ] Wrong origin, wrong Game ID and wrong/revoked/expired key rejection.
+- [ ] Wrong origin, wrong Game ID and wrong or revoked key rejection.
 - [ ] Maximum valid bet and over-limit bet rejection.
 - [ ] Player loss, player win, zero-change result and payout-limit rejection.
 - [ ] Exact duplicate settlement returns the saved settlement fields without a duplicate ledger entry; its top-level available balance reflects the current wallet, including after later gameplay.
@@ -59,6 +59,6 @@ profile. Passing local tests does not activate a public game.
 
 - [ ] Final Game URL, Backend URL, parent origins and rule version recorded.
 - [ ] SDK version and build commit recorded.
-- [ ] Backend Key scope and expiry reviewed; obsolete keys revoked.
+- [ ] Backend Key scope reviewed; obsolete keys revoked.
 - [ ] Game policy and private/public entry state explicitly approved.
 - [ ] Joy8 and provider owners sign off before public release.

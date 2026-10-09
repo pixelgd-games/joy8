@@ -29,7 +29,9 @@ separate from player enrollment and require consistent allowlist provisioning.
 
 The Supabase Before User Created Hook rejects anonymous, non-Google and
 outside-list signup. It runs as `supabase_auth_admin`; browser and game roles
-cannot invoke it. The hosted provider configuration is recorded in README.
+cannot invoke it. The hosted CLI cannot assume that role to probe the Hook; do
+not broaden its grants to enable one. The hosted provider configuration is
+recorded in README.
 
 The Gateway verifies the bearer. Member lookup and enrollment require a current,
 verified, active Google Auth user with an allowlisted email. Player/session insert
@@ -115,8 +117,9 @@ Automated checks cover Google callback routing, invalid providers/flows, callbac
 replay, one-time grants, concurrent enrollment, player/wallet stability, session
 permissions and rejected anonymous/outside-list identities. Native PostgreSQL
 checks are required for releases. Local fixtures do not prove a real Google
-provider interaction. Production provider acceptance requires an appropriate
-real account; see [KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md).
+provider interaction. Real Google accounts have verified inside-list signup and
+outside-list rejection; remaining hosted cases are in
+[KNOWN_ISSUES.md](../operations/KNOWN_ISSUES.md#test-gaps).
 
 Turnstile is not a frontend dependency. Existing hosted Auth configuration is
 separate from the Google-only member implementation.

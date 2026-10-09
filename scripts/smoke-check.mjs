@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
-import { mkdtemp, writeFile } from "node:fs/promises"
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { spawn, spawnSync } from "node:child_process"
@@ -41,6 +41,7 @@ try {
   const browserPath = findBrowser()
   console.log(`Starting browser on ${cdpPort}...`)
   browser = await startBrowser(browserPath, cdpPort)
+  await waitForHttp(`http://${host}:${cdpPort}/json/version`)
   console.log("Opening browser client...")
   const client = await openBrowserClient(cdpPort)
   await client.send("Page.enable")
@@ -99,7 +100,7 @@ try {
   client.ws.close()
   console.log("Smoke check passed.")
 } finally {
-  stopProcess(browser)
+  await stopBrowser(browser)
   stopProcess(devServer)
 }
 
@@ -200,8 +201,7 @@ async function startBrowser(browserPath, cdpPort) {
     shell: false,
   })
 
-  await waitForHttp(`http://${host}:${cdpPort}/json/version`)
-  return instance
+  return { instance, profile }
 }
 
 async function openBrowserClient(cdpPort) {
@@ -1111,4 +1111,18 @@ function stopProcess(child) {
   }
 
   child.kill("SIGTERM")
+}
+
+async function stopBrowser(browser) {
+  if (!browser) return
+
+  stopProcess(browser.instance)
+  if (process.platform === "win32") {
+    spawnSync("powershell.exe", [
+      "-NoProfile",
+      "-Command",
+      `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('${browser.profile}') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`,
+    ], { stdio: "ignore" })
+  }
+  await rm(browser.profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }).catch(() => {})
 }
