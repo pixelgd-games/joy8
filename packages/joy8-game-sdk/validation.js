@@ -79,6 +79,14 @@ export function normalizeGatewayUrl(value) {
   return `${url.origin}${url.pathname.replace(/\/+$/, "")}`
 }
 
+export function normalizeRegion(value) {
+  if (value === null) return null
+  if (typeof value !== "string" || !/^[a-z]{2}-[a-z]+-[1-9]$/.test(value)) {
+    fail("JOY8_SDK_INVALID_CONFIGURATION", "region must be a region code such as ap-northeast-1, or null")
+  }
+  return value
+}
+
 export function normalizeParentOrigins(values) {
   if (!Array.isArray(values) || values.length < 1) {
     fail("JOY8_SDK_INVALID_CONFIGURATION", "parentOrigins must contain at least one exact origin")

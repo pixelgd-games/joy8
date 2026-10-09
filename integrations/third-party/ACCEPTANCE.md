@@ -42,6 +42,12 @@ profile. Passing local tests does not activate a public game.
 - [ ] Completed settlements are never corrected by editing Joy8 history.
 - [ ] 429 handling honors `Retry-After` while preserving idempotency.
 
+## Performance and placement
+
+- [ ] A round whose result is known at opening uses one browser request to the backend with no CORS preflight, and one Gateway request (`openMatch` with its settlement).
+- [ ] The backend and game database run in the same region as Joy8, Tokyo (`ap-northeast-1`), and the SDK region pin stays enabled. See [execution region](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region).
+- [ ] p50 and p95 latency of Joy8 calls, measured from the production backend location, are reported.
+
 ## Joint private acceptance
 
 - [ ] Valid launch and one-time exchange.

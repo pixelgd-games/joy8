@@ -17,9 +17,18 @@ The authoritative protocol is
 
 ## Shared contract
 
-`@joy8/game-sdk/contract` publicly exports `GAME_SLUG_PATTERN` and
-`isLoopbackHostname`. Joy8 source uses this same maintained module. Changes are
-contract changes covered by platform and SDK verification.
+`@joy8/game-sdk/contract` publicly exports `GAME_SLUG_PATTERN`,
+`GATEWAY_REGION` and `isLoopbackHostname`. Joy8 source uses this same
+maintained module. Changes are contract changes covered by platform and SDK
+verification.
+
+## Execution region
+
+Both clients pin the Gateway to Joy8's region, `GATEWAY_REGION`
+(`ap-northeast-1`): the server client sends the `x-region` header and
+`getJoy8Balance` adds the `forceFunctionRegion` query parameter, which needs no
+extra CORS header. Pass `region` to override it or `null` to disable it. See the
+[execution region](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region).
 
 ## Installation
 
@@ -31,7 +40,7 @@ Local `npm pack` remains supported. Licensing and registry publication require
 an explicit decision; `UNLICENSED` does not grant third-party redistribution rights.
 
 ```bash
-npm install ./joy8-game-sdk-1.2.1.tgz
+npm install ./joy8-game-sdk-1.3.0.tgz
 ```
 
 Joy8 builds the tarball with:

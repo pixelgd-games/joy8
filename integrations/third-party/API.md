@@ -45,6 +45,9 @@ the provider backend after exchange. It returns:
 { sessionId, playerAccountRef, currency: "POINT", balance, lockedBalance }
 ```
 
+The optional `region` defaults to `"ap-northeast-1"` and is sent as the
+`forceFunctionRegion` query parameter; `null` sends none.
+
 `balance` and `lockedBalance` are decimal strings. The token and launch code
 remain in memory and must not enter storage, URLs, logs, analytics or save data.
 
@@ -64,7 +67,11 @@ const joy8 = new Joy8ServerClient({
 
 The Backend Key must be 64 lowercase hexadecimal characters and exist only in
 the backend secret manager. The optional `timeoutMs` is from 1,000 through
-30,000. The SDK sends no browser Origin and never retries automatically.
+30,000. The optional `region` defaults to `"ap-northeast-1"` and is sent as the
+`x-region` header on every call; `null` sends none. Region values must look like
+`ap-northeast-1`. The SDK sends no browser Origin and never retries
+automatically. See the
+[execution region](../../docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region).
 
 ### `exchangeLaunchCode({ launchCode })`
 

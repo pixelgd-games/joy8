@@ -244,6 +244,23 @@ https://lsazydefvnuqglultqii.supabase.co/functions/v1/joy8-gateway
 
 All routes accept `POST` JSON. The Gateway adds `X-Joy8-Request-Id` to responses.
 
+### Execution region
+
+Joy8 runs in one region: Tokyo (`ap-northeast-1`), where its database is hosted.
+Supabase otherwise runs the Gateway near its caller, and every database round
+trip then crosses to Tokyo, so each Gateway call pins the region. Server calls
+send the `x-region: ap-northeast-1` header. Browser calls use the
+`forceFunctionRegion=ap-northeast-1` query parameter instead, because `x-region`
+is not an allowed CORS request header; routing ignores the query string. The SDK
+pins the region by default, and the Lobby, Loader and member calls do the same.
+A direct HTTP integration without the SDK must send the same header or
+parameter. A pinned region does not fail over; this is accepted because the
+database exists only in Tokyo.
+
+Host each game backend and its game database in Tokyo as well, so the backend's
+Gateway calls stay inside the region. Placement evidence is part of
+[provider acceptance](../../integrations/third-party/ACCEPTANCE.md#performance-and-placement).
+
 ## Session Creation
 
 Endpoint:

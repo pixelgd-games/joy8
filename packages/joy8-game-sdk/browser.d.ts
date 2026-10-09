@@ -29,6 +29,7 @@ export function receiveJoy8Launch(options: ReceiveJoy8LaunchOptions): Promise<Jo
 export function getJoy8Balance(options: {
   gatewayUrl: string
   gatewayToken: string
+  region?: string | null
   timeoutMs?: number
   fetch?: typeof globalThis.fetch
 }): Promise<Joy8Balance>

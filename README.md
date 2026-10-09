@@ -138,7 +138,7 @@ Vite declares these entries in `vite.config.js`.
 | `src/member/` | H5 member UI and testable authentication flow |
 | `src/member/state.js` | Member identity transitions, duplicate-event suppression and stale-response isolation |
 | `src/member/game-visit.js` | Per-tab game-entry recency and return-to-Lobby handling |
-| `src/lib/request.js` | Browser API deadline covering connection and response-body reads |
+| `src/lib/request.js` | Browser API deadline covering connection and response-body reads; pins Gateway calls to the [execution region](docs/platform/GAME_PLATFORM_INTEGRATION.md#execution-region) |
 | `src/lib/urls.js` | URL helpers |
 | `src/ui/error-modal.js` | Shared error presentation |
 | `src/styles/` | Shared tokens plus theme, Lobby (`lobby.css`, `lobby-pc.css`, `lobby-mobile.css`), Loader, error-modal and the plain light Admin stylesheet (`admin.css`) shared by every admin page |

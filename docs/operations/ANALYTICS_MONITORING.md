@@ -208,7 +208,7 @@ Rules:
 
 ## Gateway Request Event
 
-The current Gateway emits JSON console logs containing event name, request ID, route, method, status, duration, and Origin. Those runtime logs are not a retained reporting table and are not yet connected to dashboards or alerts.
+The current Gateway emits JSON console logs containing event name, request ID, route, method, status, duration, execution region (`SB_REGION`), and Origin. Those runtime logs are not a retained reporting table and are not yet connected to dashboards or alerts.
 
 The first retained request-event record should contain only:
 

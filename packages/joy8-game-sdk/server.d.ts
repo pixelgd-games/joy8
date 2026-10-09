@@ -66,6 +66,7 @@ export class Joy8ServerClient {
     gatewayUrl: string
     backendKey: string
     gameId: string
+    region?: string | null
     timeoutMs?: number
     fetch?: typeof globalThis.fetch
   })

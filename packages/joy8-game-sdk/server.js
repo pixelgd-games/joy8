@@ -1,10 +1,12 @@
 import { postJson } from "./http.js"
 import { Joy8SdkError } from "./errors.js"
+import { GATEWAY_REGION } from "./contract.js"
 import {
   BACKEND_KEY_PATTERN,
   CURRENCY,
   isRecord,
   normalizeGatewayUrl,
+  normalizeRegion,
   requireAllowedKeys,
   requireAmount,
   requireExactKeys,
@@ -21,10 +23,12 @@ export class Joy8ServerClient {
   #fetch
   #gameId
   #gatewayUrl
+  #region
   #timeoutMs
 
-  constructor({ gatewayUrl, backendKey, gameId, timeoutMs = 8000, fetch: fetchImpl = globalThis.fetch } = {}) {
+  constructor({ gatewayUrl, backendKey, gameId, region = GATEWAY_REGION, timeoutMs = 8000, fetch: fetchImpl = globalThis.fetch } = {}) {
     this.#gatewayUrl = normalizeGatewayUrl(gatewayUrl)
+    this.#region = normalizeRegion(region)
     if (typeof backendKey !== "string" || !BACKEND_KEY_PATTERN.test(backendKey)) {
       throw new Joy8SdkError("JOY8_SDK_INVALID_CONFIGURATION", "backendKey must be a 64-character lowercase hexadecimal secret")
     }
@@ -125,7 +129,7 @@ export class Joy8ServerClient {
     return postJson({
       fetchImpl: this.#fetch,
       url: `${this.#gatewayUrl}/${route}`,
-      headers: { Authorization: `Bearer ${this.#backendKey}` },
+      headers: { Authorization: `Bearer ${this.#backendKey}`, ...(this.#region && { "x-region": this.#region }) },
       body,
       timeoutMs: this.#timeoutMs,
     })

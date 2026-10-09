@@ -1,9 +1,11 @@
 import { postJson } from "./http.js"
+import { GATEWAY_REGION } from "./contract.js"
 import {
   CURRENCY,
   PROTOCOL,
   normalizeGatewayUrl,
   normalizeParentOrigins,
+  normalizeRegion,
   rejectUrlCredentials,
   requireExactKeys,
   requireText,
@@ -89,13 +91,15 @@ export function receiveJoy8Launch({
   })
 }
 
-export async function getJoy8Balance({ gatewayUrl, gatewayToken, timeoutMs = 8000, fetch: fetchImpl = globalThis.fetch } = {}) {
+export async function getJoy8Balance({ gatewayUrl, gatewayToken, region = GATEWAY_REGION, timeoutMs = 8000, fetch: fetchImpl = globalThis.fetch } = {}) {
   const baseUrl = normalizeGatewayUrl(gatewayUrl)
+  const regionCode = normalizeRegion(region)
   requireText(gatewayToken, "gatewayToken", 1, 256)
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 30000) {
     throw new Joy8SdkError("JOY8_SDK_INVALID_CONFIGURATION", "timeoutMs must be from 1000 to 30000")
   }
-  const payload = await postJson({ fetchImpl, url: `${baseUrl}/balance`, body: { gateway_token: gatewayToken }, timeoutMs })
+  const url = `${baseUrl}/balance${regionCode ? `?forceFunctionRegion=${regionCode}` : ""}`
+  const payload = await postJson({ fetchImpl, url, body: { gateway_token: gatewayToken }, timeoutMs })
   try {
     requireExactKeys(payload, ["session_id", "player_account_ref", "currency", "balance", "locked_balance"], "balance response")
     requireUuid(payload.session_id, "session_id")

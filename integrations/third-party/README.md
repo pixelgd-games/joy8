@@ -1,6 +1,6 @@
 # Joy8 Third-Party Game Integration Kit
 
-Kit version: `1.2.1`. Its machine-readable version and protocol are in
+Kit version: `1.3.0`. Its machine-readable version and protocol are in
 [`manifest.json`](manifest.json).
 
 This kit is the handoff package for a game provider implementing Joy8
@@ -94,6 +94,8 @@ operator session. The tool refuses to download or run an unpinned Wrangler.
 ## What the provider returns
 
 - Final HTTPS game URL and backend URL.
+- Hosting region of the backend and game database (expected: Tokyo,
+  `ap-northeast-1`) and p50/p95 latency of Joy8 calls measured from that backend.
 - Exact Content Security Policy and frame-embedding confirmation.
 - Implemented SDK version and rule version.
 - Durable match/result storage and idempotency design.

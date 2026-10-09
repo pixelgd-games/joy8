@@ -13,6 +13,7 @@ globalThis.Deno = {
         SUPABASE_SERVICE_ROLE_KEY: "service-key",
         SUPABASE_ANON_KEY: "anon-key",
         JOY8_ALLOWED_ORIGINS: testOrigins,
+        SB_REGION: "ap-northeast-1",
       }[name]
     },
   },
@@ -333,6 +334,13 @@ try {
   serverError = { message: "private database diagnostic", details: key }
   assert.deepEqual(await (await request("server-settle-v1", {}, key, null)).json(), { error: "JOY8_UPSTREAM_UNAVAILABLE" })
   assert.deepEqual(await (await request("health", {}, "", null)).json(), { status: "ok" })
+  const originalLog = console.log
+  const logs = []
+  console.log = line => logs.push(JSON.parse(line))
+  try {
+    assert.equal((await request("health?forceFunctionRegion=ap-northeast-1", {}, "", null)).status, 200)
+  } finally { console.log = originalLog }
+  assert.deepEqual([logs[0].route, logs[0].status, logs[0].region], ["health", 200, "ap-northeast-1"])
   health = false
   assert.equal((await request("health", {}, "", null)).status, 503)
   console.log("Gateway unit check passed, including member, server authority and health boundaries.")

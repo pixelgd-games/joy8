@@ -129,10 +129,19 @@ describe("Joy8 browser SDK", () => {
       return response({ session_id: sessionId, player_account_ref: playerId, currency: "POINT", balance: 120, locked_balance: "20.00" })
     }
     const balance = await getJoy8Balance({ gatewayUrl, gatewayToken: "gateway-token", fetch })
-    assert.equal(request.url, `${gatewayUrl}/balance`)
+    assert.equal(request.url, `${gatewayUrl}/balance?forceFunctionRegion=ap-northeast-1`)
     assert.equal(request.options.headers.Authorization, undefined)
+    assert.deepEqual(Object.keys(request.options.headers), ["Content-Type"])
     assert.deepEqual(JSON.parse(request.options.body), { gateway_token: "gateway-token" })
     assert.deepEqual(balance, { sessionId, playerAccountRef: playerId, currency: "POINT", balance: "120", lockedBalance: "20.00" })
+    await getJoy8Balance({ gatewayUrl, gatewayToken: "gateway-token", region: "us-east-1", fetch })
+    assert.equal(request.url, `${gatewayUrl}/balance?forceFunctionRegion=us-east-1`)
+    await getJoy8Balance({ gatewayUrl, gatewayToken: "gateway-token", region: null, fetch })
+    assert.equal(request.url, `${gatewayUrl}/balance`)
+    for (const region of ["", "Tokyo", "ap-northeast-1&x=1", 1]) {
+      await assert.rejects(getJoy8Balance({ gatewayUrl, gatewayToken: "gateway-token", region, fetch }),
+        error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
+    }
   })
 })
 
@@ -166,6 +175,7 @@ describe("Joy8 server SDK", () => {
     assert.deepEqual(calls.map(call => call.route), ["server-exchange-v1", "server-renew-v1", "server-open-v1", "server-settle-v1", "server-status-v1", "server-cancel-v1"])
     for (const call of calls) {
       assert.equal(call.headers.Authorization, `Bearer ${backendKey}`)
+      assert.equal(call.headers["x-region"], "ap-northeast-1")
       assert.equal(call.headers.Origin, undefined)
       assert.equal(call.body.version, 1)
     }
@@ -250,6 +260,21 @@ describe("Joy8 server SDK", () => {
     }
   })
 
+  test("pins the execution region unless it is overridden or disabled", async () => {
+    const headers = []
+    const fetch = async (url, options) => {
+      headers.push(options.headers)
+      return response({ version: 1, match_id: matchId, state: "open", result: null, settlement_count: 0 })
+    }
+    await new Joy8ServerClient({ gatewayUrl, backendKey, gameId, region: "us-east-1", fetch }).getMatchStatus({ matchRef: "spin-1" })
+    await new Joy8ServerClient({ gatewayUrl, backendKey, gameId, region: null, fetch }).getMatchStatus({ matchRef: "spin-1" })
+    assert.equal(headers[0]["x-region"], "us-east-1")
+    assert.deepEqual(Object.keys(headers[1]).sort(), ["Authorization", "Content-Type"])
+    for (const region of ["", "Tokyo", "ap-northeast-1\r\nx: y", 1]) {
+      assert.throws(() => new Joy8ServerClient({ gatewayUrl, backendKey, gameId, region }), error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
+    }
+  })
+
   test("rejects invalid local input, another Game ID and safe API errors without leaking the key", async () => {
     assert.throws(() => new Joy8ServerClient({ gatewayUrl, backendKey: "bad", gameId }), error => error.code === "JOY8_SDK_INVALID_CONFIGURATION")
     const wrongGame = new Joy8ServerClient({ gatewayUrl, backendKey, gameId, fetch: async () => response({
@@ -285,7 +310,7 @@ test("the npm package contains only the documented distributable SDK files", () 
   assert.equal(result.status, 0, result.stderr)
   const pack = JSON.parse(result.stdout)[0]
   assert.equal(pack.name, "@joy8/game-sdk")
-  assert.equal(pack.version, "1.2.1")
+  assert.equal(pack.version, "1.3.0")
   const paths = pack.files.map(file => file.path)
   for (const required of ["README.md", "browser.js", "browser.d.ts", "server.js", "server.d.ts", "index.js", "index.d.ts", "errors.js", "errors.d.ts", "http.js", "validation.js", "package.json"]) {
     assert.ok(paths.includes(required), required)

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict"
 import test from "node:test"
 import { setImmediate } from "node:timers/promises"
+import { createClient } from "@supabase/supabase-js"
 import { createMemberState } from "../src/member/state.js"
 import { createMemberService } from "../src/member/service.js"
 import { fetchWithTimeout } from "../src/lib/request.js"
@@ -96,6 +97,23 @@ test("browser request deadline includes a stalled response body and preserves ca
     await assert.rejects(pending, { name: "AbortError" })
     globalThis.fetch = async () => Response.json({ ok: true })
     assert.deepEqual(await (await fetchWithTimeout("https://fixture.test")).json(), { ok: true })
+  } finally { globalThis.fetch = original }
+})
+
+test("Gateway calls pin the Tokyo region with a query parameter and no extra CORS header", async () => {
+  const original = globalThis.fetch
+  const requests = []
+  try {
+    globalThis.fetch = async (url, options) => {
+      requests.push({ url: String(url), headers: new Headers(options.headers) })
+      return Response.json({ member: null })
+    }
+    const client = createClient("https://fixture.supabase.co", "anon-key", { global: { fetch: fetchWithTimeout }, auth: { persistSession: false } })
+    await client.functions.invoke("joy8-gateway/member", { body: {} })
+    await fetchWithTimeout("https://fixture.supabase.co/rest/v1/public_games_v1?select=slug")
+    assert.equal(requests[0].url, "https://fixture.supabase.co/functions/v1/joy8-gateway/member?forceFunctionRegion=ap-northeast-1")
+    assert.equal(requests[0].headers.has("x-region"), false)
+    assert.equal(requests[1].url, "https://fixture.supabase.co/rest/v1/public_games_v1?select=slug")
   } finally { globalThis.fetch = original }
 })
 

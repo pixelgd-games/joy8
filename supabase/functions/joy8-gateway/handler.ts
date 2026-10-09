@@ -1,5 +1,6 @@
 import { getRoute, buildCorsHeaders, isCorsOriginAllowed, jsonResponse } from "./http.ts"
 import { callRpc } from "./rpc.ts"
+import { EXECUTION_REGION } from "./config.ts"
 import { enforceRateLimit } from "./rate-limit.ts"
 import { mailboxOperation } from "./mailbox-routes.ts"
 import { serverOperation } from "./server-routes.ts"
@@ -57,6 +58,7 @@ export async function handleRequest(request: Request): Promise<Response> {
     method: request.method,
     status: response.status,
     duration_ms: Date.now() - startedAt,
+    region: EXECUTION_REGION,
     origin: origin || null,
   }))
 
