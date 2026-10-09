@@ -22,6 +22,7 @@ const checks = [
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/gateway-unit-check.mjs"],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/mailbox-gateway-check.mjs"],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/wallet-gateway-check.mjs"],
+  ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "scripts/lobby-gateway-check.mjs"],
   ["--disable-warning=ExperimentalWarning", "--experimental-strip-types", "--test", "scripts/gateway-rate-limit-check.mjs"],
   ["scripts/smoke-check.mjs"],
 ]

@@ -64,19 +64,21 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     finally { if (pendingMember?.request === request) pendingMember = null }
   }
 
+  async function memberFailure(error) {
+    if (error.context?.status === 429) return Object.assign(new Error("Member request rate limited"), { code: "over_request_rate_limit", context: error.context })
+    let code = "member_unavailable"
+    try {
+      const body = await error.context?.json()
+      if (["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"].includes(body?.error)) code = body.error
+      if (body?.error === "player account is not active") code = "member_inactive"
+      if (body?.error === "verified member identity is required") code = "verification_required"
+    } catch {}
+    return Object.assign(new Error("Member request failed"), { code })
+  }
+
   async function requestMembership(enroll, authUserId = null) {
     const result = await client.functions.invoke(`joy8-gateway/${enroll ? "enroll-member" : "member"}`, { body: {} })
-    if (result.error) {
-      if (result.error.context?.status === 429) throw Object.assign(new Error("Member request rate limited"), { code: "over_request_rate_limit", context: result.error.context })
-      let code = "member_unavailable"
-      try {
-        const body = await result.error.context?.json()
-        if (["JOY8_EMAIL_NOT_ALLOWED", "JOY8_GUEST_DISABLED"].includes(body?.error)) code = body.error
-        if (body?.error === "player account is not active") code = "member_inactive"
-        if (body?.error === "verified member identity is required") code = "verification_required"
-      } catch {}
-      throw Object.assign(new Error("Member request failed"), { code })
-    }
+    if (result.error) throw await memberFailure(result.error)
     const member = result.data?.member ?? null
     if (enroll && !member) throw new Error("Enrollment returned no member")
     if (enroll && (await session())?.user.id !== authUserId) throw new Error("Member identity changed")
@@ -84,6 +86,14 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
       window.dispatchEvent(new CustomEvent("joy8:membership", { detail: { ...member, auth_user_id: authUserId } }))
     }
     return member
+  }
+
+  async function lobby() {
+    if (!(await session())) return null
+    const result = await client.functions.invoke("joy8-gateway/lobby", { body: {} })
+    if (result.error) throw await memberFailure(result.error)
+    const member = result.data?.member ?? null
+    return { member, wallet: member ? result.data?.wallet ?? null : null, mail: member ? result.data?.mail ?? null : null }
   }
 
   async function wallet() {
@@ -115,5 +125,5 @@ export function createMemberService(client, { origin, next = "/" } = {}) {
     checked(await client.auth.signOut({ scope: "local" }))
   }
 
-  return { session, membership, wallet, oauth, completeCallback, signOut, returnPath }
+  return { session, membership, lobby, wallet, oauth, completeCallback, signOut, returnPath }
 }

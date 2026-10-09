@@ -227,6 +227,11 @@ export function createMailSheet({ api, toast, onUnread, onClaimed }) {
     close() {
       if (dialog.open) dialog.close()
     },
+    prime(result) {
+      if (!result || typeof result !== "object" || Array.isArray(result)) return
+      firstPage = { result, at: Date.now() }
+      setUnread(result.unread)
+    },
     async refreshUnread() {
       const current = revision
       try {

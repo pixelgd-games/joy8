@@ -1,6 +1,6 @@
 import { GAME_SLUG_PATTERN } from "../../../packages/joy8-game-sdk/contract.js"
 import { resolveAuthUser } from "./auth.ts"
-import { callRpc, firstRpcRow, statusFromRpcError, toPublicRpcError } from "./rpc.ts"
+import { callRpc, firstRpcRow, statusFromRpcError, toPublicRpcError, SERVER_ERROR_STATUSES } from "./rpc.ts"
 import { enforceCounterRateLimit, enforceSubjectRateLimit } from "./rate-limit.ts"
 import { jsonResponse, readJsonBody, normalizeRequiredText } from "./http.ts"
 import type { JsonValue } from "./http.ts"
@@ -209,4 +209,54 @@ export async function getMemberWallet(request: Request, headers: HeadersInit): P
     return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
   }
   return jsonResponse({ wallet }, 200, headers)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
+
+export async function resolveLobby(request: Request, headers: HeadersInit): Promise<Response> {
+  const auth = await resolveAuthUser(request)
+  if (!auth.ok) return jsonResponse({ error: auth.error }, auth.status, headers)
+  if (!auth.userId) return jsonResponse({ error: "User session is required" }, 401, headers)
+  const body = await readJsonBody(request)
+  if (!body.ok) return jsonResponse({ error: body.error }, 400, headers)
+  if (Object.keys(body.value).length) return jsonResponse({ error: "Lobby request must be empty" }, 400, headers)
+  const result = await callRpc("joy8_member_lobby_v1", { p_auth_user_id: auth.userId })
+  if (!result.ok) return jsonResponse(toPublicRpcError(result.body), statusFromRpcError(result.body), headers)
+  const packet = result.body
+  if (!isRecord(packet)) return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  if (packet.limited === true) {
+    const retryAfter = Number(packet.retry_after)
+    if (!Number.isInteger(retryAfter) || retryAfter <= 0 || retryAfter > 86400) return jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+    return jsonResponse({ error: "Too many requests" }, 429, { ...headers, "Retry-After": String(retryAfter) })
+  }
+  if (typeof packet.admission_error === "string") {
+    return Object.hasOwn(SERVER_ERROR_STATUSES, packet.admission_error)
+      ? jsonResponse({ error: packet.admission_error }, SERVER_ERROR_STATUSES[packet.admission_error], headers)
+      : jsonResponse({ error: "Gateway rate limit is unavailable" }, 503, headers)
+  }
+  if (Object.hasOwn(packet, "error")) {
+    return isRecord(packet.error)
+      ? jsonResponse(toPublicRpcError(packet.error), statusFromRpcError(packet.error), headers)
+      : jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  }
+  const lobby = packet.result
+  if (!isRecord(lobby) || !Object.hasOwn(lobby, "member")) return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  if (lobby.member === null) return jsonResponse({ member: null }, 200, headers)
+  const member = lobby.member
+  if (!isRecord(member) || typeof member.player_account_ref !== "string" || !member.player_account_ref
+    || member.account_type !== "registered" || typeof member.public_id !== "string" || !/^[1-9][0-9]{5}$/.test(member.public_id)) {
+    return jsonResponse({ error: "Gateway returned an invalid member" }, 502, headers)
+  }
+  const wallet = lobby.wallet ?? null
+  const mail = lobby.mail ?? null
+  if ((wallet !== null && !isRecord(wallet)) || (mail !== null && !isRecord(mail))) {
+    return jsonResponse({ error: "JOY8_UPSTREAM_UNAVAILABLE" }, 502, headers)
+  }
+  return jsonResponse({
+    member: { player_account_ref: member.player_account_ref, public_id: member.public_id, account_type: member.account_type },
+    wallet: wallet as JsonValue,
+    mail: mail as JsonValue,
+  }, 200, headers)
 }

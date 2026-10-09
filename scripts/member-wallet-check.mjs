@@ -69,3 +69,33 @@ test("browser roles cannot read member wallets", async () => {
     await assert.rejects(wallet(id, role), error => error.code === "42501")
   }
 })
+
+const lobby = (id, role = "service_role") => asRole(role, "select public.joy8_member_lobby_v1($1::uuid) result", [id]).then(row => row.result)
+
+test("the lobby snapshot returns the member, wallet and first mailbox page in one call", async () => {
+  const { id, member } = await enroll()
+  const snapshot = await lobby(id)
+  assert.deepEqual(snapshot.result.member, { player_account_ref: member.player_account_id, public_id: member.public_id, account_type: "registered" })
+  assert.deepEqual(snapshot.result.wallet, await wallet(id))
+  assert.deepEqual(snapshot.result.mail, { items: [], unread: 0, offset: 0 })
+})
+
+test("the lobby snapshot reports non-members and rejects inactive identities", async () => {
+  assert.deepEqual(await lobby(await googleIdentity(db)), { result: { member: null } })
+  const { id } = await enroll()
+  await db.query("update auth.users set banned_until=now()+interval '1 day' where id=$1", [id])
+  assert.deepEqual(await lobby(id), { admission_error: "JOY8_PLAYER_INACTIVE" })
+})
+
+test("the lobby snapshot uses the member request budget", async () => {
+  const { id } = await enroll()
+  for (let index = 0; index < 120; index++) assert.ok((await lobby(id)).result.member)
+  assert.deepEqual(await lobby(id), { limited: true, retry_after: 60 })
+})
+
+test("browser roles cannot read the lobby snapshot", async () => {
+  const { id } = await enroll()
+  for (const role of ["anon", "authenticated"]) {
+    await assert.rejects(lobby(id, role), error => error.code === "42501")
+  }
+})

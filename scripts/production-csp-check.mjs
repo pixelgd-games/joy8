@@ -53,6 +53,8 @@ export async function expectProductionCsp(client, cwd) {
       if (!url.hostname.endsWith('.supabase.co')) return fetchOriginal(input, options);
       if (url.pathname === '/rest/v1/public_games_v1') return Response.json([{id:'00000000-0000-4000-8000-000000000002',slug:'built-game',name:'Built Game',type:'arcade',thumbnail:null,launch_url:location.origin+'/built-game/'}]);
       if (url.pathname === '/auth/v1/user') return Response.json(user);
+      const mailPage = () => ({items:[{id:'built-mail',kind:'reward',title:'Built reward',body:'Built mail body',amount:'500',read_at:builtFixture.read?'2026-09-30':null,claimed_at:builtFixture.claimed?'2026-09-30':null}],unread:builtFixture.read?0:1});
+      if (url.pathname.endsWith('/lobby')) return Response.json({member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'},wallet:{balance:builtFixture.claimed?'1500':'1000'},mail:mailPage()});
       if (url.pathname.endsWith('/member')) return Response.json({member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'}});
       if (url.pathname.endsWith('/wallet')) return Response.json({wallet:{balance:builtFixture.claimed?'1500':'1000'}});
       if (url.pathname.endsWith('/create-session')) {
@@ -63,7 +65,7 @@ export async function expectProductionCsp(client, cwd) {
         const {action} = JSON.parse(options.body);
         if (action === 'read') { builtFixture.read = true; return Response.json({read_at:'2026-09-30'}); }
         if (action === 'claim') { builtFixture.claims++; builtFixture.claimed = true; return Response.json({claimed_at:'2026-09-30'}); }
-        return Response.json({items:[{id:'built-mail',kind:'reward',title:'Built reward',body:'Built mail body',amount:'500',read_at:builtFixture.read?'2026-09-30':null,claimed_at:builtFixture.claimed?'2026-09-30':null}],unread:builtFixture.read?0:1});
+        return Response.json(mailPage());
       }
       return Response.json({error:'Blocked isolated request'}, {status:403});
     };

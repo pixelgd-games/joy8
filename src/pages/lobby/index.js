@@ -130,12 +130,24 @@ function setupMember(appRoot) {
     for (const node of appRoot.querySelectorAll(".account")) node.setAttribute("aria-label", `會員資料 Player ${publicId}`)
     menu.render({ publicId, email: user.email, joinedAt: user.created_at })
     settings.render({ publicId })
-    void refreshWallet()
-    void mail.refreshUnread()
+    const snapshot = member.lobby
+    delete member.lobby
+    if (!snapshot) {
+      void refreshWallet()
+      void mail.refreshUnread()
+      return
+    }
+    ++walletRevision
+    renderWallet(snapshot.wallet ? Number(snapshot.wallet.balance) : null)
+    if (snapshot.mail) mail.prime(snapshot.mail)
+    else void mail.refreshUnread()
   }
 
   const account = createMemberState({
-    readMember: () => service.membership(),
+    readMember: async () => {
+      const snapshot = await service.lobby()
+      return snapshot?.member ? { ...snapshot.member, lobby: snapshot } : null
+    },
     onReset: applyGuest,
     onMember: applyMember,
     onPending: () => loginButton.setAttribute("aria-busy", "true"),

@@ -31,7 +31,8 @@ Open acceptance items and launch risks are tracked only in
 - [Reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
   and their Gateway routes are deployed. Only Baccarat enables them, with the
   policy flag and `reserve` key scope applied.
-- The Lobby shows the member's POINT balance through the Gateway `wallet` route.
+- The Lobby loads the member, POINT balance and first mailbox page through one
+  Gateway `lobby` request.
 
 ## Current Scope
 
@@ -188,8 +189,9 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    name on the platform fallback.
 3. Signed-out visitors see `登入`. An enrolled player sees the avatar,
    `Player 123456`, the POINT balance, the unread count and a member card with
-   the player ID, masked Google email and join date. The balance comes from the
-   Gateway `wallet` route and refreshes after a mailbox claim.
+   the player ID, masked Google email and join date. One `lobby` request returns
+   the member, balance and first mailbox page together; the `wallet` route
+   refreshes the balance after a mailbox claim.
 4. Selecting a game checks membership. Enrolled registered players continue to
    `/game/?slug=<slug>`. Other visitors see the member dialog with the chosen
    game named and its cover. Google entry preserves that destination; closing
@@ -263,8 +265,12 @@ callback queries in analytics or access-log exports.
 enrolls the authenticated identity. Both take an empty JSON object, require an
 allowed Origin and server-verified bearer token, and return
 `{ "member": { "player_account_ref": "...", "public_id": "482731", "account_type": "registered" } }`.
-`player_account_ref` is the internal UUID used for authorization and backend
-mapping. `public_id` is a presentation identifier, not a credential, launch field,
+`POST /lobby` takes the same empty request and returns that member plus
+`wallet` and `mail` (the first mailbox page with its unread count), or
+`{ "member": null }`. One database call performs member admission, which shares
+the `member` request budget, and reads all three; `mail` is null when the
+mailbox read fails. `player_account_ref` is the internal UUID used for
+authorization and backend mapping. `public_id` is a presentation identifier, not a credential, launch field,
 or settlement key. The read route may return `{ "member": null }` and never
 writes. `enroll-member` creates the player's wallet and enrollment grant, and
 never creates a guest or a promotion grant.
@@ -313,7 +319,7 @@ Tests exercise the actual handler and import HTTP/auth/RPC helpers directly.
 
 The hosted `joy8-gateway` implements these POST routes:
 
-- member, enroll-member, wallet, mailbox, admin-mailbox, create-session,
+- member, enroll-member, lobby, wallet, mailbox, admin-mailbox, create-session,
   private-session, branded-entry, balance, health.
 - server-exchange-v1, server-renew-v1, server-open-v1,
   server-settle-v1, server-status-v1, server-cancel-v1, server-reserve-v1,
@@ -429,7 +435,7 @@ $env:JOY8_TEST_PG_BIN = Join-Path $joy8PgTools 'node_modules\@embedded-postgres\
 | `npm run test:member` / `test:iframe` | Member flow and Loader handshake with mocks |
 | `npm run test:gateway` / `test:gateway-rate` | Gateway routes, error mapping, health and scoped rate limits |
 | `npm run test:member-db` / `test:member-pg` | Enrollment, one-time grants, launch and wallet concurrency |
-| `npm run test:member-wallet` | Member wallet read permissions, reserved/available POINT and the `wallet` Gateway route |
+| `npm run test:member-wallet` | Member wallet and lobby snapshot permissions, reserved/available POINT, the shared member budget and the `wallet` and `lobby` Gateway routes |
 | `npm run test:mailbox` | Mailbox audience snapshot, permissions, read/claim states, atomic credit and retries on the current schema; set `JOY8_TEST_ENGINE=postgres17` with `JOY8_TEST_PG_BIN` for competing connections |
 | `npm run test:public-id` / `test:member-product-db` / `test:member-product-pg` | Public IDs and product-schema registration |
 | `npm run test:platform-db` / `test:platform-pg` | Reservation, settlement, fees, frozen wallets and adapter isolation |

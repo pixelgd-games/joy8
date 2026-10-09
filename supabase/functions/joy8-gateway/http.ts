@@ -54,7 +54,7 @@ export function buildCorsHeaders(
 }
 
 export function isCorsOriginAllowed(origin: string | null, route: string): boolean {
-  if (["wallet", "mailbox", "admin-mailbox"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
+  if (["wallet", "lobby", "mailbox", "admin-mailbox"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
   if (route.startsWith("server-") && route.endsWith("-v1")) return !origin
   if (["private-session", "branded-entry"].includes(route)) return Boolean(origin && allowedOrigins.includes(origin))
   const memberRoute = ["create-session", "member", "enroll-member"].includes(route)
