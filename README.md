@@ -608,11 +608,11 @@ for the complete safety rules.
   `http://localhost:5173/admin/login/`.
 - Member returns go to `https://joy8.cc/` and `https://joy8.cc/entry/`. Supabase
   Auth accepts them because they share the Site URL's scheme and host;
-  `joy8.pages.dev` and `www.joy8.cc` redirect to that host first. The older
-  member allowlist entries end in `/account/*` and no longer match any return.
-  A local Google sign-in on `localhost` falls back to the Site URL until the
-  local origins (for example `http://localhost:5173/**`) are added to the
-  allowlist.
+  `joy8.pages.dev` and `www.joy8.cc` redirect to that host first. Local returns
+  use the allowlist entries `http://localhost:5173/**`,
+  `http://127.0.0.1:5173/**`, `http://localhost:4173/**` and
+  `http://127.0.0.1:4173/**`. The allowlist holds only these four and the four
+  admin entries.
 - No outbound email is configured: Cloudflare Email Sending is disabled and no
   SMTP credential exists.
 - Cloudflare Turnstile configuration remains hosted. The Google-only frontend
