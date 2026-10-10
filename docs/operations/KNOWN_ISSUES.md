@@ -176,6 +176,14 @@ origin and the Loader sends the launch response with target `*` after checking
 the exact iframe window and `null` origin. This deliberate exception is weaker
 than exact-origin delivery used for cross-origin games.
 
+### Temporary Trial-Link URL
+
+釣魚大亨 (`fishing-ace`) launches from a Cloudflare quick tunnel
+(`*.trycloudflare.com`). The address changes whenever that tunnel restarts,
+and the Lobby card then opens a dead frame until the catalog URL is updated.
+A fixed deployment such as `*.pages.dev` removes this. Its in-game BET and
+test points are the game's own and never touch POINT.
+
 ### Error Modal Accessibility
 
 The shared Error Modal does not provide a complete focus trap or focus

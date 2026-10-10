@@ -28,6 +28,9 @@ Open acceptance items and launch risks are tracked only in
   with game-scoped Backend Keys; their private entries are disabled. Hosted
   settlements from each game reconcile with Joy8. Each game tracks its own
   release acceptance in its repository.
+- 七號樣本 (`specimen-07`) and 釣魚大亨 (`fishing-ace`) are published as
+  [trial links](docs/product/PRODUCT_SCOPE.md#catalog-direction) without
+  covers, after the Joy8 games in the Lobby.
 - [Reserve increases](docs/platform/GAME_PLATFORM_INTEGRATION.md#reserve-increase)
   and their Gateway routes are deployed. Only Baccarat enables them, with the
   policy flag and `reserve` key scope applied.
