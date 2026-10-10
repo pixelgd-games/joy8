@@ -6,9 +6,9 @@ The administrator composer (`/admin/mail/`), Gateway routes and incremental SQL
 are deployed. Players read and claim mail in the Lobby mailbox drawer; there is
 no standalone player mailbox page. The approved migration is
 `supabase/migrations/20260926100000_in_app_mailbox.sql`. Hosted installation and
-permission checks are verified. No real mail or POINT was issued during
-development or deployment; real-player issuance and claim acceptance remains
-pending a designated player and approved amount.
+permission checks are verified. A hosted reward broadcast to every enrolled
+player was prepared and sent from the composer; player read and claim on the
+hosted service are not yet confirmed.
 
 Joy8 owns the service, identity, permissions and shared POINT accounting. It
 uses database records, not email or SMTP. The initial UI runs in Joy8; Mahjong's

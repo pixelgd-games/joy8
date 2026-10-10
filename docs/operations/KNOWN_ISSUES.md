@@ -146,7 +146,7 @@ Manual hosted coverage and remaining boundaries:
 | Game entry | Public Lobby browsing and allowlisted Lobby-to-Mahjong iframe launch; disabled `/play-test/` and `/entry/` reject access | Successful enabled independent entry in a hosted browser; native tests cover enabled entry, publication transitions, origin checks and permissions |
 | Financial gameplay | Hosted Monster Lab rounds and a real Mahjong hand settled and reconciled with Joy8; isolated snapshot capacity and retry checks | Hosted production capacity |
 | Baccarat raises | One hosted raise of an open bet, its single final settlement and platform reconciliation | Hosted timeout retry, cancel at betting close, cancel before arrival, rejected raise and void after a raise; Joy8 and Baccarat automated tests cover them, and the user will test them once the game is more complete |
-| Identity and mailbox | Real inside-list Google signup and outside-list rejection; automated Google-only access guards and atomic mail claim/retry checks | Hosted allowlist add/remove with session denial, a real member's Lobby balance display, and hosted mail reward send/read/claim |
+| Identity and mailbox | Real inside-list Google signup and outside-list rejection; automated Google-only access guards and atomic mail claim/retry checks | Hosted allowlist add/remove with session denial, a real member's Lobby balance display, and hosted mail reward read/claim (send is verified) |
 | Operations | Direct hosted IP-header probe and local snapshot restore described in this document | Production capacity, Worker/native IPv6 paths and managed backup/PITR recovery |
 
 The temporary catalog draft used for hosted checks was removed. Those checks did
