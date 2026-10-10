@@ -30,7 +30,7 @@ async function denied(sql, args = [], pattern = /row-level security/) {
   await assert.rejects(db.query(sql, args), pattern)
   await db.exec("rollback to savepoint rejection")
 }
-const readiness = () => one("select public.joy8_game_readiness($1,'test-game','https://game.example/','/games/test-game/cover.webp') missing", [game])
+const readiness = (mode = "joy8") => one("select public.joy8_game_readiness($1,'test-game','https://game.example/','/games/test-game/cover.webp',$2) missing", [game, mode])
 
 test("member 429 reaches its actionable localized message", async () => {
   const service = createMemberService({ auth: { getSession: async () => ({ data: { session: { user: {} } } }) },
@@ -60,6 +60,26 @@ test("ready publication succeeds; revoked keys, disabled policies and invalid me
   await db.exec("reset role; update public.joy8_game_policies set enabled=false")
   await db.exec("set local role authenticated")
   assert.ok((await readiness()).missing.includes("game_policy"))
+})
+
+test("trial links publish without wallet configuration and never issue a game session", async () => {
+  await db.exec("set local role authenticated")
+  assert.deepEqual((await readiness("trial")).missing, [])
+  assert.deepEqual((await readiness("demo")).missing, ["launch_mode"])
+  await db.query("update public.games set launch_mode='trial',published=true where id=$1", [game])
+  await denied("update public.games set launch_url='http://game.example/' where id=$1", [game])
+  await denied("update public.games set launch_mode='joy8' where id=$1", [game])
+  await db.query("insert into public.games(name,slug,type,published,launch_url,thumbnail,launch_mode) values('Trial','trial-game','arcade',true,'https://trial.example/','/games/trial-game/cover.webp','trial')")
+  await db.exec("reset role; set local role anon")
+  assert.deepEqual((await db.query("select slug,launch_mode from public.public_games_v1 order by slug")).rows, [{ slug: "test-game", launch_mode: "trial" }, { slug: "trial-game", launch_mode: "trial" }])
+  await db.exec("reset role")
+  await db.query("select * from public.joy8_resolve_member($1,true)", [admin])
+  await db.exec("set local role service_role")
+  await denied("select * from public.create_game_session('test-game',$1)", [admin], /game is not available/)
+  await db.exec("reset role")
+  await db.exec("set local role authenticated")
+  await denied("update public.games set launch_mode='demo' where id=$1", [game])
+  await denied("update public.games set published=false,launch_mode='demo' where id=$1", [game], /games_launch_mode_check/)
 })
 
 test("independent entry keeps its explicit origin and enabled gate after publication and shares the same member", async () => {

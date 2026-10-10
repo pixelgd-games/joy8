@@ -1,6 +1,6 @@
 import { catalogSupabase as supabase } from "../../lib/catalogClient.js"
 
-const PUBLIC_GAME_FIELDS = "slug, name, type, thumbnail"
+const PUBLIC_GAME_FIELDS = "slug, name, type, thumbnail, launch_mode"
 
 export async function fetchPublicGames() {
   const { data, error } = await supabase

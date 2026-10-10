@@ -13,6 +13,7 @@ import { createGameEntry } from "../../member/game-entry.js"
 import { memberSupabase } from "../../lib/memberClient.js"
 import { createMailboxService } from "../../mailbox/service.js"
 import { createMemberState } from "../../member/state.js"
+import { prepareGameEntry } from "../../member/game-visit.js"
 
 export async function initLobbyPage(appRoot, { renderHero = null, entryParams = new URLSearchParams() } = {}) {
   if (!appRoot) return
@@ -177,6 +178,10 @@ function setupMember(appRoot) {
   const openGame = (trigger, slug) => {
     const game = games.get(slug)
     if (!game) return toast("這款遊戲目前沒有開放")
+    if (game.launch_mode === "trial") {
+      prepareGameEntry(buildGameUrl(slug))
+      return location.assign(buildGameUrl(slug))
+    }
     return openEntry(trigger, buildGameUrl(slug), game)
   }
 

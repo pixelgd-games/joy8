@@ -4,7 +4,7 @@ import { normalizeCoverPath, normalizeLaunchUrl } from "../lib/urls.js"
 import { ERROR_CODES, showErrorModal } from "../ui/error-modal.js"
 import { requireAdmin, signOut } from "./auth.js"
 
-const GAME_FIELDS = "id,name,slug,thumbnail,type,published,launch_url,sort_order,created_at"
+const GAME_FIELDS = "id,name,slug,thumbnail,type,published,launch_url,sort_order,created_at,launch_mode"
 
 let gameRows = []
 
@@ -66,6 +66,7 @@ function createGamesTable(games) {
       "縮圖",
       "類型",
       "上架",
+      "上架方式",
       "排序",
       "launch url",
       "建立時間",
@@ -105,6 +106,7 @@ function createGameRow(game) {
     createLinkCell(normalizeCoverPath(game.thumbnail, game.slug), "thumbnail", Boolean(game.thumbnail)),
     createTextCell(game.type),
     createTextCell(game.published ? "是" : "否"),
+    createTextCell(game.launch_mode === "trial" ? "試玩連結" : "Joy8 正式"),
     createTextCell(game.sort_order ?? ""),
     createLinkCell(game.launch_url, game.launch_url),
     createTextCell(game.created_at),

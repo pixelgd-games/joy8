@@ -31,7 +31,7 @@ CREATE FUNCTION public.create_game_session(p_game_slug text, p_auth_user_id uuid
     AS $$
 begin
   perform 1 from public.games g where g.slug=btrim(p_game_slug)
-    and g.published and nullif(btrim(g.launch_url),'') is not null for share;
+    and g.published and g.launch_mode='joy8' and nullif(btrim(g.launch_url),'') is not null for share;
   if not found then raise exception 'game is not available' using errcode='P0002'; end if;
   return query select * from public.joy8_issue_game_session(p_game_slug,p_auth_user_id);
 end;
@@ -569,7 +569,7 @@ $$;
 
 
 
-CREATE FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text) RETURNS text[]
+CREATE FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text, p_launch_mode text) RETURNS text[]
     LANGUAGE plpgsql STABLE SECURITY DEFINER
     SET search_path TO ''
     AS $_$
@@ -584,6 +584,10 @@ begin
     or p_launch_url ~ '[[:space:]]' then v_missing:=array_append(v_missing,'https_url'); end if;
   if p_thumbnail is null or p_thumbnail is distinct from '/games/'||p_slug||'/cover.webp' then
     v_missing:=array_append(v_missing,'cover');
+  end if;
+  if p_launch_mode is distinct from 'joy8' then
+    if p_launch_mode is distinct from 'trial' then v_missing:=array_append(v_missing,'launch_mode'); end if;
+    return v_missing;
   end if;
   select * into v_policy from public.joy8_game_policies where game_id=p_game_id;
   if not found or not v_policy.enabled then v_missing:=array_append(v_missing,'game_policy'); end if;
@@ -1274,19 +1278,11 @@ $$;
 
 
 
-CREATE FUNCTION public.joy8_public_games_v1() RETURNS TABLE(id uuid, slug text, name text, type text, thumbnail text, created_at timestamp with time zone, launch_url text, sort_order integer)
+CREATE FUNCTION public.joy8_public_games_v1() RETURNS TABLE(id uuid, slug text, name text, type text, thumbnail text, created_at timestamp with time zone, launch_url text, sort_order integer, launch_mode text)
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO ''
     AS $$
-  select
-    g.id,
-    g.slug,
-    g.name,
-    g.type,
-    g.thumbnail,
-    g.created_at,
-    g.launch_url,
-    g.sort_order
+  select g.id,g.slug,g.name,g.type,g.thumbnail,g.created_at,g.launch_url,g.sort_order,g.launch_mode
   from public.games g
   where g.published = true
     and g.launch_url is not null
@@ -2101,6 +2097,8 @@ CREATE TABLE public.games (
     created_at timestamp with time zone DEFAULT now(),
     launch_url text,
     sort_order integer DEFAULT 0 NOT NULL,
+    launch_mode text DEFAULT 'joy8'::text NOT NULL,
+    CONSTRAINT games_launch_mode_check CHECK ((launch_mode = ANY (ARRAY['joy8'::text, 'trial'::text]))),
     CONSTRAINT games_type_check CHECK ((type = ANY (ARRAY['slot'::text, 'fish'::text, 'card'::text, 'arcade'::text, 'casual'::text, 'adult'::text])))
 );
 
@@ -2331,8 +2329,9 @@ CREATE VIEW public.public_games_v1 WITH (security_invoker='true', security_barri
     thumbnail,
     created_at,
     launch_url,
-    sort_order
-   FROM public.joy8_public_games_v1() joy8_public_games_v1(id, slug, name, type, thumbnail, created_at, launch_url, sort_order);
+    sort_order,
+    launch_mode
+   FROM public.joy8_public_games_v1() joy8_public_games_v1(id, slug, name, type, thumbnail, created_at, launch_url, sort_order, launch_mode);
 
 
 
@@ -2825,7 +2824,7 @@ ALTER TABLE public.game_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.games ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY games_admin_insert ON public.games FOR INSERT TO authenticated WITH CHECK ((public.is_joy8_admin() AND ((NOT published) OR (cardinality(public.joy8_game_readiness(id, slug, launch_url, thumbnail)) = 0))));
+CREATE POLICY games_admin_insert ON public.games FOR INSERT TO authenticated WITH CHECK ((public.is_joy8_admin() AND ((NOT published) OR (cardinality(public.joy8_game_readiness(id, slug, launch_url, thumbnail, launch_mode)) = 0))));
 
 
 
@@ -2833,7 +2832,7 @@ CREATE POLICY games_admin_select ON public.games FOR SELECT TO authenticated USI
 
 
 
-CREATE POLICY games_admin_update ON public.games FOR UPDATE TO authenticated USING (public.is_joy8_admin()) WITH CHECK ((public.is_joy8_admin() AND ((NOT published) OR (cardinality(public.joy8_game_readiness(id, slug, launch_url, thumbnail)) = 0))));
+CREATE POLICY games_admin_update ON public.games FOR UPDATE TO authenticated USING (public.is_joy8_admin()) WITH CHECK ((public.is_joy8_admin() AND ((NOT published) OR (cardinality(public.joy8_game_readiness(id, slug, launch_url, thumbnail, launch_mode)) = 0))));
 
 
 
@@ -2983,8 +2982,8 @@ GRANT ALL ON FUNCTION public.joy8_create_private_session(p_game_slug text, p_aut
 
 
 
-REVOKE ALL ON FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text) TO authenticated;
+REVOKE ALL ON FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text, p_launch_mode text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.joy8_game_readiness(p_game_id uuid, p_slug text, p_launch_url text, p_thumbnail text, p_launch_mode text) TO authenticated;
 
 
 

@@ -104,6 +104,12 @@ automatically or replace this authoritative wire specification.
 9. The game backend exchanges the launch code once, then gives the client a balance-only token.
 10. The client keeps that token in memory; financial operations belong to the game backend.
 
+A catalog trial link (`launch_mode` `trial`) skips steps 4 to 10: it opens the
+game's own URL in the same iframe for any visitor, with no session, launch
+payload, handshake or POINT. A game must pass this flow before it is switched
+to a Joy8 game. See the
+[catalog direction](../product/PRODUCT_SCOPE.md#catalog-direction).
+
 The Gateway fixes the session currency to `POINT` and its lifetime to 12 hours.
 
 ## Loader In-Memory Handoff

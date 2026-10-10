@@ -41,7 +41,8 @@ Joy8 currently provides:
 - A public game Lobby on one URL with separate PC and mobile layouts, selected
   from the device when the page opens.
 - An in-Lobby member card, POINT balance and mailbox drawer.
-- A database-backed game catalog exposed through `public_games_v1`.
+- A database-backed game catalog exposed through `public_games_v1`, including
+  trial links that open an unintegrated game without sign-in or POINT.
 - A Game Loader that creates a Joy8 session and embeds a selected game in an iframe.
 - A reusable branded game-entry shell with Joy8-controlled Google entry before
   protected game metadata and artwork; Joy8 retains enrollment and session authority.
@@ -195,7 +196,8 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    when it is still in flight instead of sending another. Enrolled registered
    players continue to `/game/?slug=<slug>`. Other visitors see the member dialog with the chosen
    game named and its cover. Google entry preserves that destination; closing
-   cancels it.
+   cancels it. A trial link (card label 「試玩」) skips the membership check and
+   opens `/game/?slug=<slug>` for every visitor.
 5. 信箱 opens a right-side drawer on PC and a bottom sheet on mobile. It uses the
    `mailbox` Gateway route: opening a mail marks it read, and 「領取 POINT」 is a
    separate explicit claim. Visitors are sent to the member dialog instead.
@@ -226,8 +228,10 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    catalog/member reads, session creation or iframe loading. Lobby selection and
    successful member continuation establish a fresh entry. See the
    [return policy](docs/platform/MEMBER_AUTH_PLAN.md#game-page-return-policy).
-   A recent entry without a member Auth session redirects to `/?play=<slug>`
-   without a Gateway request.
+   Without a member Auth session the Loader reads the catalog record; it opens a
+   trial link and otherwise redirects to `/?play=<slug>` without a Gateway
+   request. A trial link mounts its URL in the shared iframe and top bar with no
+   session, launch payload or handshake; its frame hides the Loader on `load`.
 2. It calls `joy8-gateway/create-session` with only the game slug while it loads
    the matching published game from `public_games_v1`. The session issuer checks
    enrollment, so the Loader makes no separate member request; `player
@@ -291,7 +295,9 @@ never creates a guest or a promotion grant.
 Published catalog writes through authenticated PostgREST must pass the database
 `joy8_game_readiness` policy: HTTPS URL, matching cover path, enabled game and
 POINT policies, an active key with all six runtime scopes, and a valid configured
-adapter. Save a new game as an unpublished draft before provisioning it. Admin
+adapter. A trial link (`games.launch_mode='trial'`, chosen as 上架方式 in the
+form) needs only the slug, HTTPS URL and cover, and `create_game_session`
+refuses it. Save a new game as an unpublished draft before provisioning it. Admin
 forms show missing prerequisites; direct writes cannot bypass RLS. These checks
 do not certify real gameplay acceptance or prevent later operator revocation.
 

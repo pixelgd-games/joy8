@@ -1,4 +1,4 @@
-import { mountGameFrame } from "./iframe.js"
+import { createGameIframe, mountGameFrame } from "./iframe.js"
 import { gameLaunchPayload } from "./launch.js"
 import { gameFailure } from "./errors.js"
 import { gameBarMarkup, gameConfirmMarkup, setupGameBar } from "./game-bar.js"
@@ -34,6 +34,16 @@ export function showGameError({ code, title, message, reload = true }) {
 
 export async function failedGame(error) { showGameError(await gameFailure(error)) }
 
+function hideLoader() {
+  const loading = document.getElementById("loading")
+  loading?.classList.add("is-hidden")
+  window.setTimeout(() => loading?.remove(), 320)
+}
+
+export function mountTrial(gameUrl, gameName) {
+  document.getElementById("game").append(createGameIframe({ gameUrl, gameName, onLoad: hideLoader }))
+}
+
 export function mountSession(gameUrl, gameName, session) {
   document.getElementById("private-start")?.remove()
   const copy = document.querySelector(".loader-copy")
@@ -41,11 +51,7 @@ export function mountSession(gameUrl, gameName, session) {
   mountGameFrame({
     gameRoot: document.getElementById("game"), gameUrl, gameName,
     launch: gameLaunchPayload(session, import.meta.env.VITE_SUPABASE_URL),
-    onLoad: () => {
-      const loading = document.getElementById("loading")
-      loading?.classList.add("is-hidden")
-      window.setTimeout(() => loading?.remove(), 320)
-    },
+    onLoad: hideLoader,
     onTimeout: reason => showGameError({ code: "JOY8-GAME-006", title: reason === "handshake" ? "遊戲連線未完成" : "遊戲載入逾時", message: "遊戲未能完成連線，請重新整理後再試。" }),
   })
   if (window.scrollY === 0 && document.documentElement.scrollHeight > window.innerHeight) window.requestAnimationFrame(() => window.scrollTo(0, 1))

@@ -224,6 +224,14 @@ A published catalog item needs:
 
 Published status describes platform availability; it does not make Joy8 responsible for changing a game's own source code.
 
+A catalog item is either a Joy8 game (`launch_mode` `joy8`, the default) or a
+trial link (`trial`). A trial link needs only the slug, HTTPS URL and cover. It
+opens the game's own URL in the Loader frame without sign-in, a game session,
+the launch handshake or POINT, and is labelled 「試玩」 in the Lobby. It lets
+an unintegrated game be played from Joy8 before its wallet integration; switch
+it to `joy8` once that integration passes readiness. Trial links are for the
+pre-operation period; review them before operation begins.
+
 ## Explicitly Out of Scope
 
 Unless the user changes the product direction, Joy8 does not own:

@@ -46,7 +46,7 @@ function parseSortOrder(rawValue) {
 async function loadGame() {
   const { data, error } = await supabase
     .from("games")
-    .select("id,name,slug,thumbnail,type,published,launch_url,sort_order")
+    .select("id,name,slug,thumbnail,type,published,launch_url,sort_order,launch_mode")
     .eq("id", gameId)
     .maybeSingle()
 
@@ -81,6 +81,7 @@ async function loadGame() {
   document.getElementById("type").value = data.type ?? "slot"
   document.getElementById("published").checked = !!data.published
   document.getElementById("launch_url").value = data.launch_url ?? ""
+  document.getElementById("launch_mode").value = data.launch_mode ?? "joy8"
   document.getElementById("sort_order").value = data.sort_order ?? ""
 
   const loading = document.getElementById("loading")
@@ -117,6 +118,7 @@ async function submitForm(e) {
     published: checked("published"),
     launch_url: launchUrl || null,
     sort_order: sortOrderCheck.value,
+    launch_mode: val("launch_mode"),
   }
 
   if (!payload.name) return showValidationError("名稱不能為空")
@@ -134,6 +136,7 @@ async function submitForm(e) {
     if (payload.published) {
       const { data, error } = await supabase.rpc("joy8_game_readiness", {
         p_game_id: gameId, p_slug: payload.slug, p_launch_url: payload.launch_url, p_thumbnail: payload.thumbnail,
+        p_launch_mode: payload.launch_mode,
       })
       if (error || !Array.isArray(data)) {
         showValidationError("目前無法確認遊戲是否可上架，請稍後再試。")
@@ -141,7 +144,7 @@ async function submitForm(e) {
       }
       const labels = { save_draft: "先儲存未上架的遊戲", slug: "有效的遊戲代碼", https_url: "HTTPS 遊戲網址",
         cover: "遊戲封面", game_policy: "已啟用的遊戲規則", wallet_policy: "已啟用的 POINT 錢包",
-        backend_key: "完整遊戲服務授權", product_adapter: "有效的遊戲結算連接" }
+        backend_key: "完整遊戲服務授權", product_adapter: "有效的遊戲結算連接", launch_mode: "有效的上架方式" }
       if (data.length) {
         showValidationError(`尚未完成上架設定：${data.map(key => labels[key] || "遊戲設定").join("、")}。`)
         return

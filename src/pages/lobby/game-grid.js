@@ -4,6 +4,7 @@ import { normalizeCoverPath } from "../../lib/urls.js"
 const TEXT = {
   openGame: "開啟遊戲",
   playable: "可遊玩",
+  trial: "試玩",
   emptyTitle: "目前沒有開放的遊戲",
   emptyCopy: "遊戲上架後會顯示在這裡。",
   errorTitle: "遊戲列表讀取失敗",
@@ -81,7 +82,7 @@ function createGameCard(game) {
   }
 
   const meta = element("span", "card__meta")
-  meta.append(document.createElement("i"), `${TEXT.playable} · ${getGameTypeLabel(game.type)}`)
+  meta.append(document.createElement("i"), `${game.launch_mode === "trial" ? TEXT.trial : TEXT.playable} · ${getGameTypeLabel(game.type)}`)
   card.append(art, element("span", "card__name game-card-title", displayName), meta)
   return card
 }

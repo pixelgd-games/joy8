@@ -16,6 +16,11 @@ export async function expectProductionCsp(client, cwd) {
         response.end('<!doctype html><script src="/built-game.js"></script>')
         return
       }
+      if (name === "/built-trial/") {
+        response.writeHead(200, { "Content-Type": "text/html" })
+        response.end('<!doctype html><title>Built Trial</title><p>trial</p>')
+        return
+      }
       if (name === "/built-game.js") {
         response.writeHead(200, { "Content-Type": "text/javascript" })
         response.end('window.addEventListener("message", event => { if (event.source === parent && event.data?.type === "joy8-launch-v1") parent.postMessage({type:"built-received",protocol:event.data.launch.joy8_protocol}, "*") }); parent.postMessage({type:"joy8-launch-ready-v1",protocol:"server-v1"}, "*")')
@@ -51,7 +56,12 @@ export async function expectProductionCsp(client, cwd) {
     window.fetch = async (input, options) => {
       const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
       if (!url.hostname.endsWith('.supabase.co')) return fetchOriginal(input, options);
-      if (url.pathname === '/rest/v1/public_games_v1') return Response.json([{id:'00000000-0000-4000-8000-000000000002',slug:'built-game',name:'Built Game',type:'arcade',thumbnail:null,launch_url:location.origin+'/built-game/'}]);
+      if (url.pathname === '/rest/v1/public_games_v1') {
+        const rows = [{id:'00000000-0000-4000-8000-000000000002',slug:'built-game',name:'Built Game',type:'arcade',thumbnail:null,launch_url:location.origin+'/built-game/',launch_mode:'joy8'},
+          {id:'00000000-0000-4000-8000-000000000004',slug:'built-trial',name:'Built Trial',type:'arcade',thumbnail:null,launch_url:location.origin+'/built-trial/',launch_mode:'trial'}];
+        const slug = url.searchParams.get('slug');
+        return Response.json(slug ? rows.filter(row => 'eq.' + row.slug === slug) : rows);
+      }
       if (url.pathname === '/auth/v1/user') return Response.json(user);
       const mailPage = () => ({items:[{id:'built-mail',kind:'reward',title:'Built reward',body:'Built mail body',amount:'500',read_at:builtFixture.read?'2026-09-30':null,claimed_at:builtFixture.claimed?'2026-09-30':null}],unread:builtFixture.read?0:1});
       const unenrolled = sessionStorage.getItem('built-unenrolled') === '1';
@@ -144,14 +154,22 @@ export async function expectProductionCsp(client, cwd) {
     assert.equal(await evaluate("document.querySelectorAll('iframe').length"), 0)
     await evaluate("sessionStorage.removeItem('built-unenrolled')")
     assert.deepEqual(await evaluate("cspViolations"), [])
-    await evaluate("localStorage.removeItem('joy8-member-auth-v1')")
+    await evaluate("localStorage.removeItem('joy8-member-auth-v1'); sessionStorage.setItem('built-session-requests', '0')")
+    await client.send("Page.navigate", { url: origin + "/" })
+    await until("Boolean(document.querySelector('#gameGrid [data-play=built-trial]'))")
+    assert.equal(await evaluate("document.querySelector('#gameGrid [data-play=built-trial] .card__meta').textContent"), "試玩 · 街機")
+    await evaluate("document.querySelector('#gameGrid [data-play=built-trial]').click()")
+    await until("location.pathname === '/game/' && new URL(document.querySelector('#game iframe')?.src || location.origin).pathname === '/built-trial/' && !document.querySelector('#loading')")
+    assert.equal(await evaluate("sessionStorage.getItem('built-session-requests')"), "0")
+    assert.equal(await evaluate("document.querySelectorAll('#member-dialog[open]').length"), 0)
+    assert.deepEqual(await evaluate("cspViolations"), [])
     const result = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `new Promise(resolve => {
       const script = document.createElement('script'); script.textContent = 'window.inlineScriptExecuted = true'; document.body.append(script);
       setTimeout(() => resolve({executed:!!window.inlineScriptExecuted,violations:window.cspViolations}),100);
     })` })
     assert.equal(result.result.value.executed, false)
     assert.ok(result.result.value.violations.some(value => value.startsWith("script-src")))
-    console.log("OK Built Lobby/Admin, lazy sign-in, mailbox claim, explicit game entry and recent reload work under CSP; stale/missing visits return without a session; inline scripts are blocked")
+    console.log("OK Built Lobby/Admin, lazy sign-in, mailbox claim, explicit game entry and recent reload work under CSP; stale/missing visits return without a session; trial links open without sign-in or a session; inline scripts are blocked")
   } finally {
     await client.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: injected.identifier })
     server.closeAllConnections()
