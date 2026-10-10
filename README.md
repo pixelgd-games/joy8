@@ -582,6 +582,25 @@ for the complete safety rules.
   It is not granted to anon, authenticated, service_role or game runtimes. Never
   put the project administrator password or player credentials in command
   arguments or chat.
+- **Ledger reset.** `public.joy8_operator_reset_ledger(expected, game_id)` clears
+  POINT history for every game (`game_id` null) or for one game. It keeps players,
+  wallets, administrators, the allowlist, the catalog, policies and keys.
+  - All games: deletes every wallet transaction (including welcome grants),
+    match, settlement, reserve operation, recovery, game session and mail, and
+    sets wallet and fee balances to 0. The next enrollment or game launch grants
+    the welcome POINT again.
+  - One game: deletes that game's matches, settlements, gameplay transactions and
+    sessions, and reverses their net effect on each wallet; mail credits stay. It
+    stops with `JOY8_LEDGER_RESET_NEGATIVE_BALANCE` if a wallet would fall below
+    its reserved POINT.
+
+  Both stop on open matches (`JOY8_LEDGER_RESET_OPEN_MATCH`) or when the counts
+  differ from `expected` (`JOY8_LEDGER_RESET_STALE`), and re-check wallet and fee
+  reconciliation. Sessions that product data still references are kept and
+  returned as `game_sessions_kept`. Procedure: the game side clears its own data
+  first; run `scripts/sql/ledger-reset-plan.sql` read-only and confirm
+  `open_matches` is 0; then apply a reviewed migration calling the function with
+  that scope's `expected` object. The function is granted to no API role.
 - **Allowlist.** Add or remove player emails at `/admin/access/`, never through
   new migrations. Drafts are not installed until individually approved.
 - **Backend Keys.** Use `npm run key:backend`; the operator flow is in

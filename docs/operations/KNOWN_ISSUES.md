@@ -154,6 +154,10 @@ not publish test games, issue rewards or play a new hand. Browser smoke remains
 mocked; manual coverage is not an automated end-to-end release gate. Modal focus
 and keyboard accessibility also remain unverified.
 
+On Windows, `npm run verify:release` has twice ended one PGlite suite with
+exit code `0xC0000409` (a process crash, not an assertion). The suite passed
+alone and the gate passed on rerun; the cause is not established.
+
 ## Database Recovery Boundary
 
 A current empty-project bootstrap and native schema/data restore verification are

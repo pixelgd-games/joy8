@@ -61,7 +61,8 @@
     "20260929100000_member_wallet_balance.sql",
     "20261007100000_match_reserve_increase.sql",
     "20261009100000_member_lobby_snapshot.sql",
-    "20261010100000_trial_link_games.sql"
+    "20261010100000_trial_link_games.sql",
+    "20261011100000_operator_ledger_reset.sql"
   ],
   "drafts": [],
   "excluded": {
@@ -119,6 +120,7 @@
     "20261008100100_baccarat_reserve_increase.sql": "Hosted Baccarat reserve-increase policy flag and key scope; no shared runtime change.",
     "20261009110000_close_baccarat_private_entry.sql": "Hosted Baccarat private-entry closure after publication; synthetic fixtures keep private entries paused.",
     "20261010110000_add_trial_link_games.sql": "Hosted trial-link catalog entries; synthetic fixtures register their own catalog.",
-    "20261010120000_update_fishing_ace_trial_url.sql": "Hosted trial-link URL update; synthetic fixtures register their own catalog."
+    "20261010120000_update_fishing_ace_trial_url.sql": "Hosted trial-link URL update; synthetic fixtures register their own catalog.",
+    "20261011110000_reset_prelaunch_ledger.sql": "Hosted pre-launch ledger reset bound to reviewed counts; ledger-reset-check exercises the function."
   }
 }
