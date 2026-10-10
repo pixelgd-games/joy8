@@ -118,6 +118,7 @@
     "20261008100000_baccarat_bet_raises.sql": "Baccarat same-round raise state and guards; the product fixture installs its current canonical schema.",
     "20261008100100_baccarat_reserve_increase.sql": "Hosted Baccarat reserve-increase policy flag and key scope; no shared runtime change.",
     "20261009110000_close_baccarat_private_entry.sql": "Hosted Baccarat private-entry closure after publication; synthetic fixtures keep private entries paused.",
-    "20261010110000_add_trial_link_games.sql": "Hosted trial-link catalog entries; synthetic fixtures register their own catalog."
+    "20261010110000_add_trial_link_games.sql": "Hosted trial-link catalog entries; synthetic fixtures register their own catalog.",
+    "20261010120000_update_fishing_ace_trial_url.sql": "Hosted trial-link URL update; synthetic fixtures register their own catalog."
   }
 }
