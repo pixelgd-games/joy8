@@ -123,6 +123,7 @@
     "20261010120000_update_fishing_ace_trial_url.sql": "Hosted trial-link URL update; synthetic fixtures register their own catalog.",
     "20261011110000_reset_prelaunch_ledger.sql": "Hosted pre-launch ledger reset bound to reviewed counts; ledger-reset-check exercises the function.",
     "20261011113000_baccarat_clear_pre_ledger_reset.sql": "Hosted Baccarat play-data clearing after the Joy8 ledger reset; data only, no shared runtime change.",
-    "20261011120000_mahjong_clear_play_data.sql": "Hosted Mahjong play-data cleanup bound to reviewed counts and fingerprints; fixtures install empty Mahjong data."
+    "20261011120000_mahjong_clear_play_data.sql": "Hosted Mahjong play-data cleanup bound to reviewed counts and fingerprints; fixtures install empty Mahjong data.",
+    "20261011130000_reset_mahjong_ledger.sql": "Hosted Mahjong-scoped ledger reset removing sessions released by the Mahjong cleanup; ledger-reset-check exercises the function."
   }
 }
