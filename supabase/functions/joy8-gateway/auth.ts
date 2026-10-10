@@ -4,7 +4,15 @@ type AuthResult =
   | { ok: true; userId: string | null }
   | { ok: false; error: string; status: number }
 
-export async function resolveAuthUser(request: Request): Promise<AuthResult> {
+const verifications = new WeakMap<Request, Promise<AuthResult>>()
+
+export function resolveAuthUser(request: Request): Promise<AuthResult> {
+  let verification = verifications.get(request)
+  if (!verification) verifications.set(request, verification = verifyAuthUser(request))
+  return verification
+}
+
+async function verifyAuthUser(request: Request): Promise<AuthResult> {
   const authorization = request.headers.get("authorization")?.trim() ?? ""
   const apiKey = request.headers.get("apikey")?.trim() ?? ""
 

@@ -2,6 +2,7 @@ import { getRoute, buildCorsHeaders, isCorsOriginAllowed, jsonResponse } from ".
 import { callRpc } from "./rpc.ts"
 import { EXECUTION_REGION } from "./config.ts"
 import { enforceRateLimit } from "./rate-limit.ts"
+import { resolveAuthUser } from "./auth.ts"
 import { mailboxOperation } from "./mailbox-routes.ts"
 import { serverOperation } from "./server-routes.ts"
 import { resolveMember, resolveLobby, createSession, createPrivateSession, resolveBrandedEntry, getBalance, getMemberWallet } from "./member-routes.ts"
@@ -12,6 +13,10 @@ const ROUTES = new Set([
   "server-reserve-cancel-v1", "server-reserve-status-v1", "member",
   "enroll-member", "create-session", "private-session", "branded-entry",
   "balance", "wallet", "lobby", "mailbox", "admin-mailbox",
+])
+const MEMBER_AUTH_ROUTES = new Set([
+  "member", "enroll-member", "create-session", "private-session", "branded-entry",
+  "wallet", "lobby", "mailbox", "admin-mailbox",
 ])
 
 export async function handleRequest(request: Request): Promise<Response> {
@@ -38,6 +43,7 @@ export async function handleRequest(request: Request): Promise<Response> {
     } else if (!ROUTES.has(route)) {
       response = jsonResponse({ error: "Route not found" }, 404, corsHeaders)
     } else {
+      if (MEMBER_AUTH_ROUTES.has(route)) void resolveAuthUser(request)
       const rateLimitResponse = route.startsWith("server-") ? null : await enforceRateLimit(route, request, corsHeaders)
       response = rateLimitResponse ?? await dispatchRoute(route, request, corsHeaders)
     }

@@ -48,5 +48,5 @@ export function createMemberState({ readMember, onReset, onMember, onPending }) 
     return pending
   }
 
-  return { update, get member() { return member } }
+  return { update, get member() { return member }, get pending() { return pending } }
 }

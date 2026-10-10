@@ -134,7 +134,9 @@ try {
   let accessError = null
   let accessReply = true
   const rpcCalls = []
+  const fetchStarts = []
   globalThis.fetch = async (url, options) => {
+    fetchStarts.push(url.split("/").at(-1))
     if (url.endsWith("/auth/v1/user")) return Response.json({ id: "verified-user" })
     const name = url.split("/").at(-1)
     const args = JSON.parse(options.body)
@@ -205,7 +207,9 @@ try {
   memberRows = [{ player_account_id: "player-1", public_id: "482731", account_type: "registered" }]
   for (const extra of [{auth_user_id:"victim"},{currency:"POINT"},{expires_in_seconds:3600},{display_name:"unused"}]) assert.equal((await request("create-session", {slug:"test",...extra})).status,400)
   rpcCalls.length = 0
+  fetchStarts.length = 0
   const launched = await request("create-session", { slug: "test" })
+  assert.deepEqual(fetchStarts.slice(0, 2), ["user", "joy8_consume_gateway_rate_limit"])
   assert.equal(launched.status, 200)
   assert.equal(launched.headers.get("cache-control"), "no-store")
   assert.equal((await launched.json()).account_type, "registered")

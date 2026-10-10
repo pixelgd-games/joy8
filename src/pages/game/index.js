@@ -15,20 +15,25 @@ async function main() {
   }
   renderLoader()
   const service = createMemberService(memberSupabase, { origin: location.origin })
-  const [member, { data: game, error }] = await Promise.all([
-    service.membership(),
-    catalogSupabase.from("public_games_v1").select("id,slug,name,launch_url").eq("slug", slug).maybeSingle(),
+  const returnToLobby = () => location.replace(lobbyGamePath(location.pathname + location.search, location.origin))
+  const catalog = catalogSupabase.from("public_games_v1").select("id,slug,name,launch_url").eq("slug", slug).maybeSingle()
+  if (!await service.session()) return returnToLobby()
+  const [launch, { data: game, error }] = await Promise.all([
+    memberSupabase.functions.invoke("joy8-gateway/create-session", { body: { slug } }),
+    catalog,
   ])
-  if (!member) {
-    location.replace(lobbyGamePath(location.pathname + location.search, location.origin))
-    return
-  }
+  if (await requiresMembership(launch.error)) return returnToLobby()
   if (error) throw error
   if (!game) return showGameError({ code: "JOY8-GAME-002", title: "找不到遊戲", message: "請回大廳選擇目前開放的遊戲。", reload: false })
   const url = normalizeLaunchUrl(game.launch_url)
   if (!url) return showGameError({ code: "JOY8-GAME-005", title: "遊戲網址設定錯誤", message: "請聯絡平台。", reload: false })
-  const result = await memberSupabase.functions.invoke("joy8-gateway/create-session", { body: { slug } })
-  if (result.error) throw result.error
-  mountSession(url, game.name, result.data)
+  if (launch.error) throw launch.error
+  mountSession(url, game.name, launch.data)
+}
+
+async function requiresMembership(error) {
+  if (error?.context?.status !== 403) return false
+  try { return (await error.context.clone().json()).error === "player membership is required" }
+  catch { return false }
 }
 main().catch(failedGame)

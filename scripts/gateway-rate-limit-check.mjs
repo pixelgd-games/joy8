@@ -224,7 +224,7 @@ test("IP only supplies the coarse shared ingress cap, and both rate stores fail 
     try {
       assert.equal((await post("enroll-member","192.0.2.31","test-member-0")).status,503)
       assert.equal((await post("server-settle-v1","192.0.2.31",secret,{version:1,match_ref:"table-0"})).status,503)
-      assert.equal(authCalls,previousAuth+(mode==="subject"?1:0))
+      assert.equal(authCalls,previousAuth+1)
       assert.equal(settlementCalls,previousSettlements)
     } finally { unavailable=false; subjectUnavailable=false }
   }

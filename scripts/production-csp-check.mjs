@@ -54,11 +54,16 @@ export async function expectProductionCsp(client, cwd) {
       if (url.pathname === '/rest/v1/public_games_v1') return Response.json([{id:'00000000-0000-4000-8000-000000000002',slug:'built-game',name:'Built Game',type:'arcade',thumbnail:null,launch_url:location.origin+'/built-game/'}]);
       if (url.pathname === '/auth/v1/user') return Response.json(user);
       const mailPage = () => ({items:[{id:'built-mail',kind:'reward',title:'Built reward',body:'Built mail body',amount:'500',read_at:builtFixture.read?'2026-09-30':null,claimed_at:builtFixture.claimed?'2026-09-30':null}],unread:builtFixture.read?0:1});
-      if (url.pathname.endsWith('/lobby')) return Response.json({member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'},wallet:{balance:builtFixture.claimed?'1500':'1000'},mail:mailPage()});
-      if (url.pathname.endsWith('/member')) return Response.json({member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'}});
+      const unenrolled = sessionStorage.getItem('built-unenrolled') === '1';
+      if (url.pathname.endsWith('/lobby')) return Response.json(unenrolled ? {member:null} : {member:{player_account_ref:user.id,public_id:'482731',account_type:'registered'},wallet:{balance:builtFixture.claimed?'1500':'1000'},mail:mailPage()});
+      if (url.pathname.endsWith('/member')) {
+        sessionStorage.setItem('built-member-requests', String(Number(sessionStorage.getItem('built-member-requests') || 0)+1));
+        return Response.json({member:unenrolled ? null : {player_account_ref:user.id,public_id:'482731',account_type:'registered'}});
+      }
       if (url.pathname.endsWith('/wallet')) return Response.json({wallet:{balance:builtFixture.claimed?'1500':'1000'}});
       if (url.pathname.endsWith('/create-session')) {
         sessionStorage.setItem('built-session-requests', String(Number(sessionStorage.getItem('built-session-requests') || 0)+1));
+        if (unenrolled) return Response.json({error:'player membership is required'}, {status:403});
         return Response.json({session_id:'00000000-0000-4000-8000-000000000003',game_id:'00000000-0000-4000-8000-000000000002',launch_code:'a'.repeat(64),currency:'POINT',protocol:'server-v1'});
       }
       if (url.pathname.endsWith('/mailbox')) {
@@ -132,6 +137,12 @@ export async function expectProductionCsp(client, cwd) {
     }
     await evaluate("document.querySelector('#gameGrid [data-play=built-game]').click()")
     await until("window.builtFixture?.handedOff && sessionStorage.getItem('built-session-requests') === '3'")
+    assert.equal(await evaluate("sessionStorage.getItem('built-member-requests')"), null)
+    await evaluate("sessionStorage.setItem('built-unenrolled', '1'); sessionStorage.setItem('joy8-game-visit-v1', JSON.stringify({slug:'built-game',at:Date.now()}))")
+    await client.send("Page.navigate", { url: origin + "/game/?slug=built-game" })
+    await until("location.pathname === '/' && Boolean(document.querySelector('#member-dialog[open]')) && sessionStorage.getItem('built-session-requests') === '4'")
+    assert.equal(await evaluate("document.querySelectorAll('iframe').length"), 0)
+    await evaluate("sessionStorage.removeItem('built-unenrolled')")
     assert.deepEqual(await evaluate("cspViolations"), [])
     await evaluate("localStorage.removeItem('joy8-member-auth-v1')")
     const result = await client.send("Runtime.evaluate", { awaitPromise: true, returnByValue: true, expression: `new Promise(resolve => {

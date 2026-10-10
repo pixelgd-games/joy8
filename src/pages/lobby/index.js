@@ -151,7 +151,7 @@ function setupMember(appRoot) {
 
   const enterGame = createGameEntry({
     origin: location.origin,
-    membership: () => account.member ? Promise.resolve(account.member) : service.membership(),
+    membership: async () => account.member ?? (await account.pending, account.member) ?? service.membership(),
     openMember: async (...args) => {
       const { openMemberModal } = await import("../../member/modal.js")
       await openMemberModal(...args)

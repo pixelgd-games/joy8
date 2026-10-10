@@ -1,5 +1,6 @@
+begin read only;
 select jsonb_build_object(
-  'policy',(select jsonb_agg(jsonb_build_object('currency',currency,'enabled',enabled,'member_credit',initial_credit,'guest_credit',guest_initial_credit)) from public.joy8_wallet_policies),
+  'policy',(select jsonb_agg(jsonb_build_object('currency',currency,'enabled',enabled,'member_credit',initial_credit)) from public.joy8_wallet_policies),
   'players',(select count(*) from public.player_accounts where status='active' and member_enrolled_at is not null),
   'players_without_wallet',(select count(*) from public.player_accounts p where p.status='active' and p.member_enrolled_at is not null
     and not exists(select 1 from public.wallet_accounts w where w.player_account_id=p.id)),

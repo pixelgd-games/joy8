@@ -191,8 +191,9 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    the player ID, masked Google email and join date. One `lobby` request returns
    the member, balance and first mailbox page together; the `wallet` route
    refreshes the balance after a mailbox claim.
-4. Selecting a game checks membership. Enrolled registered players continue to
-   `/game/?slug=<slug>`. Other visitors see the member dialog with the chosen
+4. Selecting a game checks membership, waiting for the Lobby's own member read
+   when it is still in flight instead of sending another. Enrolled registered
+   players continue to `/game/?slug=<slug>`. Other visitors see the member dialog with the chosen
    game named and its cover. Google entry preserves that destination; closing
    cancels it.
 5. 信箱 opens a right-side drawer on PC and a bottom sheet on mobile. It uses the
@@ -225,11 +226,15 @@ Lobby account/game entry shares one pending guard, including lazy dialog loading
    catalog/member reads, session creation or iframe loading. Lobby selection and
    successful member continuation establish a fresh entry. See the
    [return policy](docs/platform/MEMBER_AUTH_PLAN.md#game-page-return-policy).
-   A recent entry without member session/enrollment redirects to `/?play=<slug>`;
-   backend failures stop launch visibly.
-2. It loads the matching published game from `public_games_v1`.
+   A recent entry without a member Auth session redirects to `/?play=<slug>`
+   without a Gateway request.
+2. It calls `joy8-gateway/create-session` with only the game slug while it loads
+   the matching published game from `public_games_v1`. The session issuer checks
+   enrollment, so the Loader makes no separate member request; `player
+   membership is required` redirects to `/?play=<slug>`, and other backend
+   failures stop launch visibly.
 3. It normalizes `launch_url` as an HTTPS URL or a root-relative platform path. HTTP is accepted only between loopback hosts during local development.
-4. It calls `joy8-gateway/create-session` with only the game slug.
+4. It uses the session only after the catalog record and URL are valid.
 5. It creates the iframe from the catalog URL without launch credentials.
 6. The game announces its Joy8 Client from an approved parent origin, then the
    Loader delivers the session parameters once through an origin-checked in-memory message.
