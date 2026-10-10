@@ -4,7 +4,7 @@ import { restoreSnapshot } from './restore-snapshot.mjs';
 
 const directory = process.argv[2];
 assert.ok(directory, 'Supply a local hosted snapshot; this check never connects to hosted data');
-const sql = await readFile('supabase/drafts/20261001000100_mahjong_single_hand_reset.sql', 'utf8');
+const sql = await readFile(new URL('../supabase/migrations/20261011120000_mahjong_clear_play_data.sql', import.meta.url), 'utf8');
 const quote = value => '"' + value.replaceAll('"', '""') + '"';
 
 await restoreSnapshot(directory, async db => {
@@ -15,18 +15,21 @@ await restoreSnapshot(directory, async db => {
   const blocker = await db.connect();
   try {
     await blocker.query('select pg_advisory_lock(1296123978,1)');
-    await assert.rejects(db.exec(sql), /Stop Mahjong authority/);
+    await assert.rejects(db.exec(sql), /MAHJONG_CLEAR_AUTHORITY_RUNNING/);
     await db.exec('rollback');
     await blocker.query('select pg_advisory_unlock(1296123978,1)');
   } finally { await blocker.end(); }
-  await assert.rejects(db.exec(sql.replace("('matches',21,", "('matches',22,")), /Cleanup inventory changed: matches/);
+  const matches = (await db.query('select count(*)::int as n from mahjong_clash.matches')).rows[0].n;
+  await assert.rejects(db.exec(sql.replace(`('matches',${matches},`, `('matches',${matches + 1},`)), /MAHJONG_CLEAR_COUNTS_CHANGED/);
   await db.exec('rollback');
-  assert.equal((await db.query('select count(*)::int as n from mahjong_clash.matches')).rows[0].n, 21);
+  assert.equal((await db.query('select count(*)::int as n from mahjong_clash.matches')).rows[0].n, matches);
   await db.exec(sql);
   const after = [];
   for (const table of protectedTables) after.push(await fingerprint(table));
   assert.deepEqual(after, before);
   assert.deepEqual((await db.query('select water::text,strength,risk from mahjong_clash.economy_state')).rows[0], { water: '0', strength: 'normal', risk: 'normal' });
   await db.query('select public.joy8_validate_product_adapters()');
-  console.log('Mahjong reset passed on the local hosted snapshot: authority-lock rejection, changed-inventory rollback, 22 tables cleared, AI state reset, all Auth/platform rows preserved, triggers and adapters valid.');
+  for (const { relname } of (await db.query("select relname from pg_class where relnamespace='mahjong_clash'::regnamespace and relkind='r' and relname not in ('economy_state','economy_versions','lifecycle_config')")).rows)
+    assert.equal((await db.query(`select count(*)::int as n from mahjong_clash.${quote(relname)}`)).rows[0].n, 0, relname);
+  console.log('Mahjong play-data clear passed on the local hosted snapshot: authority-lock rejection, changed-inventory rollback, play data cleared, AI state reset, all Auth/platform rows preserved, triggers and adapters valid.');
 });

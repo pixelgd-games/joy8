@@ -1,11 +1,11 @@
 begin isolation level read committed;
 set local lock_timeout='5s';
 set local statement_timeout='60s';
-set local timezone='UTC';
+set local time zone interval '00:00' hour to minute;
 do $$
 begin
-  if not pg_try_advisory_xact_lock(1296123978,1) then raise exception 'Stop Mahjong authority before cleanup'; end if;
-  if (select id from public.games where slug='mahjong-clash') is distinct from 'faaa45eb-7d7d-40b5-9081-3dd73482adfa'::uuid then raise exception 'Mahjong game changed'; end if;
+  if not pg_try_advisory_xact_lock(1296123978,1) then raise exception 'MAHJONG_CLEAR_AUTHORITY_RUNNING'; end if;
+  if (select game_id from mahjong_clash.lifecycle_config where singleton) is distinct from 'faaa45eb-7d7d-40b5-9081-3dd73482adfa'::uuid then raise exception 'MAHJONG_CLEAR_GAME_CHANGED'; end if;
 end $$;
 lock table mahjong_clash.accounting_commits,
   mahjong_clash.accounting_requests,
@@ -32,44 +32,45 @@ lock table mahjong_clash.accounting_commits,
   mahjong_clash.runtime_operations,
   mahjong_clash.runtime_players,
   mahjong_clash.runtime_records in access exclusive mode;
-create temporary table mahjong_cleanup_review(table_name text primary key,expected_rows bigint,fingerprint text) on commit drop;
-insert into mahjong_cleanup_review values
-('accounting_commits',49,'6af2bc0fbb3ccb84b866a3d98d5bd4f3'),
-('accounting_requests',49,'50992ea07a9d55a42e5a1ea68e784d96'),
-('ai_accounts',6,'a17a6c3a86019cd0d4d995d67c54e11d'),
-('ai_reservations',63,'bbada9b1fd3318121e72621ec534d52d'),
-('economy_entries',180,'a6be1a6249e102e05ff9c2078db12431'),
-('economy_operations',55,'97a8a3f31cbb20d147661e40a4d693ae'),
-('economy_state',1,'16065da199f4b5db4151b94848123965'),
-('economy_transfers',50,'c32f462198027d96bf8fc003f80f86d7'),
+create temporary table mahjong_clear_review(table_name text primary key,expected_rows bigint,fingerprint text) on commit drop;
+insert into mahjong_clear_review values
+('accounting_commits',83,'e7829fffd4efff8d2dce9be3a657a8a6'),
+('accounting_requests',83,'7f7fa0ca48776abfe43338e357d60d0e'),
+('ai_accounts',6,'6eb210d13160e42fce22cf3a91b5a77a'),
+('ai_reservations',165,'8d612b8f34feadce40472b6b31bef636'),
+('economy_entries',348,'455c798bfdbaa9b06f2c5e465b6d40e6'),
+('economy_operations',89,'be5d923401ee59e8dde39e4bbc55b04f'),
+('economy_state',1,'3ed9f15792d771551ca5e0dd0c116ea9'),
+('economy_transfers',104,'da053df90d6ee0d8ccd139bc5d79c34b'),
 ('economy_versions',1,'9e37b510f2e6c8c100cbd2260cf46dd3'),
-('hand_economy',49,'85b5a105f3595b700732e08486494083'),
-('hands',49,'469190e6e861f9d643b7b226cf22ca3d'),
+('hand_economy',83,'806bc41010a924e32c17c9bc009e4d28'),
+('hands',83,'a6cebcce7e6e35756fe71784fc80caeb'),
 ('lifecycle_config',1,'6f8b22869389293e429d072b097d33ef'),
-('match_openings',21,'196ca7924e0133a904029e548155c557'),
-('match_players',84,'a73c9381cb905c566ee7ab19d25696a4'),
-('match_states',21,'8f92225aa4113129a56bdc88ab89b1df'),
-('matches',21,'fdfd516b48c92b7372a919b92a85795a'),
-('platform_matches',21,'7ccf1e99adce01362aa71b27031168d0'),
-('player_profiles',6,'7ff6bb7e9edc3a80dc6c5944a381609c'),
-('processed_actions',4941,'566563778a35525b69b61634d16c3ca0'),
+('match_openings',55,'814d787a00879e0ab394163c1b9301a4'),
+('match_players',220,'ae552c0b4f3e837b6e5b02ad27a4d865'),
+('match_states',55,'2be5541793bf4f176cb88af26673792f'),
+('matches',55,'19b7f4e09b6eb922f992ad3e616fac3f'),
+('platform_matches',55,'dff7b963ea68d7c927d4e347f8131768'),
+('player_profiles',7,'650a7c65b99bf753c6bce927d940bfab'),
+('processed_actions',8229,'070db4c8f8b449449675c1cedcc02785'),
 ('room_operations',0,'d41d8cd98f00b204e9800998ecf8427e'),
 ('room_resolution_log',0,'d41d8cd98f00b204e9800998ecf8427e'),
 ('room_resolutions',0,'d41d8cd98f00b204e9800998ecf8427e'),
-('runtime_operations',5107,'ed54473c3444c128279653d0ba44ff2e'),
-('runtime_players',7,'f6cb1693e980df1166315641224cc153'),
-('runtime_records',8,'5fc2b53e675b6aedbe4440d60f101700');
+('runtime_operations',8556,'b0e83c4ef2f98770a5ff44113162e092'),
+('runtime_players',7,'0b6a4e8b980d0432f904169b4d110402'),
+('runtime_records',9,'738313947a022fa0164f5d6f775d63a6');
 do $$
 declare item record; actual_rows bigint; actual_fingerprint text;
 begin
-  for item in select * from mahjong_cleanup_review loop
+  for item in select * from mahjong_clear_review loop
     execute format('select count(*),md5(coalesce(string_agg(to_jsonb(t)::text,E''\n'' order by md5(to_jsonb(t)::text)),'''')) from mahjong_clash.%I t',item.table_name) into actual_rows,actual_fingerprint;
-    if actual_rows<>item.expected_rows or actual_fingerprint<>item.fingerprint then raise exception 'Cleanup inventory changed: %',item.table_name; end if;
+    if actual_rows<>item.expected_rows or actual_fingerprint<>item.fingerprint then raise exception 'MAHJONG_CLEAR_COUNTS_CHANGED' using detail=item.table_name; end if;
   end loop;
-  if exists(select 1 from public.joy8_matches where game_id='faaa45eb-7d7d-40b5-9081-3dd73482adfa' and state='open') then raise exception 'Mahjong financial match remains open'; end if;
-  if exists(select 1 from mahjong_clash.room_operations) or exists(select 1 from mahjong_clash.room_resolutions) then raise exception 'Pending Mahjong recovery'; end if;
-  if exists(select 1 from mahjong_clash.ai_accounts where locked_balance<>0) or exists(select 1 from mahjong_clash.ai_reservations where released_at is null) then raise exception 'AI funds remain reserved'; end if;
-  if exists(select 1 from mahjong_clash.match_states where lease_expires_at>clock_timestamp()) then raise exception 'Mahjong lease remains active'; end if;
+  if exists(select 1 from mahjong_clash.platform_matches where status='open')
+    or exists(select 1 from mahjong_clash.matches where status not in ('finished','voided')) then raise exception 'MAHJONG_CLEAR_OPEN_MATCH'; end if;
+  if exists(select 1 from mahjong_clash.room_operations) or exists(select 1 from mahjong_clash.room_resolutions) then raise exception 'MAHJONG_CLEAR_PENDING_RECOVERY'; end if;
+  if exists(select 1 from mahjong_clash.ai_accounts where locked_balance<>0) or exists(select 1 from mahjong_clash.ai_reservations where released_at is null) then raise exception 'MAHJONG_CLEAR_AI_RESERVED'; end if;
+  if exists(select 1 from mahjong_clash.match_states where lease_expires_at>clock_timestamp()) then raise exception 'MAHJONG_CLEAR_LEASE_ACTIVE'; end if;
 end $$;
 alter table mahjong_clash.accounting_requests disable trigger immutable_accounting_requests;
 alter table mahjong_clash.accounting_commits disable trigger immutable_accounting_commits;
@@ -121,13 +122,15 @@ alter table mahjong_clash.hands enable trigger immutable_posted_hand;
 do $$
 declare item record; remaining bigint; actual_fingerprint text;
 begin
-  for item in select * from mahjong_cleanup_review loop
+  for item in select * from mahjong_clear_review loop
     execute format('select count(*),md5(coalesce(string_agg(to_jsonb(t)::text,E''\n'' order by md5(to_jsonb(t)::text)),'''')) from mahjong_clash.%I t',item.table_name) into remaining,actual_fingerprint;
     if item.table_name in ('economy_versions','lifecycle_config') then
-      if actual_fingerprint<>item.fingerprint then raise exception 'Configuration changed: %',item.table_name; end if;
-    elsif item.table_name<>'economy_state' and remaining<>0 then raise exception 'Cleanup incomplete: %',item.table_name;
+      if actual_fingerprint<>item.fingerprint then raise exception 'MAHJONG_CLEAR_CONFIG_CHANGED' using detail=item.table_name; end if;
+    elsif item.table_name<>'economy_state' and remaining<>0 then raise exception 'MAHJONG_CLEAR_INCOMPLETE' using detail=item.table_name;
     end if;
   end loop;
-  if exists(select 1 from pg_trigger where tgrelid in(select c.oid from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='mahjong_clash') and not tgisinternal and tgenabled<>'O') then raise exception 'Mahjong trigger was not restored'; end if;
+  if exists(select 1 from mahjong_clash.economy_state where singleton and (water<>0 or strength<>'normal' or risk<>'normal')) then raise exception 'MAHJONG_CLEAR_INCOMPLETE' using detail='economy_state'; end if;
+  if exists(select 1 from pg_trigger where tgrelid in (select oid from pg_class where relnamespace='mahjong_clash'::regnamespace) and not tgisinternal and tgenabled<>'O') then raise exception 'MAHJONG_CLEAR_TRIGGER_NOT_RESTORED'; end if;
 end $$;
+select public.joy8_validate_product_adapters();
 commit;

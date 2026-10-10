@@ -158,11 +158,6 @@ Vite declares these entries in `vite.config.js`.
 
 Unapproved SQL belongs in `supabase/drafts/`, which is excluded from migration discovery.
 
-`supabase/drafts/20261001000100_mahjong_single_hand_reset.sql` is a pending
-Mahjong data reset awaiting individual migration approval; its scope and checks
-are owned by
-`D:/Studio/Project-Gaming/production/table/products/mahjong-clash/docs/DEPLOYMENT.md`.
-
 ## Runtime Flows
 
 `src/styles/tokens.css` owns the shared font and palette. Loader and error-modal
